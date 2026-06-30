@@ -79,14 +79,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Blue Collar AI" },
+      { name: "description", content: "Tip and reputation platform for towing companies and field service teams — collect ratings, tips, and reviews from one QR code." },
+      { name: "author", content: "Blue Collar AI" },
+      { property: "og:title", content: "Blue Collar AI" },
+      { property: "og:description", content: "Tip and reputation platform for towing companies and field service teams — collect ratings, tips, and reviews from one QR code." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {

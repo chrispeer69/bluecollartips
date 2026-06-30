@@ -10,7 +10,13 @@ import { sendTipLinkSms } from "@/lib/sms.functions";
 import { confirmCashTip, disputeCashTip, listUnverifiedTips } from "@/lib/reconciliation.functions";
 
 export const Route = createFileRoute("/dashboard/driver")({
-  head: () => ({ meta: [{ title: "My dashboard — Blue Collar AI" }] }),
+  head: () => ({
+    meta: [
+      { title: "My dashboard — Blue Collar AI" },
+      { name: "description", content: "View your ratings, track tips, share your QR code, and log cash or P2P tips from your Blue Collar AI driver dashboard." },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
   component: DriverDashboard,
 });
 

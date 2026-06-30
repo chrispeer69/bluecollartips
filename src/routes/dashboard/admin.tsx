@@ -21,7 +21,13 @@ import { platformOverview, suspendTenant } from "@/lib/platform.functions";
 import { sendTipLinkSms } from "@/lib/sms.functions";
 
 export const Route = createFileRoute("/dashboard/admin")({
-  head: () => ({ meta: [{ title: "Admin — Blue Collar AI" }] }),
+  head: () => ({
+    meta: [
+      { title: "Admin — Blue Collar AI" },
+      { name: "description", content: "Manage drivers, branding, invites, and tip reconciliation for your company on Blue Collar AI." },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
   component: AdminDashboard,
 });
 

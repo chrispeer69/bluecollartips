@@ -39,9 +39,17 @@ function AdminDashboard() {
       navigate({ to: "/auth" });
       return;
     }
-    const d = await get({ data: { companyId: id } });
+    let effectiveId = id;
+    if (!effectiveId && import.meta.env.DEV) {
+      const stored = typeof window !== "undefined" ? localStorage.getItem("devTenantId") : null;
+      if (stored) effectiveId = stored;
+    }
+    const d = await get({ data: { companyId: effectiveId } });
     setData(d);
     if (d.company) setCompanyId(d.company.id);
+    if (import.meta.env.DEV && d.company) {
+      try { localStorage.setItem("devTenantId", d.company.id); } catch { /* ignore */ }
+    }
     setLoading(false);
   }
   useEffect(() => {

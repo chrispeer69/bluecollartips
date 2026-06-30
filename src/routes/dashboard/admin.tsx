@@ -12,6 +12,10 @@ import {
 } from "@/lib/admin.functions";
 import { dollars } from "@/lib/constants";
 import { Section, Stat, TopBar } from "./driver";
+import { createInvite, listInvites, revokeInvite } from "@/lib/invites.functions";
+import { reconciliationOverview } from "@/lib/reconciliation.functions";
+import { platformOverview, suspendTenant } from "@/lib/platform.functions";
+import { sendTipLinkSms } from "@/lib/sms.functions";
 
 export const Route = createFileRoute("/dashboard/admin")({
   head: () => ({ meta: [{ title: "Admin — Blue Collar AI" }] }),
@@ -162,6 +166,24 @@ function AdminDashboard() {
             }}
           />
         </Section>
+
+        <Section title="Invites">
+          <InvitesPanel companyId={data.company.id} />
+        </Section>
+
+        <Section title="Reconciliation (last 30 days)">
+          <ReconciliationPanel companyId={data.company.id} drivers={data.drivers} />
+        </Section>
+
+        <Section title="SMS a tip link to a customer">
+          <AdminSmsPanel drivers={data.drivers} />
+        </Section>
+
+        {data.isSuper && (
+          <Section title="Platform overview (super admin)">
+            <PlatformPanel />
+          </Section>
+        )}
       </div>
     </div>
   );

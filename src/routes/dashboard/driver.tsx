@@ -358,6 +358,152 @@ export function Stat({ label, value, hint }: { label: string; value: string; hin
     </div>
   );
 }
+
+function StripePanel({ driverId, stripeEnabled }: { driverId: string; stripeEnabled: boolean }) {
+  void driverId;
+  const onboard = useServerFn(createDriverOnboardingLink);
+  const refresh = useServerFn(refreshStripeStatus);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  return (
+    <Section title="Card tips (Stripe)">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <div>
+          Status:{" "}
+          <span className={stripeEnabled ? "font-medium text-emerald-600" : "text-muted-foreground"}>
+            {stripeEnabled ? "Ready to accept cards" : "Not connected"}
+          </span>
+        </div>
+        <div className="flex gap-2">
+          <button
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setMsg(null);
+              try {
+                const r = await onboard({ data: { returnUrl: window.location.href } });
+                window.location.href = r.url;
+              } catch (e) {
+                setMsg(e instanceof Error ? e.message : "Stripe not configured");
+              } finally {
+                setBusy(false);
+              }
+            }}
+            className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground disabled:opacity-50"
+          >
+            {stripeEnabled ? "Update payout info" : "Connect Stripe"}
+          </button>
+          <button
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const r = await refresh();
+                setMsg(r.enabled ? "Refreshed." : "Stripe is not configured by the platform yet.");
+              } finally {
+                setBusy(false);
+              }
+            }}
+            className="rounded-md border border-border px-3 py-1.5 text-sm"
+          >
+            Refresh status
+          </button>
+        </div>
+      </div>
+      {msg && <p className="mt-2 text-xs text-muted-foreground">{msg}</p>}
+    </Section>
+  );
+}
+
+function SmsPanel({ driverId }: { driverId: string }) {
+  const send = useServerFn(sendTipLinkSms);
+  const [phone, setPhone] = useState("");
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  return (
+    <Section title="Text my tip link to a customer">
+      <form
+        className="flex flex-wrap items-end gap-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          setMsg(null);
+          try {
+            const r = await send({ data: { driverId, toPhone: phone, customerName: name || null } });
+            setMsg(r.status === "sent" ? "Sent ✓" : r.status === "skipped" ? r.error : `Status: ${r.status}${r.error ? " — " + r.error : ""}`);
+            setPhone("");
+            setName("");
+          } catch (e) {
+            setMsg(e instanceof Error ? e.message : "Could not send");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <label className="text-sm">
+          Customer phone
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} required placeholder="(555) 555-0100" className="mt-1 w-56 rounded-md border border-input bg-background px-3 py-2 text-sm" />
+        </label>
+        <label className="text-sm">
+          Name (optional)
+          <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-48 rounded-md border border-input bg-background px-3 py-2 text-sm" />
+        </label>
+        <button disabled={busy} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">
+          {busy ? "Sending…" : "Send SMS"}
+        </button>
+      </form>
+      {msg && <p className="mt-2 text-xs text-muted-foreground">{msg}</p>}
+    </Section>
+  );
+}
+
+function UnverifiedPanel({ onChange }: { onChange: () => void }) {
+  const list = useServerFn(listUnverifiedTips);
+  const confirm = useServerFn(confirmCashTip);
+  const dispute = useServerFn(disputeCashTip);
+  const [items, setItems] = useState<Awaited<ReturnType<typeof listUnverifiedTips>>["items"]>([]);
+  const reload = async () => setItems((await list()).items);
+  useEffect(() => {
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (!items.length) return null;
+  return (
+    <Section title="Cash / P2P tips to verify">
+      <p className="mb-2 text-xs text-muted-foreground">
+        Confirm tips you actually received so your earnings reconcile. Disputed tips notify your admin.
+      </p>
+      <ul className="divide-y divide-border text-sm">
+        {items.map((t) => (
+          <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+            <div>
+              <span className="font-medium">{dollars(t.amount_cents)}</span>{" "}
+              <span className="capitalize text-muted-foreground">{t.source}</span>{" "}
+              {t.customer_name && <span className="text-xs text-muted-foreground">· {t.customer_name}</span>}
+              <div className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleString()}</div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => { await confirm({ data: { tipId: t.id } }); await reload(); onChange(); }}
+                className="rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground"
+              >
+                Confirm
+              </button>
+              <button
+                onClick={async () => { const r = window.prompt("Why dispute this?") ?? undefined; await dispute({ data: { tipId: t.id, reason: r } }); await reload(); onChange(); }}
+                className="rounded-md border border-border px-3 py-1 text-xs"
+              >
+                Dispute
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
+}
+
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border border-border bg-card p-5">

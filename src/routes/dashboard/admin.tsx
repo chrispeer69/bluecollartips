@@ -9,6 +9,8 @@ import {
   resolveFlag,
   setDriverStatus,
   updateCompanyBranding,
+  getThankYouTemplates,
+  updateThankYouTemplates,
 } from "@/lib/admin.functions";
 import { dollars } from "@/lib/constants";
 import { Section, Stat, TopBar } from "./driver";
@@ -150,6 +152,10 @@ function AdminDashboard() {
               await load(companyId);
             }}
           />
+        </Section>
+
+        <Section title="Automatic thank-you messages">
+          <ThankYouTemplatesPanel companyId={data.company.id} />
         </Section>
 
         <Section title="Recent ratings & feedback">

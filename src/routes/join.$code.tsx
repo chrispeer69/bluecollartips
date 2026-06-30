@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
+import { createFileRoute, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { peekInvite } from "@/lib/invites.functions";
@@ -11,7 +11,6 @@ export const Route = createFileRoute("/join/$code")({
 function JoinPage() {
   const { code } = useParams({ from: "/join/$code" });
   const peek = useServerFn(peekInvite);
-  const navigate = useNavigate();
   const [state, setState] = useState<Awaited<ReturnType<typeof peekInvite>> | null>(null);
 
   useEffect(() => {
@@ -51,12 +50,12 @@ function JoinPage() {
         </div>
       </div>
       <div className="mx-auto max-w-md p-6">
-        <button
-          className="w-full rounded-md bg-primary px-4 py-3 text-base font-semibold text-primary-foreground"
-          onClick={() => navigate({ to: "/auth", search: { invite: code, email: state.email ?? undefined } })}
+        <a
+          href={`/auth?invite=${encodeURIComponent(code)}${state.email ? `&email=${encodeURIComponent(state.email)}` : ""}`}
+          className="block w-full rounded-md bg-primary px-4 py-3 text-center text-base font-semibold text-primary-foreground"
         >
           Create your account
-        </button>
+        </a>
         <p className="mt-3 text-center text-xs text-muted-foreground">
           Already signed up? You can also sign in and enter invite code <span className="font-mono">{code}</span> from the dashboard.
         </p>

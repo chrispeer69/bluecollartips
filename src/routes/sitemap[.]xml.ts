@@ -28,14 +28,14 @@ export const Route = createFileRoute("/sitemap.xml")({
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const { data: drivers } = await supabaseAdmin
             .from("drivers")
-            .select("slug, updated_at, companies!inner(slug, status)")
+            .select("slug, created_at, companies!inner(slug, status)")
             .eq("status", "active");
           for (const d of drivers ?? []) {
             const company = (d as { companies: { slug: string; status: string | null } | null }).companies;
             if (!company || !company.slug) continue;
             if (company.status && company.status !== "active") continue;
             const driverSlug = (d as { slug: string }).slug;
-            const updatedAt = (d as { updated_at: string | null }).updated_at;
+            const updatedAt = (d as { created_at: string | null }).created_at;
             entries.push({
               path: `/${company.slug}/d/${driverSlug}`,
               lastmod: updatedAt ? new Date(updatedAt).toISOString().slice(0, 10) : undefined,

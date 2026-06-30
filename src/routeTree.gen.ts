@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as JoinCodeRouteImport } from './routes/join.$code'
+import { Route as GuidesTipPoolingRouteImport } from './routes/guides.tip-pooling'
 import { Route as DashboardDriverRouteImport } from './routes/dashboard/driver'
 import { Route as DashboardAdminRouteImport } from './routes/dashboard/admin'
 import { Route as CompanySlugDDriverSlugRouteImport } from './routes/$companySlug/d/$driverSlug'
@@ -44,6 +45,11 @@ const JoinCodeRoute = JoinCodeRouteImport.update({
   path: '/join/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GuidesTipPoolingRoute = GuidesTipPoolingRouteImport.update({
+  id: '/guides/tip-pooling',
+  path: '/guides/tip-pooling',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardDriverRoute = DashboardDriverRouteImport.update({
   id: '/dashboard/driver',
   path: '/dashboard/driver',
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/dashboard/admin': typeof DashboardAdminRoute
   '/dashboard/driver': typeof DashboardDriverRoute
+  '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/dashboard/admin': typeof DashboardAdminRoute
   '/dashboard/driver': typeof DashboardDriverRoute
+  '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
   '/dashboard': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/dashboard/admin': typeof DashboardAdminRoute
   '/dashboard/driver': typeof DashboardDriverRoute
+  '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/dashboard/admin'
     | '/dashboard/driver'
+    | '/guides/tip-pooling'
     | '/join/$code'
     | '/dashboard/'
     | '/$companySlug/d/$driverSlug'
@@ -118,6 +128,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/dashboard/admin'
     | '/dashboard/driver'
+    | '/guides/tip-pooling'
     | '/join/$code'
     | '/dashboard'
     | '/$companySlug/d/$driverSlug'
@@ -129,6 +140,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/dashboard/admin'
     | '/dashboard/driver'
+    | '/guides/tip-pooling'
     | '/join/$code'
     | '/dashboard/'
     | '/$companySlug/d/$driverSlug'
@@ -141,6 +153,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   DashboardAdminRoute: typeof DashboardAdminRoute
   DashboardDriverRoute: typeof DashboardDriverRoute
+  GuidesTipPoolingRoute: typeof GuidesTipPoolingRoute
   JoinCodeRoute: typeof JoinCodeRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   CompanySlugDDriverSlugRoute: typeof CompanySlugDDriverSlugRoute
@@ -184,6 +197,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JoinCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/guides/tip-pooling': {
+      id: '/guides/tip-pooling'
+      path: '/guides/tip-pooling'
+      fullPath: '/guides/tip-pooling'
+      preLoaderRoute: typeof GuidesTipPoolingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard/driver': {
       id: '/dashboard/driver'
       path: '/dashboard/driver'
@@ -221,6 +241,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   DashboardAdminRoute: DashboardAdminRoute,
   DashboardDriverRoute: DashboardDriverRoute,
+  GuidesTipPoolingRoute: GuidesTipPoolingRoute,
   JoinCodeRoute: JoinCodeRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   CompanySlugDDriverSlugRoute: CompanySlugDDriverSlugRoute,

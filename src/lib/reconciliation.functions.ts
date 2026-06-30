@@ -46,10 +46,12 @@ export const confirmCashTip = createServerFn({ method: "POST" })
       .update({ verified: true, verified_at: new Date().toISOString() })
       .eq("id", tip.id);
     await supabaseAdmin.from("cash_tip_verifications").insert({
+      company_id: tip.company_id,
       tip_id: tip.id,
       driver_id: tip.driver_id,
       confirmed_by: context.userId,
       confirmed_amount_cents: tip.amount_cents,
+      outcome: "confirmed",
     });
     return { ok: true };
   });

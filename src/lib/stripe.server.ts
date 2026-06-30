@@ -9,7 +9,7 @@ export function getStripe(): Stripe | null {
     _stripe = null;
     return null;
   }
-  _stripe = new Stripe(key, { apiVersion: "2024-12-18.acacia" as Stripe.LatestApiVersion });
+  _stripe = new Stripe(key);
   return _stripe;
 }
 

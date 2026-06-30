@@ -21,6 +21,7 @@ function DriverDashboard() {
   const getDash = useServerFn(getDriverDashboard);
   const [data, setData] = useState<DashData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showQR, setShowQR] = useState(false);
 
   const load = async () => {
     const { data: session } = await supabase.auth.getSession();
@@ -99,14 +100,22 @@ function DriverDashboard() {
                 <button onClick={downloadQR} className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground">
                   Download QR (PNG)
                 </button>
+                <button
+                  onClick={() => setShowQR(true)}
+                  className="rounded-md bg-secondary px-3 py-2 text-sm text-secondary-foreground"
+                >
+                  Show QR fullscreen
+                </button>
               </div>
               <p className="mt-3 text-xs text-muted-foreground">
-                Print this on a business card, sticker, or clipboard. SMS send is coming in the
-                next phase.
+                Print it on a card or sticker, hold your phone up for the customer to scan,
+                or text them the link below.
               </p>
             </div>
           </div>
         </Section>
+
+        {showQR && <FullscreenQR url={tipUrl} onClose={() => setShowQR(false)} />}
 
         <LogTipPanel onLogged={load} />
 
@@ -152,6 +161,39 @@ function downloadQR() {
   a.href = url;
   a.download = "tip-qr.png";
   a.click();
+}
+
+function FullscreenQR({ url, onClose }: { url: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    const prevBrightness = document.body.style.filter;
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.filter = prevBrightness;
+    };
+  }, [onClose]);
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-white p-6"
+    >
+      <div className="rounded-xl bg-white p-4 shadow-2xl">
+        <QRCodeCanvas value={url} size={Math.min(420, typeof window !== "undefined" ? window.innerWidth - 64 : 320)} includeMargin />
+      </div>
+      <div className="max-w-[90vw] break-all text-center text-sm text-neutral-700">{url}</div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        className="rounded-md bg-neutral-900 px-5 py-2 text-sm text-white"
+      >
+        Close
+      </button>
+      <p className="text-xs text-neutral-500">Tap anywhere to close. Turn brightness up for best scanning.</p>
+    </div>
+  );
 }
 
 function LogTipPanel({ onLogged }: { onLogged: () => void }) {

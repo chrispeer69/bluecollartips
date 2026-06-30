@@ -21,6 +21,32 @@ export const Route = createFileRoute("/sitemap.xml")({
           { path: "/guides/fica-tip-credit", changefreq: "monthly", priority: "0.8" },
         ];
 
+        // Dynamic public driver pages: /:companySlug/d/:driverSlug
+        // Private routes (/dashboard/*, /join/:code) are intentionally excluded —
+        // they're noindex and disallowed in robots.txt.
+        try {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const { data: drivers } = await supabaseAdmin
+            .from("drivers")
+            .select("slug, created_at, companies!inner(slug, status)")
+            .eq("status", "active");
+          for (const d of drivers ?? []) {
+            const company = (d as { companies: { slug: string; status: string | null } | null }).companies;
+            if (!company || !company.slug) continue;
+            if (company.status && company.status !== "active") continue;
+            const driverSlug = (d as { slug: string }).slug;
+            const updatedAt = (d as { created_at: string | null }).created_at;
+            entries.push({
+              path: `/${company.slug}/d/${driverSlug}`,
+              lastmod: updatedAt ? new Date(updatedAt).toISOString().slice(0, 10) : undefined,
+              changefreq: "weekly",
+              priority: "0.7",
+            });
+          }
+        } catch {
+          // If the DB lookup fails, still return the static entries above.
+        }
+
         const urls = entries.map((e) =>
           [
             `  <url>`,

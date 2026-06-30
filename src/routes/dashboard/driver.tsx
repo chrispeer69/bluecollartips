@@ -21,6 +21,7 @@ function DriverDashboard() {
   const getDash = useServerFn(getDriverDashboard);
   const [data, setData] = useState<DashData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showQR, setShowQR] = useState(false);
 
   const load = async () => {
     const { data: session } = await supabase.auth.getSession();
@@ -99,14 +100,22 @@ function DriverDashboard() {
                 <button onClick={downloadQR} className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground">
                   Download QR (PNG)
                 </button>
+                <button
+                  onClick={() => setShowQR(true)}
+                  className="rounded-md bg-secondary px-3 py-2 text-sm text-secondary-foreground"
+                >
+                  Show QR fullscreen
+                </button>
               </div>
               <p className="mt-3 text-xs text-muted-foreground">
-                Print this on a business card, sticker, or clipboard. SMS send is coming in the
-                next phase.
+                Print it on a card or sticker, hold your phone up for the customer to scan,
+                or text them the link below.
               </p>
             </div>
           </div>
         </Section>
+
+        {showQR && <FullscreenQR url={tipUrl} onClose={() => setShowQR(false)} />}
 
         <LogTipPanel onLogged={load} />
 

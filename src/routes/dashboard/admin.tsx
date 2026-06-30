@@ -750,3 +750,103 @@ function PlatformPanel() {
     </div>
   );
 }
+
+function ThankYouTemplatesPanel({ companyId }: { companyId: string }) {
+  const get = useServerFn(getThankYouTemplates);
+  const save = useServerFn(updateThankYouTemplates);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [enabled, setEnabled] = useState(true);
+  const [sms, setSms] = useState("");
+  const [subject, setSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    get({ data: { companyId } }).then((r) => {
+      if (r) {
+        setEnabled(r.thank_you_enabled);
+        setSms(r.thank_you_sms_template);
+        setSubject(r.thank_you_email_subject);
+        setEmailBody(r.thank_you_email_template);
+      }
+      setLoading(false);
+    });
+  }, [companyId, get]);
+
+  if (loading) return <div className="text-sm text-muted-foreground">Loading templates…</div>;
+
+  return (
+    <form
+      className="space-y-3"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        setSaved(false);
+        try {
+          await save({
+            data: {
+              companyId,
+              enabled,
+              smsTemplate: sms,
+              emailSubject: subject,
+              emailTemplate: emailBody,
+            },
+          });
+          setSaved(true);
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <p className="text-xs text-muted-foreground">
+        Sent automatically when a customer leaves a rating and provides a phone or email.
+        Available placeholders: <code>{"{{customer_name}}"}</code>, <code>{"{{driver_name}}"}</code>,
+        <code>{"{{company_name}}"}</code>, <code>{"{{stars}}"}</code>, <code>{"{{tip_amount}}"}</code>,
+        <code>{"{{tip_line}}"}</code>.
+      </p>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+        Send thank-you messages
+      </label>
+      <div>
+        <div className="text-sm font-medium">SMS template</div>
+        <textarea
+          rows={3}
+          value={sms}
+          onChange={(e) => setSms(e.target.value)}
+          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          maxLength={800}
+        />
+      </div>
+      <div>
+        <div className="text-sm font-medium">Email subject</div>
+        <input
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          maxLength={200}
+        />
+      </div>
+      <div>
+        <div className="text-sm font-medium">Email body</div>
+        <textarea
+          rows={6}
+          value={emailBody}
+          onChange={(e) => setEmailBody(e.target.value)}
+          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          maxLength={4000}
+        />
+      </div>
+      <div className="flex items-center gap-3">
+        <button
+          disabled={busy}
+          className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
+        >
+          {busy ? "Saving…" : "Save templates"}
+        </button>
+        {saved && <span className="text-xs text-muted-foreground">Saved.</span>}
+      </div>
+    </form>
+  );
+}

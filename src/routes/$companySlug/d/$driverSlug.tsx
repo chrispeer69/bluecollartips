@@ -300,15 +300,7 @@ function TipPage() {
 
           {finalTipCents > 0 && (
             <>
-              <label className="mt-5 block text-sm font-medium">Your name (optional)</label>
-              <input
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                maxLength={120}
-              />
-
-              <div className="mt-5 text-sm font-medium">Payment method</div>
+              <div className="mt-2 text-sm font-medium">Payment method</div>
               <button
                 type="button"
                 onClick={() => setTipSource("stripe")}

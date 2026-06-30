@@ -208,6 +208,39 @@ function TipPage() {
             maxLength={2000}
             placeholder="Optional"
           />
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium">Your name (optional)</label>
+              <input
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                maxLength={120}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Phone (for a thank-you text)</label>
+              <input
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                placeholder="(555) 123-4567"
+                maxLength={40}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium">Email (for a thank-you email)</label>
+              <input
+                type="email"
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                placeholder="you@example.com"
+                maxLength={200}
+              />
+            </div>
+          </div>
         </section>
 
         <section className="mt-5 rounded-xl border border-border bg-card p-5">

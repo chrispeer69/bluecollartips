@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getPublicDriver, submitRating } from "@/lib/public.functions";
 import { PRESET_TIPS, TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib/constants";
+import { StripeCardPanel } from "@/components/StripeCardPanel";
 
 export const Route = createFileRoute("/$companySlug/d/$driverSlug")({
   head: () => ({
@@ -110,6 +111,11 @@ function TipPage() {
     }
     if (!tipValid) {
       setError(`Tip must be between ${dollars(TIP_MIN_CENTS)} and ${dollars(TIP_MAX_CENTS)}.`);
+      return;
+    }
+    // Stripe card path: rating must be submitted first; webhook records the tip when payment succeeds.
+    if (finalTipCents > 0 && tipSource === "stripe") {
+      setError("Tap the blue Pay-by-card button above to finish your tip.");
       return;
     }
     setSubmitting(true);
@@ -268,13 +274,42 @@ function TipPage() {
               <div className="mt-5 text-sm font-medium">Payment method</div>
               <button
                 type="button"
-                disabled
-                className="mt-2 w-full rounded-md px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
-                style={{ background: brand.secondary }}
-                title="In-app card payments arrive once Stripe Connect is wired"
+                onClick={() => setTipSource("stripe")}
+                className="mt-2 w-full rounded-md px-4 py-3 text-sm font-semibold text-white"
+                style={{
+                  background: tipSource === "stripe" ? brand.primary : brand.secondary,
+                  outline: tipSource === "stripe" ? `2px solid ${brand.primary}` : undefined,
+                }}
               >
-                Card / Apple Pay / Google Pay — coming soon
+                Card / Apple Pay / Google Pay
               </button>
+              {tipSource === "stripe" && (
+                <StripeCardPanel
+                  companySlug={companySlug}
+                  driverSlug={driverSlug}
+                  amountCents={finalTipCents}
+                  customerName={customerName || null}
+                  brandColor={brand.primary}
+                  onPaid={async () => {
+                    if (stars) {
+                      try {
+                        await submit({
+                          data: {
+                            companySlug,
+                            driverSlug,
+                            stars,
+                            feedback: feedback.trim() || null,
+                            customerName: customerName.trim() || null,
+                            tipCents: null,
+                            tipSource: null,
+                          },
+                        });
+                      } catch { /* rating optional after payment */ }
+                    }
+                    setDone(true);
+                  }}
+                />
+              )}
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {(
                   [

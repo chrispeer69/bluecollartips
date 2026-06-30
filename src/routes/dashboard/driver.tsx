@@ -163,6 +163,39 @@ function downloadQR() {
   a.click();
 }
 
+function FullscreenQR({ url, onClose }: { url: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    const prevBrightness = document.body.style.filter;
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.filter = prevBrightness;
+    };
+  }, [onClose]);
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-white p-6"
+    >
+      <div className="rounded-xl bg-white p-4 shadow-2xl">
+        <QRCodeCanvas value={url} size={Math.min(420, typeof window !== "undefined" ? window.innerWidth - 64 : 320)} includeMargin />
+      </div>
+      <div className="max-w-[90vw] break-all text-center text-sm text-neutral-700">{url}</div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        className="rounded-md bg-neutral-900 px-5 py-2 text-sm text-white"
+      >
+        Close
+      </button>
+      <p className="text-xs text-neutral-500">Tap anywhere to close. Turn brightness up for best scanning.</p>
+    </div>
+  );
+}
+
 function LogTipPanel({ onLogged }: { onLogged: () => void }) {
   const logTip = useServerFn(logManualTip);
   const [amount, setAmount] = useState("");

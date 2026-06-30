@@ -7,11 +7,13 @@ import { z } from "zod";
 export const getMyRoleContext = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { data: roles } = await supabase
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: roles } = await supabaseAdmin
       .from("user_roles")
-      .select("role, company_id");
-    const { data: driver } = await supabase
+      .select("role, company_id")
+      .eq("user_id", userId);
+    const { data: driver } = await supabaseAdmin
       .from("drivers")
       .select("id, slug, status, company_id, display_name, photo_url, companies(slug, name, primary_color, secondary_color, logo_url)")
       .eq("user_id", userId)

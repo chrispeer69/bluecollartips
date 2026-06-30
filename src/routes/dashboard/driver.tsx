@@ -5,6 +5,9 @@ import { QRCodeCanvas } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { getDriverDashboard, logManualTip } from "@/lib/driver.functions";
 import { PRESET_TIPS, SPLIT, TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib/constants";
+import { createDriverOnboardingLink, refreshStripeStatus } from "@/lib/stripe.functions";
+import { sendTipLinkSms } from "@/lib/sms.functions";
+import { confirmCashTip, disputeCashTip, listUnverifiedTips } from "@/lib/reconciliation.functions";
 
 export const Route = createFileRoute("/dashboard/driver")({
   head: () => ({ meta: [{ title: "My dashboard — Blue Collar AI" }] }),
@@ -106,6 +109,12 @@ function DriverDashboard() {
         </Section>
 
         <LogTipPanel onLogged={load} />
+
+        <StripePanel driverId={data.driver.id} stripeEnabled={!!data.driver.stripe_charges_enabled} />
+
+        <SmsPanel driverId={data.driver.id} />
+
+        <UnverifiedPanel onChange={load} />
 
         <Section title="Recent tips">
           <TipsTable tips={data.tips} />

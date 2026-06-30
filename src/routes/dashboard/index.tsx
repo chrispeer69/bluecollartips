@@ -5,7 +5,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { getMyRoleContext } from "@/lib/auth.functions";
 
 export const Route = createFileRoute("/dashboard/")({
-  head: () => ({ meta: [{ title: "Dashboard — Blue Collar AI" }] }),
+  head: () => ({
+    meta: [
+      { title: "Dashboard — Blue Collar AI" },
+      { name: "description", content: "Sign in to your Blue Collar AI dashboard to view ratings, tips, and team activity for your towing or service company." },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
   component: DashboardRouter,
 });
 

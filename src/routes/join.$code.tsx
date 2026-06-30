@@ -4,7 +4,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { peekInvite } from "@/lib/invites.functions";
 
 export const Route = createFileRoute("/join/$code")({
-  head: () => ({ meta: [{ title: "Join — Blue Collar AI" }] }),
+  head: () => ({
+    meta: [
+      { title: "Join — Blue Collar AI" },
+      { name: "description", content: "Accept your invite to join your company on Blue Collar AI and start collecting ratings and tips from customers." },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
   component: JoinPage,
 });
 

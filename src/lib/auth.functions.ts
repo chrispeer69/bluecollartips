@@ -24,7 +24,7 @@ export const claimRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ inviteCode: z.string().trim().max(64).optional() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+    const { userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     if (data.inviteCode) {
@@ -73,6 +73,3 @@ export const claimRole = createServerFn({ method: "POST" })
       "No invite code provided. Ask your company admin for one, or contact Blue Collar AI.",
     );
   });
-
-// Suppress unused import warning for supabase in handlers that only need userId
-void (async () => {})();

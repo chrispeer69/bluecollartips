@@ -31,7 +31,7 @@ export const confirmCashTip = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: tip } = await supabaseAdmin
       .from("tips")
-      .select("id, driver_id, amount_cents")
+      .select("id, driver_id, amount_cents, company_id")
       .eq("id", data.tipId)
       .maybeSingle();
     if (!tip) throw new Error("Not found");

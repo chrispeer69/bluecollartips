@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { QRCodeCanvas } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createCompany,
@@ -250,6 +251,7 @@ function DriverRoster({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [empId, setEmpId] = useState("");
+  const [qrFor, setQrFor] = useState<{ name: string; url: string } | null>(null);
   return (
     <>
       <div className="mb-3 flex justify-end">
@@ -321,6 +323,18 @@ function DriverRoster({
                     <td className="text-right">{avg}</td>
                     <td className="text-right">{dollars(tipsByDriver.get(d.id) ?? 0)}</td>
                     <td className="text-right">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setQrFor({
+                            name: d.display_name,
+                            url: `${window.location.origin}/${companySlug}/d/${d.slug}`,
+                          })
+                        }
+                        className="mr-2 rounded-md border border-border px-2 py-1 text-xs"
+                      >
+                        QR / Link
+                      </button>
                       <select
                         value={d.status}
                         onChange={(e) => onStatus(d.id, e.target.value as "pending" | "active" | "deactivated")}
@@ -338,7 +352,67 @@ function DriverRoster({
           </table>
         </div>
       )}
+      {qrFor && <DriverQRModal driverName={qrFor.name} url={qrFor.url} onClose={() => setQrFor(null)} />}
     </>
+  );
+}
+
+function DriverQRModal({ driverName, url, onClose }: { driverName: string; url: string; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const download = () => {
+    const canvas = document.getElementById("admin-driver-qr") as HTMLCanvasElement | null;
+    if (!canvas) return;
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL("image/png");
+    a.download = `${driverName.replace(/\s+/g, "-").toLowerCase()}-tip-qr.png`;
+    a.click();
+  };
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md rounded-lg bg-card p-6 shadow-2xl"
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-semibold">{driverName} — Tip link</h3>
+          <button onClick={onClose} className="text-sm text-muted-foreground hover:text-foreground">✕</button>
+        </div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="rounded-lg bg-white p-4">
+            <QRCodeCanvas id="admin-driver-qr" value={url} size={240} includeMargin />
+          </div>
+          <div className="w-full break-all rounded-md bg-muted px-3 py-2 text-xs">{url}</div>
+          <div className="flex flex-wrap justify-center gap-2">
+            <button
+              onClick={async () => {
+                await navigator.clipboard.writeText(url);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
+              className="rounded-md border border-border bg-card px-3 py-2 text-sm"
+            >
+              {copied ? "Copied ✓" : "Copy link"}
+            </button>
+            <button onClick={download} className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground">
+              Download QR (PNG)
+            </button>
+            <a
+              href={`sms:?&body=${encodeURIComponent(`Thanks for choosing us! Rate & tip your driver: ${url}`)}`}
+              className="rounded-md bg-secondary px-3 py-2 text-sm text-secondary-foreground"
+            >
+              Open in Messages
+            </a>
+          </div>
+          <p className="text-center text-xs text-muted-foreground">
+            Print, email, or text this link. Use the SMS panel below to send through the platform
+            (logs delivery and thank-you flow).
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 

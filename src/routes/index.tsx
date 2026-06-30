@@ -72,6 +72,12 @@ function Index() {
           >
             Tip pooling guide
           </Link>
+          <Link
+            to="/guides/fica-tip-credit"
+            className="rounded-md border border-border bg-card px-6 py-3 font-medium hover:bg-muted"
+          >
+            FICA tip credit guide
+          </Link>
         </div>
 
         <div id="how" className="mt-24 grid gap-6 md:grid-cols-3">

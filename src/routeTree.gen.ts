@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as JoinCodeRouteImport } from './routes/join.$code'
 import { Route as GuidesTipPoolingRouteImport } from './routes/guides.tip-pooling'
+import { Route as GuidesFicaTipCreditRouteImport } from './routes/guides.fica-tip-credit'
 import { Route as DashboardDriverRouteImport } from './routes/dashboard/driver'
 import { Route as DashboardAdminRouteImport } from './routes/dashboard/admin'
 import { Route as CompanySlugDDriverSlugRouteImport } from './routes/$companySlug/d/$driverSlug'
@@ -50,6 +51,11 @@ const GuidesTipPoolingRoute = GuidesTipPoolingRouteImport.update({
   path: '/guides/tip-pooling',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GuidesFicaTipCreditRoute = GuidesFicaTipCreditRouteImport.update({
+  id: '/guides/fica-tip-credit',
+  path: '/guides/fica-tip-credit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardDriverRoute = DashboardDriverRouteImport.update({
   id: '/dashboard/driver',
   path: '/dashboard/driver',
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/dashboard/admin': typeof DashboardAdminRoute
   '/dashboard/driver': typeof DashboardDriverRoute
+  '/guides/fica-tip-credit': typeof GuidesFicaTipCreditRoute
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/dashboard/admin': typeof DashboardAdminRoute
   '/dashboard/driver': typeof DashboardDriverRoute
+  '/guides/fica-tip-credit': typeof GuidesFicaTipCreditRoute
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/dashboard/admin': typeof DashboardAdminRoute
   '/dashboard/driver': typeof DashboardDriverRoute
+  '/guides/fica-tip-credit': typeof GuidesFicaTipCreditRoute
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/dashboard/admin'
     | '/dashboard/driver'
+    | '/guides/fica-tip-credit'
     | '/guides/tip-pooling'
     | '/join/$code'
     | '/dashboard/'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/dashboard/admin'
     | '/dashboard/driver'
+    | '/guides/fica-tip-credit'
     | '/guides/tip-pooling'
     | '/join/$code'
     | '/dashboard'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/dashboard/admin'
     | '/dashboard/driver'
+    | '/guides/fica-tip-credit'
     | '/guides/tip-pooling'
     | '/join/$code'
     | '/dashboard/'
@@ -153,6 +165,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   DashboardAdminRoute: typeof DashboardAdminRoute
   DashboardDriverRoute: typeof DashboardDriverRoute
+  GuidesFicaTipCreditRoute: typeof GuidesFicaTipCreditRoute
   GuidesTipPoolingRoute: typeof GuidesTipPoolingRoute
   JoinCodeRoute: typeof JoinCodeRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
@@ -204,6 +217,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GuidesTipPoolingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/guides/fica-tip-credit': {
+      id: '/guides/fica-tip-credit'
+      path: '/guides/fica-tip-credit'
+      fullPath: '/guides/fica-tip-credit'
+      preLoaderRoute: typeof GuidesFicaTipCreditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard/driver': {
       id: '/dashboard/driver'
       path: '/dashboard/driver'
@@ -241,6 +261,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   DashboardAdminRoute: DashboardAdminRoute,
   DashboardDriverRoute: DashboardDriverRoute,
+  GuidesFicaTipCreditRoute: GuidesFicaTipCreditRoute,
   GuidesTipPoolingRoute: GuidesTipPoolingRoute,
   JoinCodeRoute: JoinCodeRoute,
   DashboardIndexRoute: DashboardIndexRoute,

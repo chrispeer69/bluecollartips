@@ -82,7 +82,7 @@ function Index() {
             },
           ].map((s) => (
             <div key={s.t} className="rounded-lg border border-border bg-card p-6">
-              <h3 className="font-semibold">{s.t}</h3>
+              <h2 className="font-semibold">{s.t}</h2>
               <p className="mt-2 text-sm text-muted-foreground">{s.d}</p>
             </div>
           ))}

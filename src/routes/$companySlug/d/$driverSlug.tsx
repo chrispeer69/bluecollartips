@@ -293,6 +293,9 @@ function TipPage() {
                   driverSlug={driverSlug}
                   amountCents={finalTipCents}
                   customerName={customerName || null}
+                customerPhone={customerPhone || null}
+                customerEmail={customerEmail || null}
+                stars={stars || null}
                   brandColor={brand.primary}
                   onPaid={async () => {
                     if (stars) {
@@ -304,6 +307,8 @@ function TipPage() {
                             stars,
                             feedback: feedback.trim() || null,
                             customerName: customerName.trim() || null,
+                          customerPhone: customerPhone.trim() || null,
+                          customerEmail: customerEmail.trim() || null,
                             tipCents: null,
                             tipSource: null,
                           },

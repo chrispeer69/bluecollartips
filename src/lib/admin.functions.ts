@@ -240,3 +240,48 @@ export const createCompany = createServerFn({ method: "POST" })
     });
     return { ok: true, companyId: company.id, slug: company.slug, inviteCode: code };
   });
+
+export const getThankYouTemplates = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertCompanyAdmin(context.userId, data.companyId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row } = await supabaseAdmin
+      .from("companies")
+      .select(
+        "thank_you_enabled, thank_you_sms_template, thank_you_email_subject, thank_you_email_template",
+      )
+      .eq("id", data.companyId)
+      .maybeSingle();
+    return row;
+  });
+
+export const updateThankYouTemplates = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        companyId: z.string().uuid(),
+        enabled: z.boolean(),
+        smsTemplate: z.string().trim().min(1).max(800),
+        emailSubject: z.string().trim().min(1).max(200),
+        emailTemplate: z.string().trim().min(1).max(4000),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertCompanyAdmin(context.userId, data.companyId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("companies")
+      .update({
+        thank_you_enabled: data.enabled,
+        thank_you_sms_template: data.smsTemplate,
+        thank_you_email_subject: data.emailSubject,
+        thank_you_email_template: data.emailTemplate,
+      })
+      .eq("id", data.companyId);
+    if (error) throw error;
+    return { ok: true };
+  });

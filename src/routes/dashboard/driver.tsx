@@ -16,7 +16,6 @@ type DashData = Awaited<ReturnType<typeof getDriverDashboard>>;
 function DriverDashboard() {
   const navigate = useNavigate();
   const getDash = useServerFn(getDriverDashboard);
-  const logTip = useServerFn(logManualTip);
   const [data, setData] = useState<DashData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -106,7 +105,7 @@ function DriverDashboard() {
           </div>
         </Section>
 
-        <LogTipPanel onLogged={load} logTip={logTip} />
+        <LogTipPanel onLogged={load} />
 
         <Section title="Recent tips">
           <TipsTable tips={data.tips} />
@@ -146,13 +145,8 @@ function downloadQR() {
   a.click();
 }
 
-function LogTipPanel({
-  onLogged,
-  logTip,
-}: {
-  onLogged: () => void;
-  logTip: ReturnType<typeof useServerFn<typeof logManualTip>>;
-}) {
+function LogTipPanel({ onLogged }: { onLogged: () => void }) {
+  const logTip = useServerFn(logManualTip);
   const [amount, setAmount] = useState("");
   const [source, setSource] = useState<"cash" | "venmo" | "cashapp" | "zelle" | "paypal" | "other">("cash");
   const [customerName, setCustomerName] = useState("");

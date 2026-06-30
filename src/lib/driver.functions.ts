@@ -58,7 +58,8 @@ export const logManualTip = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!driver) throw new Error("No driver profile");
     if (driver.status !== "active") throw new Error("Driver account not active");
-    const { error } = await supabase.from("tips").insert({
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("tips").insert({
       company_id: driver.company_id,
       driver_id: driver.id,
       amount_cents: data.amountCents,

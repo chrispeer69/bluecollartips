@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /join/
+
+Sitemap: https://roadsidetips.lovable.app/sitemap.xml

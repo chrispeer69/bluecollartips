@@ -73,6 +73,9 @@ export const createTipPaymentIntent = createServerFn({ method: "POST" })
         driverSlug: z.string().min(1),
         amountCents: z.number().int().min(TIP_MIN_CENTS).max(TIP_MAX_CENTS),
         customerName: z.string().trim().max(120).optional().nullable(),
+        customerPhone: z.string().trim().max(40).optional().nullable(),
+        customerEmail: z.string().trim().email().max(200).optional().nullable(),
+        stars: z.number().int().min(1).max(5).optional().nullable(),
       })
       .parse(d),
   )
@@ -108,6 +111,9 @@ export const createTipPaymentIntent = createServerFn({ method: "POST" })
         company_id: company.id,
         driver_id: driver.id,
         customer_name: data.customerName ?? "",
+        customer_phone: data.customerPhone ?? "",
+        customer_email: data.customerEmail ?? "",
+        stars: String(data.stars ?? ""),
       },
     });
     return { clientSecret: pi.client_secret, paymentIntentId: pi.id };

@@ -172,7 +172,10 @@ export type Database = {
           photo_url: string | null
           slug: string
           status: Database["public"]["Enums"]["driver_status"]
+          stripe_account_id: string | null
+          stripe_charges_enabled: boolean
           stripe_onboarded: boolean
+          stripe_payouts_enabled: boolean
           user_id: string | null
           venmo_handle: string | null
           zelle_handle: string | null
@@ -190,7 +193,10 @@ export type Database = {
           photo_url?: string | null
           slug: string
           status?: Database["public"]["Enums"]["driver_status"]
+          stripe_account_id?: string | null
+          stripe_charges_enabled?: boolean
           stripe_onboarded?: boolean
+          stripe_payouts_enabled?: boolean
           user_id?: string | null
           venmo_handle?: string | null
           zelle_handle?: string | null
@@ -208,7 +214,10 @@ export type Database = {
           photo_url?: string | null
           slug?: string
           status?: Database["public"]["Enums"]["driver_status"]
+          stripe_account_id?: string | null
+          stripe_charges_enabled?: boolean
           stripe_onboarded?: boolean
+          stripe_payouts_enabled?: boolean
           user_id?: string | null
           venmo_handle?: string | null
           zelle_handle?: string | null
@@ -348,6 +357,63 @@ export type Database = {
           },
         ]
       }
+      sms_deliveries: {
+        Row: {
+          body: string
+          company_id: string
+          created_at: string
+          driver_id: string | null
+          error: string | null
+          id: string
+          provider: string
+          provider_sid: string | null
+          sent_by: string | null
+          status: string
+          to_phone: string
+        }
+        Insert: {
+          body: string
+          company_id: string
+          created_at?: string
+          driver_id?: string | null
+          error?: string | null
+          id?: string
+          provider?: string
+          provider_sid?: string | null
+          sent_by?: string | null
+          status?: string
+          to_phone: string
+        }
+        Update: {
+          body?: string
+          company_id?: string
+          created_at?: string
+          driver_id?: string | null
+          error?: string | null
+          id?: string
+          provider?: string
+          provider_sid?: string | null
+          sent_by?: string | null
+          status?: string
+          to_phone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_deliveries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_deliveries_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tips: {
         Row: {
           amount_cents: number
@@ -355,6 +421,8 @@ export type Database = {
           company_id: string
           created_at: string
           customer_name: string | null
+          disputed: boolean
+          disputed_at: string | null
           driver_amount_cents: number
           driver_id: string
           id: string
@@ -363,6 +431,10 @@ export type Database = {
           platform_amount_cents: number
           rating_id: string | null
           source: Database["public"]["Enums"]["tip_source"]
+          stripe_payment_intent_id: string | null
+          stripe_status: string | null
+          verified: boolean
+          verified_at: string | null
         }
         Insert: {
           amount_cents: number
@@ -370,6 +442,8 @@ export type Database = {
           company_id: string
           created_at?: string
           customer_name?: string | null
+          disputed?: boolean
+          disputed_at?: string | null
           driver_amount_cents: number
           driver_id: string
           id?: string
@@ -378,6 +452,10 @@ export type Database = {
           platform_amount_cents: number
           rating_id?: string | null
           source: Database["public"]["Enums"]["tip_source"]
+          stripe_payment_intent_id?: string | null
+          stripe_status?: string | null
+          verified?: boolean
+          verified_at?: string | null
         }
         Update: {
           amount_cents?: number
@@ -385,6 +463,8 @@ export type Database = {
           company_id?: string
           created_at?: string
           customer_name?: string | null
+          disputed?: boolean
+          disputed_at?: string | null
           driver_amount_cents?: number
           driver_id?: string
           id?: string
@@ -393,6 +473,10 @@ export type Database = {
           platform_amount_cents?: number
           rating_id?: string | null
           source?: Database["public"]["Enums"]["tip_source"]
+          stripe_payment_intent_id?: string | null
+          stripe_status?: string | null
+          verified?: boolean
+          verified_at?: string | null
         }
         Relationships: [
           {

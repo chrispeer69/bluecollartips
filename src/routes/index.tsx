@@ -9,11 +9,12 @@ export const Route = createFileRoute("/")({
         content:
           "A tip and review platform built for towing companies and blue-collar service teams. Capture ratings, collect tips, and grow your reputation.",
       },
-      { property: "og:title", content: "Blue Collar AI" },
+      { property: "og:title", content: "Blue Collar AI — Tips & Reputation for Service Pros" },
       {
         property: "og:description",
         content: "Tips and reviews for towing companies and field service teams.",
       },
+      { property: "og:url", content: "/" },
     ],
   }),
   component: Index,

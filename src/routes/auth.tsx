@@ -9,6 +9,9 @@ export const Route = createFileRoute("/auth")({
     meta: [
       { title: "Sign in — Blue Collar AI" },
       { name: "description", content: "Sign in or create your Blue Collar AI account." },
+      { property: "og:title", content: "Sign in — Blue Collar AI" },
+      { property: "og:description", content: "Sign in or create your Blue Collar AI account to manage tips, ratings, and your team." },
+      { property: "og:url", content: "/auth" },
     ],
   }),
   component: AuthPage,

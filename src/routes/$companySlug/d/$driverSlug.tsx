@@ -11,6 +11,8 @@ export const Route = createFileRoute("/$companySlug/d/$driverSlug")({
       { title: "Rate your service — Blue Collar AI" },
       { name: "description", content: "Rate your service, leave feedback, and tip your driver securely by card or P2P — powered by Blue Collar AI." },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+      { property: "og:title", content: "Rate your service — Blue Collar AI" },
+      { property: "og:description", content: "Rate your driver, leave feedback, and tip securely by card or P2P." },
     ],
   }),
   component: TipPage,

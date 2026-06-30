@@ -1,29 +1,26 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { listDevTenants } from "@/lib/dev-tenant.functions";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getDevSampleDriver } from "@/lib/dev-tenant.functions";
 
 // DEV ONLY: floating nav so the developer can hit every page in one click,
 // with no auth/role friction. Pairs with ensureDevSession() (auto super-admin).
 export function DevNavMenu() {
-  const list = useServerFn(listDevTenants);
+  const sampleFn = useServerFn(getDevSampleDriver);
   const [open, setOpen] = useState(false);
   const [sample, setSample] = useState<{ companySlug: string; driverSlug: string } | null>(null);
 
   useEffect(() => {
-    (async () => {
+    const t = setTimeout(async () => {
       try {
-        const r = await list();
-        if (!r.isSuper || !r.companies[0]) return;
-        // Fetch first driver of first tenant via a tiny server fn proxy:
-        const res = await fetch("/api/dev/sample-driver").then((x) => x.json()).catch(() => null);
+        const res = await sampleFn();
         if (res?.companySlug && res?.driverSlug) setSample(res);
       } catch {
-        /* ignore */
+        /* ignore — dev session may not be ready yet */
       }
-    })();
-  }, [list]);
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [sampleFn]);
 
   const linkCls =
     "block px-3 py-2 rounded text-sm hover:bg-amber-100 text-slate-800 no-underline";
@@ -82,6 +79,3 @@ export function DevNavMenu() {
     </div>
   );
 }
-
-// Silence unused import for tree-shaken paths
-void supabaseAdmin;

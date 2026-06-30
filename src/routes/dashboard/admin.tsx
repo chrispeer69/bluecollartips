@@ -12,6 +12,10 @@ import {
 } from "@/lib/admin.functions";
 import { dollars } from "@/lib/constants";
 import { Section, Stat, TopBar } from "./driver";
+import { createInvite, listInvites, revokeInvite } from "@/lib/invites.functions";
+import { reconciliationOverview } from "@/lib/reconciliation.functions";
+import { platformOverview, suspendTenant } from "@/lib/platform.functions";
+import { sendTipLinkSms } from "@/lib/sms.functions";
 
 export const Route = createFileRoute("/dashboard/admin")({
   head: () => ({ meta: [{ title: "Admin — Blue Collar AI" }] }),
@@ -162,6 +166,24 @@ function AdminDashboard() {
             }}
           />
         </Section>
+
+        <Section title="Invites">
+          <InvitesPanel companyId={data.company.id} />
+        </Section>
+
+        <Section title="Reconciliation (last 30 days)">
+          <ReconciliationPanel companyId={data.company.id} drivers={data.drivers} />
+        </Section>
+
+        <Section title="SMS a tip link to a customer">
+          <AdminSmsPanel drivers={data.drivers} />
+        </Section>
+
+        {data.isSuper && (
+          <Section title="Platform overview (super admin)">
+            <PlatformPanel />
+          </Section>
+        )}
       </div>
     </div>
   );
@@ -522,5 +544,203 @@ function Input({
         className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
       />
     </label>
+  );
+}
+
+function InvitesPanel({ companyId }: { companyId: string }) {
+  const list = useServerFn(listInvites);
+  const create = useServerFn(createInvite);
+  const revoke = useServerFn(revokeInvite);
+  const [items, setItems] = useState<Awaited<ReturnType<typeof listInvites>>["items"]>([]);
+  const [role, setRole] = useState<"driver" | "company_admin">("driver");
+  const [email, setEmail] = useState("");
+  const reload = async () => setItems((await list({ data: { companyId } })).items);
+  useEffect(() => {
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId]);
+  return (
+    <>
+      <form
+        className="mb-3 flex flex-wrap items-end gap-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const r = await create({ data: { companyId, role, email: email || null } });
+          setEmail("");
+          const origin = typeof window !== "undefined" ? window.location.origin : "";
+          alert(`Invite created.\nCode: ${r.code}\nShare link: ${origin}/join/${r.code}`);
+          await reload();
+        }}
+      >
+        <label className="text-sm">
+          Role
+          <select value={role} onChange={(e) => setRole(e.target.value as typeof role)} className="mt-1 block rounded-md border border-input bg-background px-3 py-2 text-sm">
+            <option value="driver">Driver</option>
+            <option value="company_admin">Company admin</option>
+          </select>
+        </label>
+        <Input label="Email (optional)" value={email} onChange={setEmail} type="email" />
+        <button className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground">Generate invite</button>
+      </form>
+      {items.length === 0 ? (
+        <div className="text-sm text-muted-foreground">No invites yet.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs uppercase text-muted-foreground">
+              <tr><th className="py-2">Code</th><th>Role</th><th>Email</th><th>Status</th><th>Expires</th><th></th></tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {items.map((i) => {
+                const expired = i.expires_at && new Date(i.expires_at) < new Date();
+                const status = i.used_at ? "used" : expired ? "expired" : "active";
+                const origin = typeof window !== "undefined" ? window.location.origin : "";
+                return (
+                  <tr key={i.id}>
+                    <td className="py-2"><span className="font-mono">{i.code}</span></td>
+                    <td className="capitalize">{i.role.replace("_", " ")}</td>
+                    <td>{i.email ?? "—"}</td>
+                    <td><span className="rounded-full bg-muted px-2 py-0.5 text-xs">{status}</span></td>
+                    <td className="text-xs">{i.expires_at ? new Date(i.expires_at).toLocaleDateString() : "—"}</td>
+                    <td className="text-right">
+                      <button onClick={() => navigator.clipboard.writeText(`${origin}/join/${i.code}`)} className="rounded border border-border px-2 py-1 text-xs">Copy link</button>
+                      {status === "active" && (
+                        <button onClick={async () => { await revoke({ data: { inviteId: i.id } }); await reload(); }} className="ml-1 rounded border border-border px-2 py-1 text-xs">Revoke</button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ReconciliationPanel({ companyId, drivers }: { companyId: string; drivers: Data["drivers"] }) {
+  const fetchOverview = useServerFn(reconciliationOverview);
+  const [rows, setRows] = useState<Awaited<ReturnType<typeof reconciliationOverview>>["rows"]>([]);
+  const byId = new Map(drivers.map((d) => [d.id, d.display_name]));
+  useEffect(() => {
+    fetchOverview({ data: { companyId } }).then((r) => setRows(r.rows));
+  }, [companyId, fetchOverview]);
+  if (!rows.length) return <div className="text-sm text-muted-foreground">No tip activity in last 30 days.</div>;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="text-left text-xs uppercase text-muted-foreground">
+          <tr><th className="py-2">Driver</th><th>Total tips</th><th>Manual</th><th>Unverified</th><th>Unverified $</th><th>Unverified %</th></tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {rows.map((r) => (
+            <tr key={r.driverId} className={r.unverifiedPct > 20 ? "bg-destructive/5" : undefined}>
+              <td className="py-2 font-medium">{byId.get(r.driverId) ?? "—"}</td>
+              <td>{r.total}</td>
+              <td>{r.manual}</td>
+              <td>{r.unverified}</td>
+              <td>{dollars(r.amountUnverified)}</td>
+              <td className={r.unverifiedPct > 20 ? "font-semibold text-destructive" : ""}>{r.unverifiedPct}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Drivers above 20% unverified are highlighted; consider following up.
+      </p>
+    </div>
+  );
+}
+
+function AdminSmsPanel({ drivers }: { drivers: Data["drivers"] }) {
+  const send = useServerFn(sendTipLinkSms);
+  const [driverId, setDriverId] = useState(drivers[0]?.id ?? "");
+  const [phone, setPhone] = useState("");
+  const [name, setName] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  if (!drivers.length) return <div className="text-sm text-muted-foreground">Add a driver first.</div>;
+  return (
+    <form
+      className="flex flex-wrap items-end gap-2"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setMsg(null);
+        try {
+          const r = await send({ data: { driverId, toPhone: phone, customerName: name || null } });
+          setMsg(r.status === "sent" ? "Sent ✓" : r.error || r.status);
+        } catch (e) {
+          setMsg(e instanceof Error ? e.message : "Failed");
+        }
+      }}
+    >
+      <label className="text-sm">
+        Driver
+        <select value={driverId} onChange={(e) => setDriverId(e.target.value)} className="mt-1 block rounded-md border border-input bg-background px-3 py-2 text-sm">
+          {drivers.map((d) => <option key={d.id} value={d.id}>{d.display_name}</option>)}
+        </select>
+      </label>
+      <Input label="Customer phone" value={phone} onChange={setPhone} required />
+      <Input label="Name (optional)" value={name} onChange={setName} />
+      <button className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground">Send SMS</button>
+      {msg && <div className="basis-full text-xs text-muted-foreground">{msg}</div>}
+    </form>
+  );
+}
+
+function PlatformPanel() {
+  const get = useServerFn(platformOverview);
+  const suspend = useServerFn(suspendTenant);
+  const [data, setData] = useState<Awaited<ReturnType<typeof platformOverview>> | null>(null);
+  const reload = async () => setData(await get());
+  useEffect(() => {
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (!data) return <div className="text-sm text-muted-foreground">Loading…</div>;
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Stat label="Gross tips" value={dollars(data.grossTotal)} />
+        <Stat label="Platform 10%" value={dollars(data.platformTotal)} />
+        <Stat label="Tenants" value={String(data.tenants.length)} />
+        <Stat label="Drivers" value={String(data.driverCount)} />
+      </div>
+      <div className="text-xs text-muted-foreground">
+        Integrations · Stripe: <span className={data.integrations.stripe ? "text-emerald-600" : ""}>{data.integrations.stripe ? "connected" : "not connected"}</span>{" "}
+        · Twilio: <span className={data.integrations.twilio ? "text-emerald-600" : ""}>{data.integrations.twilio ? "connected" : "not connected"}</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-left text-xs uppercase text-muted-foreground">
+            <tr><th className="py-2">Tenant</th><th>Status</th><th>Tips</th><th>Gross</th><th>Co share</th><th>Platform 10%</th><th>Pending co payout</th><th></th></tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {data.tenants.map((t) => (
+              <tr key={t.id}>
+                <td className="py-2 font-medium">{t.name}</td>
+                <td><span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize">{t.status}</span></td>
+                <td>{t.count}</td>
+                <td>{dollars(t.gross)}</td>
+                <td>{dollars(t.companyShare)}</td>
+                <td>{dollars(t.platformShare)}</td>
+                <td>{dollars(t.pendingCompany)}</td>
+                <td className="text-right">
+                  <button
+                    onClick={async () => {
+                      await suspend({ data: { companyId: t.id, status: t.status === "active" ? "suspended" : "active" } });
+                      await reload();
+                    }}
+                    className="rounded border border-border px-2 py-1 text-xs"
+                  >
+                    {t.status === "active" ? "Suspend" : "Reactivate"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }

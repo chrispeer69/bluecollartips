@@ -28,6 +28,16 @@ function AuthPage() {
   const [info, setInfo] = useState<string | null>(null);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const inv = params.get("invite");
+      const em = params.get("email");
+      if (inv) {
+        setInviteCode(inv.toUpperCase());
+        setMode("signup");
+      }
+      if (em) setEmail(em);
+    }
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/dashboard" });
     });

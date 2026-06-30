@@ -1,0 +1,118 @@
+import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { z } from "zod";
+import { TIP_MAX_CENTS, TIP_MIN_CENTS } from "./constants";
+
+/** Driver-initiated Stripe Express onboarding. Returns a one-time AccountLink URL. */
+export const createDriverOnboardingLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ returnUrl: z.string().url() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { getStripe } = await import("./stripe.server");
+    const stripe = getStripe();
+    if (!stripe) throw new Error("Stripe is not configured yet. Ask the platform admin to add STRIPE_SECRET_KEY.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: driver } = await supabaseAdmin
+      .from("drivers")
+      .select("id, email, display_name, stripe_account_id")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (!driver) throw new Error("No driver profile");
+
+    let accountId = driver.stripe_account_id;
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: "express",
+        email: driver.email ?? undefined,
+        capabilities: { transfers: { requested: true }, card_payments: { requested: true } },
+        metadata: { driver_id: driver.id },
+      });
+      accountId = account.id;
+      await supabaseAdmin.from("drivers").update({ stripe_account_id: accountId }).eq("id", driver.id);
+    }
+    const link = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: data.returnUrl,
+      return_url: data.returnUrl,
+      type: "account_onboarding",
+    });
+    return { url: link.url };
+  });
+
+/** Refresh Stripe status flags for the signed-in driver. */
+export const refreshStripeStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { getStripe } = await import("./stripe.server");
+    const stripe = getStripe();
+    if (!stripe) return { enabled: false };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: driver } = await supabaseAdmin
+      .from("drivers")
+      .select("id, stripe_account_id")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (!driver?.stripe_account_id) return { enabled: false };
+    const acct = await stripe.accounts.retrieve(driver.stripe_account_id);
+    await supabaseAdmin
+      .from("drivers")
+      .update({
+        stripe_charges_enabled: !!acct.charges_enabled,
+        stripe_payouts_enabled: !!acct.payouts_enabled,
+      })
+      .eq("id", driver.id);
+    return { enabled: true, charges: !!acct.charges_enabled, payouts: !!acct.payouts_enabled };
+  });
+
+/** Public: creates a PaymentIntent with 20% application fee, transferring 80% to driver. */
+export const createTipPaymentIntent = createServerFn({ method: "POST" })
+  .inputValidator((d) =>
+    z
+      .object({
+        companySlug: z.string().min(1),
+        driverSlug: z.string().min(1),
+        amountCents: z.number().int().min(TIP_MIN_CENTS).max(TIP_MAX_CENTS),
+        customerName: z.string().trim().max(120).optional().nullable(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) => {
+    const { getStripe } = await import("./stripe.server");
+    const stripe = getStripe();
+    if (!stripe) throw new Error("Card payments are not configured yet.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: company } = await supabaseAdmin
+      .from("companies")
+      .select("id")
+      .eq("slug", data.companySlug)
+      .maybeSingle();
+    if (!company) throw new Error("Company not found");
+    const { data: driver } = await supabaseAdmin
+      .from("drivers")
+      .select("id, stripe_account_id, stripe_charges_enabled, status, display_name")
+      .eq("company_id", company.id)
+      .eq("slug", data.driverSlug)
+      .maybeSingle();
+    if (!driver || driver.status !== "active") throw new Error("Driver not available");
+    if (!driver.stripe_account_id || !driver.stripe_charges_enabled)
+      throw new Error("This driver isn't accepting card tips yet.");
+
+    const applicationFee = Math.round((data.amountCents * 20) / 100);
+    const pi = await stripe.paymentIntents.create({
+      amount: data.amountCents,
+      currency: "usd",
+      automatic_payment_methods: { enabled: true },
+      application_fee_amount: applicationFee,
+      transfer_data: { destination: driver.stripe_account_id },
+      metadata: {
+        company_id: company.id,
+        driver_id: driver.id,
+        customer_name: data.customerName ?? "",
+      },
+    });
+    return { clientSecret: pi.client_secret, paymentIntentId: pi.id };
+  });
+
+export const getStripePublishableKey = createServerFn({ method: "GET" }).handler(async () => {
+  return { publishableKey: process.env.STRIPE_PUBLISHABLE_KEY ?? null };
+});

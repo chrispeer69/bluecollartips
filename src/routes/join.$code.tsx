@@ -9,6 +9,8 @@ export const Route = createFileRoute("/join/$code")({
       { title: "Join — Blue Collar AI" },
       { name: "description", content: "Accept your invite to join your company on Blue Collar AI and start collecting ratings and tips from customers." },
       { name: "robots", content: "noindex" },
+      { property: "og:title", content: "Join your team on Blue Collar AI" },
+      { property: "og:description", content: "Accept your invite to start collecting ratings and tips from customers." },
     ],
   }),
   component: JoinPage,

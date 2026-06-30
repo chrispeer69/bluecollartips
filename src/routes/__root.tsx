@@ -79,11 +79,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Blue Collar AI" },
-      { name: "description", content: "Tip and reputation platform for towing companies and field service teams — collect ratings, tips, and reviews from one QR code." },
       { name: "author", content: "Blue Collar AI" },
-      { property: "og:title", content: "Blue Collar AI" },
-      { property: "og:description", content: "Tip and reputation platform for towing companies and field service teams — collect ratings, tips, and reviews from one QR code." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

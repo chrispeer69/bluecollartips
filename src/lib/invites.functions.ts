@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { randomBytes } from "crypto";
 
 export const listInvites = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -45,7 +46,7 @@ export const createInvite = createServerFn({ method: "POST" })
       (r) => r.role === "super_admin" || (r.role === "company_admin" && r.company_id === data.companyId),
     );
     if (!ok) throw new Error("Forbidden");
-    const code = Math.random().toString(36).slice(2, 10).toUpperCase();
+    const code = randomBytes(6).toString("hex").toUpperCase();
     await supabaseAdmin.from("invites").insert({
       company_id: data.companyId,
       code,

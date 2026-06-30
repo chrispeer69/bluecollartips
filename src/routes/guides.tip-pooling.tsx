@@ -16,7 +16,7 @@ export const Route = createFileRoute("/guides/tip-pooling")({
           "A practical guide to automated tip pooling and the 80/10/10 split for towing and field service companies.",
       },
       { property: "og:type", content: "article" },
-      { property: "og:url", content: "/guides/tip-pooling" },
+      { property: "og:url", content: "https://roadsidetips.lovable.app/guides/tip-pooling" },
     ],
     links: [
       { rel: "canonical", href: "https://roadsidetips.lovable.app/guides/tip-pooling" },

@@ -14,8 +14,9 @@ export const Route = createFileRoute("/")({
         property: "og:description",
         content: "Tips and reviews for towing companies and field service teams.",
       },
-      { property: "og:url", content: "/" },
+      { property: "og:url", content: "https://roadsidetips.lovable.app/" },
     ],
+    links: [{ rel: "canonical", href: "https://roadsidetips.lovable.app/" }],
   }),
   component: Index,
 });

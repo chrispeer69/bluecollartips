@@ -1,30 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import type { Database } from "@/integrations/supabase/types";
 import { TIP_MAX_CENTS, TIP_MIN_CENTS } from "./constants";
-
-function publicClient() {
-  return createClient<Database>(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_PUBLISHABLE_KEY!,
-    { auth: { storage: undefined, persistSession: false, autoRefreshToken: false } },
-  );
-}
 
 export const getPublicDriver = createServerFn({ method: "GET" })
   .inputValidator((data) =>
     z.object({ companySlug: z.string().min(1), driverSlug: z.string().min(1) }).parse(data),
   )
   .handler(async ({ data }) => {
-    const supabase = publicClient();
-    const { data: company } = await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: company } = await supabaseAdmin
       .from("companies")
       .select("id, name, slug, logo_url, primary_color, secondary_color, support_email")
       .eq("slug", data.companySlug)
       .maybeSingle();
     if (!company) return { company: null, driver: null };
-    const { data: driver } = await supabase
+    const { data: driver } = await supabaseAdmin
       .from("drivers")
       .select("id, display_name, slug, photo_url, status, venmo_handle, cashapp_handle, zelle_handle, paypal_handle")
       .eq("company_id", company.id)

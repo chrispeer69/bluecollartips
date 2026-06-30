@@ -51,3 +51,28 @@ export const ensureRoadsideTowing = createServerFn({ method: "POST" })
     if (error) throw error;
     return { id: created.id, created: true };
   });
+
+// DEV ONLY: return first company slug + first driver slug for quick public-page nav.
+export const getDevSampleDriver = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: roles } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+    const isSuper = roles?.some((r) => r.role === "super_admin") ?? false;
+    if (!isSuper) return null;
+    const { data: driver } = await supabaseAdmin
+      .from("drivers")
+      .select("public_slug, companies!inner(slug)")
+      .limit(1)
+      .maybeSingle();
+    if (!driver) return null;
+    // @ts-expect-error supabase join shape
+    const companySlug = driver.companies?.slug as string | undefined;
+    const driverSlug = driver.public_slug as string | undefined;
+    if (!companySlug || !driverSlug) return null;
+    return { companySlug, driverSlug };
+  });

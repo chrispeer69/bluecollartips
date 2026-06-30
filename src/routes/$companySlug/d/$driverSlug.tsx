@@ -29,6 +29,8 @@ function TipPage() {
   const [hoverStars, setHoverStars] = useState(0);
   const [feedback, setFeedback] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [tipCents, setTipCents] = useState<number | null>(null);
   const [customTip, setCustomTip] = useState("");
   const [tipSource, setTipSource] = useState<TipSource | null>(null);
@@ -127,6 +129,8 @@ function TipPage() {
           stars,
           feedback: feedback.trim() || null,
           customerName: customerName.trim() || null,
+          customerPhone: customerPhone.trim() || null,
+          customerEmail: customerEmail.trim() || null,
           tipCents: finalTipCents > 0 ? finalTipCents : null,
           tipSource: finalTipCents > 0 ? tipSource : null,
         },

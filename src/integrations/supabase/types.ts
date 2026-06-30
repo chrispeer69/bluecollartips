@@ -97,6 +97,10 @@ export type Database = {
           status: string
           support_email: string | null
           support_phone: string | null
+          thank_you_email_subject: string
+          thank_you_email_template: string
+          thank_you_enabled: boolean
+          thank_you_sms_template: string
         }
         Insert: {
           created_at?: string
@@ -110,6 +114,10 @@ export type Database = {
           status?: string
           support_email?: string | null
           support_phone?: string | null
+          thank_you_email_subject?: string
+          thank_you_email_template?: string
+          thank_you_enabled?: boolean
+          thank_you_sms_template?: string
         }
         Update: {
           created_at?: string
@@ -123,6 +131,10 @@ export type Database = {
           status?: string
           support_email?: string | null
           support_phone?: string | null
+          thank_you_email_subject?: string
+          thank_you_email_template?: string
+          thank_you_enabled?: boolean
+          thank_you_sms_template?: string
         }
         Relationships: []
       }
@@ -261,6 +273,70 @@ export type Database = {
           },
         ]
       }
+      email_deliveries: {
+        Row: {
+          body: string
+          company_id: string
+          created_at: string
+          driver_id: string | null
+          error: string | null
+          id: string
+          provider_id: string | null
+          rating_id: string | null
+          status: string
+          subject: string
+          to_email: string
+        }
+        Insert: {
+          body: string
+          company_id: string
+          created_at?: string
+          driver_id?: string | null
+          error?: string | null
+          id?: string
+          provider_id?: string | null
+          rating_id?: string | null
+          status?: string
+          subject: string
+          to_email: string
+        }
+        Update: {
+          body?: string
+          company_id?: string
+          created_at?: string
+          driver_id?: string | null
+          error?: string | null
+          id?: string
+          provider_id?: string | null
+          rating_id?: string | null
+          status?: string
+          subject?: string
+          to_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_deliveries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_deliveries_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_deliveries_rating_id_fkey"
+            columns: ["rating_id"]
+            isOneToOne: false
+            referencedRelation: "ratings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invites: {
         Row: {
           code: string
@@ -338,7 +414,9 @@ export type Database = {
           company_id: string
           created_at: string
           customer_contact: string | null
+          customer_email: string | null
           customer_name: string | null
+          customer_phone: string | null
           driver_id: string
           feedback: string | null
           flagged: boolean
@@ -350,7 +428,9 @@ export type Database = {
           company_id: string
           created_at?: string
           customer_contact?: string | null
+          customer_email?: string | null
           customer_name?: string | null
+          customer_phone?: string | null
           driver_id: string
           feedback?: string | null
           flagged?: boolean
@@ -362,7 +442,9 @@ export type Database = {
           company_id?: string
           created_at?: string
           customer_contact?: string | null
+          customer_email?: string | null
           customer_name?: string | null
+          customer_phone?: string | null
           driver_id?: string
           feedback?: string | null
           flagged?: boolean

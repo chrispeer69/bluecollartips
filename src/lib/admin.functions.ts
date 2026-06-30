@@ -2,6 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { slugify } from "./constants";
+import { randomBytes } from "crypto";
+
+function generateInviteCode() {
+  return randomBytes(6).toString("hex").toUpperCase();
+}
 
 async function assertCompanyAdmin(userId: string, companyId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -100,7 +105,7 @@ export const createDriver = createServerFn({ method: "POST" })
       .single();
     if (error) throw error;
 
-    const code = Math.random().toString(36).slice(2, 10).toUpperCase();
+    const code = generateInviteCode();
     await supabaseAdmin.from("invites").insert({
       company_id: data.companyId,
       code,
@@ -229,7 +234,7 @@ export const createCompany = createServerFn({ method: "POST" })
       .select("id, slug")
       .single();
     if (error) throw error;
-    const code = Math.random().toString(36).slice(2, 10).toUpperCase();
+    const code = generateInviteCode();
     await supabaseAdmin.from("invites").insert({
       company_id: company.id,
       code,

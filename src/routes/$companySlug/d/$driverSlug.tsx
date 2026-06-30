@@ -6,14 +6,16 @@ import { PRESET_TIPS, TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib/consta
 import { StripeCardPanel } from "@/components/StripeCardPanel";
 
 export const Route = createFileRoute("/$companySlug/d/$driverSlug")({
-  head: () => ({
+  head: ({ params }) => ({
     meta: [
       { title: "Rate your service — Blue Collar AI" },
       { name: "description", content: "Rate your service, leave feedback, and tip your driver securely by card or P2P — powered by Blue Collar AI." },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { property: "og:title", content: "Rate your service — Blue Collar AI" },
       { property: "og:description", content: "Rate your driver, leave feedback, and tip securely by card or P2P." },
+      { property: "og:url", content: `https://roadsidetips.lovable.app/${params.companySlug}/d/${params.driverSlug}` },
     ],
+    links: [{ rel: "canonical", href: `https://roadsidetips.lovable.app/${params.companySlug}/d/${params.driverSlug}` }],
   }),
   component: TipPage,
 });

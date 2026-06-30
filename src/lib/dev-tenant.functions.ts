@@ -66,13 +66,13 @@ export const getDevSampleDriver = createServerFn({ method: "GET" })
     if (!isSuper) return null;
     const { data: driver } = await supabaseAdmin
       .from("drivers")
-      .select("public_slug, companies!inner(slug)")
+      .select("slug, companies!inner(slug)")
       .limit(1)
       .maybeSingle();
     if (!driver) return null;
-    // @ts-expect-error supabase join shape
-    const companySlug = driver.companies?.slug as string | undefined;
-    const driverSlug = driver.public_slug as string | undefined;
+    const companies = driver.companies as unknown as { slug?: string } | { slug?: string }[] | null;
+    const companySlug = Array.isArray(companies) ? companies[0]?.slug : companies?.slug;
+    const driverSlug = driver.slug as string | undefined;
     if (!companySlug || !driverSlug) return null;
     return { companySlug, driverSlug };
   });

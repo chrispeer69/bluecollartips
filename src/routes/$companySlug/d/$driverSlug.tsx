@@ -175,6 +175,7 @@ function TipPage() {
       </header>
 
       <form onSubmit={onSubmit} className="mx-auto max-w-md px-5 pt-6">
+        <h1 className="sr-only">Rate your service{driver ? ` with ${driver.display_name}` : ""}</h1>
         <section className="rounded-xl border border-border bg-card p-5">
           <h2 className="text-base font-semibold">How did we do?</h2>
           <div

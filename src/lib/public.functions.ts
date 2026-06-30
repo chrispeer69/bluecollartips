@@ -33,6 +33,8 @@ export const submitRating = createServerFn({ method: "POST" })
         stars: z.number().int().min(1).max(5),
         feedback: z.string().trim().max(2000).optional().nullable(),
         customerName: z.string().trim().max(120).optional().nullable(),
+        customerPhone: z.string().trim().max(40).optional().nullable(),
+        customerEmail: z.string().trim().email().max(200).optional().nullable(),
         tipCents: z
           .number()
           .int()
@@ -72,6 +74,8 @@ export const submitRating = createServerFn({ method: "POST" })
         stars: data.stars,
         feedback: data.feedback ?? null,
         customer_name: data.customerName ?? null,
+        customer_phone: data.customerPhone ?? null,
+        customer_email: data.customerEmail ?? null,
         flagged: data.stars <= 2,
       })
       .select("id")
@@ -96,6 +100,23 @@ export const submitRating = createServerFn({ method: "POST" })
         note: "Customer-reported P2P tip (awaiting driver confirmation)",
       });
       if (tErr) throw tErr;
+    }
+
+    // Fire-and-await thank-you notifications (per-company templates).
+    try {
+      const { sendThankYou } = await import("@/lib/thankyou.server");
+      await sendThankYou(supabaseAdmin, {
+        companyId: company.id,
+        driverId: driver.id,
+        ratingId: rating.id,
+        stars: data.stars,
+        tipCents: data.tipCents ?? null,
+        customerName: data.customerName ?? null,
+        customerPhone: data.customerPhone ?? null,
+        customerEmail: data.customerEmail ?? null,
+      });
+    } catch (e) {
+      console.error("thank-you send failed", e);
     }
 
     return { ok: true, ratingId: rating.id };

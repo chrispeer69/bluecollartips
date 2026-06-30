@@ -10,6 +10,9 @@ type Props = {
   driverSlug: string;
   amountCents: number;
   customerName?: string | null;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
+  stars?: number | null;
   brandColor: string;
   onPaid: () => void;
 };
@@ -33,11 +36,14 @@ export function StripeCardPanel(props: Props) {
         driverSlug: props.driverSlug,
         amountCents: props.amountCents,
         customerName: props.customerName ?? null,
+        customerPhone: props.customerPhone ?? null,
+        customerEmail: props.customerEmail ?? null,
+        stars: props.stars ?? null,
       },
     })
       .then((r) => setClientSecret(r.clientSecret as string))
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : "Card not available"));
-  }, [pk, props.amountCents, props.companySlug, props.driverSlug, props.customerName, createPi]);
+  }, [pk, props.amountCents, props.companySlug, props.driverSlug, props.customerName, props.customerPhone, props.customerEmail, props.stars, createPi]);
 
   const stripePromise = useMemo<Promise<Stripe | null> | null>(
     () => (pk ? loadStripe(pk) : null),

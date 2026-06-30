@@ -49,6 +49,20 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
               },
               { onConflict: "stripe_payment_intent_id" },
             );
+            try {
+              const { sendThankYou } = await import("@/lib/thankyou.server");
+              await sendThankYou(supabaseAdmin, {
+                companyId,
+                driverId,
+                stars: Number(pi.metadata?.stars ?? 5),
+                tipCents: pi.amount,
+                customerName: pi.metadata?.customer_name || null,
+                customerPhone: pi.metadata?.customer_phone || null,
+                customerEmail: pi.metadata?.customer_email || null,
+              });
+            } catch (e) {
+              console.error("thank-you (stripe webhook) failed", e);
+            }
           }
         } else if (event.type === "account.updated") {
           const acct = event.data.object as {

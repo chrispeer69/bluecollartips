@@ -29,6 +29,8 @@ function TipPage() {
   const [hoverStars, setHoverStars] = useState(0);
   const [feedback, setFeedback] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [tipCents, setTipCents] = useState<number | null>(null);
   const [customTip, setCustomTip] = useState("");
   const [tipSource, setTipSource] = useState<TipSource | null>(null);
@@ -127,6 +129,8 @@ function TipPage() {
           stars,
           feedback: feedback.trim() || null,
           customerName: customerName.trim() || null,
+          customerPhone: customerPhone.trim() || null,
+          customerEmail: customerEmail.trim() || null,
           tipCents: finalTipCents > 0 ? finalTipCents : null,
           tipSource: finalTipCents > 0 ? tipSource : null,
         },
@@ -204,6 +208,39 @@ function TipPage() {
             maxLength={2000}
             placeholder="Optional"
           />
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium">Your name (optional)</label>
+              <input
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                maxLength={120}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Phone (for a thank-you text)</label>
+              <input
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                placeholder="(555) 123-4567"
+                maxLength={40}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium">Email (for a thank-you email)</label>
+              <input
+                type="email"
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                placeholder="you@example.com"
+                maxLength={200}
+              />
+            </div>
+          </div>
         </section>
 
         <section className="mt-5 rounded-xl border border-border bg-card p-5">
@@ -263,15 +300,7 @@ function TipPage() {
 
           {finalTipCents > 0 && (
             <>
-              <label className="mt-5 block text-sm font-medium">Your name (optional)</label>
-              <input
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                maxLength={120}
-              />
-
-              <div className="mt-5 text-sm font-medium">Payment method</div>
+              <div className="mt-2 text-sm font-medium">Payment method</div>
               <button
                 type="button"
                 onClick={() => setTipSource("stripe")}
@@ -289,6 +318,9 @@ function TipPage() {
                   driverSlug={driverSlug}
                   amountCents={finalTipCents}
                   customerName={customerName || null}
+                customerPhone={customerPhone || null}
+                customerEmail={customerEmail || null}
+                stars={stars || null}
                   brandColor={brand.primary}
                   onPaid={async () => {
                     if (stars) {
@@ -300,6 +332,8 @@ function TipPage() {
                             stars,
                             feedback: feedback.trim() || null,
                             customerName: customerName.trim() || null,
+                          customerPhone: customerPhone.trim() || null,
+                          customerEmail: customerEmail.trim() || null,
                             tipCents: null,
                             tipSource: null,
                           },

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
+import { Route as DashboardDriverRouteImport } from './routes/dashboard/driver'
 import { Route as CompanySlugDDriverSlugRouteImport } from './routes/$companySlug/d/$driverSlug'
 
 const AuthRoute = AuthRouteImport.update({
@@ -29,6 +30,11 @@ const DashboardIndexRoute = DashboardIndexRouteImport.update({
   path: '/dashboard/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardDriverRoute = DashboardDriverRouteImport.update({
+  id: '/dashboard/driver',
+  path: '/dashboard/driver',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CompanySlugDDriverSlugRoute = CompanySlugDDriverSlugRouteImport.update({
   id: '/$companySlug/d/$driverSlug',
   path: '/$companySlug/d/$driverSlug',
@@ -38,12 +44,14 @@ const CompanySlugDDriverSlugRoute = CompanySlugDDriverSlugRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/dashboard/driver': typeof DashboardDriverRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/dashboard/driver': typeof DashboardDriverRoute
   '/dashboard': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
 }
@@ -51,20 +59,38 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/dashboard/driver': typeof DashboardDriverRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/dashboard/' | '/$companySlug/d/$driverSlug'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/dashboard/driver'
+    | '/dashboard/'
+    | '/$companySlug/d/$driverSlug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/dashboard' | '/$companySlug/d/$driverSlug'
-  id: '__root__' | '/' | '/auth' | '/dashboard/' | '/$companySlug/d/$driverSlug'
+  to:
+    | '/'
+    | '/auth'
+    | '/dashboard/driver'
+    | '/dashboard'
+    | '/$companySlug/d/$driverSlug'
+  id:
+    | '__root__'
+    | '/'
+    | '/auth'
+    | '/dashboard/driver'
+    | '/dashboard/'
+    | '/$companySlug/d/$driverSlug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
+  DashboardDriverRoute: typeof DashboardDriverRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   CompanySlugDDriverSlugRoute: typeof CompanySlugDDriverSlugRoute
 }
@@ -92,6 +118,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard/driver': {
+      id: '/dashboard/driver'
+      path: '/dashboard/driver'
+      fullPath: '/dashboard/driver'
+      preLoaderRoute: typeof DashboardDriverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/$companySlug/d/$driverSlug': {
       id: '/$companySlug/d/$driverSlug'
       path: '/$companySlug/d/$driverSlug'
@@ -105,6 +138,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
+  DashboardDriverRoute: DashboardDriverRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   CompanySlugDDriverSlugRoute: CompanySlugDDriverSlugRoute,
 }

@@ -9,38 +9,114 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
+import { Route as DashboardDriverRouteImport } from './routes/dashboard/driver'
+import { Route as DashboardAdminRouteImport } from './routes/dashboard/admin'
+import { Route as CompanySlugDDriverSlugRouteImport } from './routes/$companySlug/d/$driverSlug'
 
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardIndexRoute = DashboardIndexRouteImport.update({
+  id: '/dashboard/',
+  path: '/dashboard/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardDriverRoute = DashboardDriverRouteImport.update({
+  id: '/dashboard/driver',
+  path: '/dashboard/driver',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardAdminRoute = DashboardAdminRouteImport.update({
+  id: '/dashboard/admin',
+  path: '/dashboard/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompanySlugDDriverSlugRoute = CompanySlugDDriverSlugRouteImport.update({
+  id: '/$companySlug/d/$driverSlug',
+  path: '/$companySlug/d/$driverSlug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/dashboard/admin': typeof DashboardAdminRoute
+  '/dashboard/driver': typeof DashboardDriverRoute
+  '/dashboard/': typeof DashboardIndexRoute
+  '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/dashboard/admin': typeof DashboardAdminRoute
+  '/dashboard/driver': typeof DashboardDriverRoute
+  '/dashboard': typeof DashboardIndexRoute
+  '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/dashboard/admin': typeof DashboardAdminRoute
+  '/dashboard/driver': typeof DashboardDriverRoute
+  '/dashboard/': typeof DashboardIndexRoute
+  '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/dashboard/admin'
+    | '/dashboard/driver'
+    | '/dashboard/'
+    | '/$companySlug/d/$driverSlug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/dashboard/admin'
+    | '/dashboard/driver'
+    | '/dashboard'
+    | '/$companySlug/d/$driverSlug'
+  id:
+    | '__root__'
+    | '/'
+    | '/auth'
+    | '/dashboard/admin'
+    | '/dashboard/driver'
+    | '/dashboard/'
+    | '/$companySlug/d/$driverSlug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRoute
+  DashboardAdminRoute: typeof DashboardAdminRoute
+  DashboardDriverRoute: typeof DashboardDriverRoute
+  DashboardIndexRoute: typeof DashboardIndexRoute
+  CompanySlugDDriverSlugRoute: typeof CompanySlugDDriverSlugRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +124,45 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard/': {
+      id: '/dashboard/'
+      path: '/dashboard'
+      fullPath: '/dashboard/'
+      preLoaderRoute: typeof DashboardIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard/driver': {
+      id: '/dashboard/driver'
+      path: '/dashboard/driver'
+      fullPath: '/dashboard/driver'
+      preLoaderRoute: typeof DashboardDriverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard/admin': {
+      id: '/dashboard/admin'
+      path: '/dashboard/admin'
+      fullPath: '/dashboard/admin'
+      preLoaderRoute: typeof DashboardAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/$companySlug/d/$driverSlug': {
+      id: '/$companySlug/d/$driverSlug'
+      path: '/$companySlug/d/$driverSlug'
+      fullPath: '/$companySlug/d/$driverSlug'
+      preLoaderRoute: typeof CompanySlugDDriverSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRoute,
+  DashboardAdminRoute: DashboardAdminRoute,
+  DashboardDriverRoute: DashboardDriverRoute,
+  DashboardIndexRoute: DashboardIndexRoute,
+  CompanySlugDDriverSlugRoute: CompanySlugDDriverSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

@@ -58,7 +58,8 @@ export async function sendThankYou(
       : "";
   const vars: Record<string, string> = {
     customer_name: ctx.customerName?.trim() || "there",
-    driver_name: driver?.display_name ?? "your driver",
+    driver_name: driver?.display_name ?? "your service pro",
+    employee_name: driver?.display_name ?? "your service pro",
     company_name: company.name,
     stars: String(ctx.stars),
     tip_amount: tipAmount || "no tip",

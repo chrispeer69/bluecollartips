@@ -603,6 +603,117 @@ function UnverifiedPanel({ driverId, onChange }: { driverId: string; onChange: (
   );
 }
 
+function EarningsPanel({ driverId, driverName }: { driverId: string; driverName: string }) {
+  const payout = useServerFn(getPayoutStatement);
+  const today = new Date();
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const [from, setFrom] = useState(monthStart.toISOString().slice(0, 10));
+  const [to, setTo] = useState(today.toISOString().slice(0, 10));
+  const [data, setData] = useState<Awaited<ReturnType<typeof getPayoutStatement>> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function run() {
+    setBusy(true); setErr(null);
+    try {
+      const r = await payout({
+        data: {
+          driverId,
+          from: from ? new Date(from + "T00:00:00Z").toISOString() : undefined,
+          to: to ? new Date(to + "T23:59:59Z").toISOString() : undefined,
+        },
+      });
+      setData(r);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed");
+    } finally { setBusy(false); }
+  }
+  useEffect(() => { run(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  function downloadCsv() {
+    if (!data) return;
+    const header = ["date","source","customer","gross","employee_80","company_10","platform_10","verified","note"];
+    const rows = data.tips.map((t) => [
+      new Date(t.created_at).toISOString(),
+      t.source,
+      (t.customer_name ?? "").replaceAll(",", " "),
+      (t.amount_cents / 100).toFixed(2),
+      (t.driver_amount_cents / 100).toFixed(2),
+      (t.company_amount_cents / 100).toFixed(2),
+      (t.platform_amount_cents / 100).toFixed(2),
+      t.verified ? "yes" : "",
+      (t.note ?? "").replaceAll(",", " "),
+    ]);
+    const csv = [header, ...rows].map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${driverName.replace(/\s+/g, "-").toLowerCase()}-payouts-${from}_${to}.csv`;
+    a.click();
+  }
+
+  return (
+    <Section title="My earnings / payout statement">
+      <div className="flex flex-wrap items-end gap-2 text-sm">
+        <label>From<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="mt-1 block rounded-md border border-input bg-background px-3 py-2 text-sm" /></label>
+        <label>To<input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="mt-1 block rounded-md border border-input bg-background px-3 py-2 text-sm" /></label>
+        <button onClick={run} disabled={busy} className="rounded-md border border-border px-3 py-2 text-sm">{busy ? "…" : "Run"}</button>
+        <button onClick={downloadCsv} disabled={!data} className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50">Export CSV</button>
+        <a
+          href={`/print/employee/${driverId}?mode=statement&from=${encodeURIComponent(new Date(from + "T00:00:00Z").toISOString())}&to=${encodeURIComponent(new Date(to + "T23:59:59Z").toISOString())}`}
+          target="_blank" rel="noopener noreferrer"
+          className="rounded-md bg-secondary px-3 py-2 text-sm text-secondary-foreground"
+        >
+          Print / PDF
+        </a>
+      </div>
+      {err && <div className="mt-2 text-xs text-destructive">{err}</div>}
+      {data && (
+        <div className="mt-4 grid gap-2 sm:grid-cols-4">
+          <Stat label="Gross" value={dollars(data.totals.gross)} />
+          <Stat label="Your 80%" value={dollars(data.totals.driver)} />
+          <Stat label="Company 10%" value={dollars(data.totals.company)} />
+          <Stat label="Platform 10%" value={dollars(data.totals.platform)} />
+        </div>
+      )}
+      {data && data.tips.length === 0 && <div className="mt-3 text-xs text-muted-foreground">No tips in this range.</div>}
+    </Section>
+  );
+}
+
+function NotifyPrefsPanel({ driverId, initial, phone }: { driverId: string; initial: boolean; phone: string | null }) {
+  const save = useServerFn(updateNotifyPrefs);
+  const [enabled, setEnabled] = useState(initial);
+  const [msg, setMsg] = useState<string | null>(null);
+  return (
+    <Section title="Notifications">
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={async (e) => {
+            const v = e.target.checked;
+            setEnabled(v);
+            setMsg(null);
+            try {
+              await save({ data: { driverId, notifySms: v } });
+              setMsg("Saved ✓");
+            } catch (err) {
+              setEnabled(!v);
+              setMsg(err instanceof Error ? err.message : "Failed");
+            }
+          }}
+        />
+        Text me when I get a new tip or rating
+      </label>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {phone ? `SMS will be sent to ${phone}.` : "Add a phone number to your profile so we can text you."}
+      </p>
+      {msg && <p className="mt-1 text-xs text-muted-foreground">{msg}</p>}
+    </Section>
+  );
+}
+
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border border-border bg-card p-5">

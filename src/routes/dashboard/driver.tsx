@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { QRCodeCanvas } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
-import { getDriverDashboard, logManualTip } from "@/lib/driver.functions";
+import { getDriverDashboard, logManualTip, updateNotifyPrefs } from "@/lib/driver.functions";
+import { getPayoutStatement } from "@/lib/payouts.functions";
 import { PRESET_TIPS, SPLIT, TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib/constants";
 import { createDriverOnboardingLink, refreshStripeStatus } from "@/lib/stripe.functions";
 import { sendTipLinkSms } from "@/lib/sms.functions";
@@ -150,6 +151,14 @@ function DriverDashboard() {
                 >
                   Show QR fullscreen
                 </button>
+                <a
+                  href={`/print/employee/${data.driver.id}?mode=poster`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-md border border-border px-3 py-2 text-sm"
+                >
+                  Print branded poster
+                </a>
               </div>
               <p className="mt-3 text-xs text-muted-foreground">
                 Print it on a card or sticker, hold your phone up for the customer to scan,
@@ -162,6 +171,10 @@ function DriverDashboard() {
         {showQR && <FullscreenQR url={tipUrl} onClose={() => setShowQR(false)} />}
 
         <LogTipPanel driverId={data.driver.id} onLogged={() => load(data.driver.id)} />
+
+        <EarningsPanel driverId={data.driver.id} driverName={data.driver.display_name} />
+
+        <NotifyPrefsPanel driverId={data.driver.id} initial={!!data.driver.notify_sms} phone={data.driver.phone ?? null} />
 
         <StripePanel driverId={data.driver.id} stripeEnabled={!!data.driver.stripe_charges_enabled} />
 

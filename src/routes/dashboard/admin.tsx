@@ -409,7 +409,7 @@ function DriverQRModal({ driverName, url, onClose }: { driverName: string; url: 
               Download QR (PNG)
             </button>
             <a
-              href={`sms:?&body=${encodeURIComponent(`Thanks for choosing us! Rate Rate & tip your driver: tip us: ${url}`)}`}
+              href={`sms:?&body=${encodeURIComponent(`Thanks for choosing us! Rate & tip us: ${url}`)}`}
               className="rounded-md bg-secondary px-3 py-2 text-sm text-secondary-foreground"
             >
               Open in Messages

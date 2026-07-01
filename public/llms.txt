@@ -1,10 +1,10 @@
-# Blue Collar AI
+# Blue Collar Tips
 
-> Review, reputation, and tipping platform for towing companies and other blue-collar service crews.
+> Recognition and tipping platform for any field service employee — the feedback loop that turns good work into more tips.
 
-Blue Collar AI lets service drivers collect customer ratings, feedback, and tips through a branded public page — shared by QR code or text link — while company admins manage drivers, branding, and tip reconciliation.
+Blue Collar Tips helps field service employees (towing, HVAC, plumbing, landscaping, cleaning, delivery, install/repair, and more) get recognized more often for doing good work. Company-supported and technology-leveraged: a branded page delivered by QR code or text link captures a rating, feedback, and a tip in one tap. The feedback gets you the tip — more often, and with higher payouts.
 
 ## Pages
 
-- [Home](/): What Blue Collar AI does and who it's for.
+- [Home](/): What Blue Collar Tips does and who it's for.
 - [Sign in or sign up](/auth): Create an account or redeem a company invite.

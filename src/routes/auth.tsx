@@ -7,10 +7,10 @@ import { claimRole, getMyRoleContext } from "@/lib/auth.functions";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in — Blue Collar AI" },
-      { name: "description", content: "Sign in to Blue Collar AI to manage employee tips, customer ratings, team invites, and company reputation tools." },
-      { property: "og:title", content: "Sign in — Blue Collar AI" },
-      { property: "og:description", content: "Sign in or create your Blue Collar AI account to manage tips, ratings, and your team." },
+      { title: "Sign in — Blue Collar Tips" },
+      { name: "description", content: "Sign in to Blue Collar Tips to manage employee tips, customer ratings, team invites, and company reputation tools." },
+      { property: "og:title", content: "Sign in — Blue Collar Tips" },
+      { property: "og:description", content: "Sign in or create your Blue Collar Tips account to manage tips, ratings, and your team." },
       { property: "og:url", content: "https://roadsidetips.lovable.app/auth" },
     ],
     links: [{ rel: "canonical", href: "https://roadsidetips.lovable.app/auth" }],

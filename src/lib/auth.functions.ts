@@ -72,6 +72,6 @@ export const claimRole = createServerFn({ method: "POST" })
       return { role: "super_admin" as const, companyId: null };
     }
     throw new Error(
-      "No invite code provided. Ask your company admin for one, or contact Blue Collar AI.",
+      "No invite code provided. Ask your company admin for one, or contact Blue Collar Tips.",
     );
   });

@@ -13,10 +13,10 @@ import { confirmCashTip, disputeCashTip, listUnverifiedTips } from "@/lib/reconc
 export const Route = createFileRoute("/dashboard/driver")({
   head: () => ({
     meta: [
-      { title: "My dashboard — Blue Collar AI" },
-      { name: "description", content: "View your ratings, track tips, share your QR code, and log cash or P2P tips from your Blue Collar AI employee dashboard." },
+      { title: "My dashboard — Blue Collar Tips" },
+      { name: "description", content: "View your ratings, track tips, share your QR code, and log cash or P2P tips from your Blue Collar Tips employee dashboard." },
       { name: "robots", content: "noindex" },
-      { property: "og:title", content: "Employee dashboard — Blue Collar AI" },
+      { property: "og:title", content: "Employee dashboard — Blue Collar Tips" },
       { property: "og:description", content: "Track your ratings and tips, share your QR code, and log cash or P2P tips." },
       { property: "og:url", content: "/dashboard/driver" },
     ],

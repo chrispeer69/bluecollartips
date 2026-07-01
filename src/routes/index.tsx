@@ -3,16 +3,16 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Blue Collar AI — Tips & Reputation for Service Pros" },
+      { title: "Blue Collar Tips — Get Recognized. Get Tipped More." },
       {
         name: "description",
         content:
-          "A tip and review platform built for towing companies and blue-collar service teams. Capture ratings, collect tips, and grow your reputation.",
+          "Recognition and tipping for any field service employee. Company-supported technology that turns great work into more feedback — and more tips.",
       },
-      { property: "og:title", content: "Blue Collar AI — Tips & Reputation for Service Pros" },
+      { property: "og:title", content: "Blue Collar Tips — Get Recognized. Get Tipped More." },
       {
         property: "og:description",
-        content: "Tips and reviews for towing companies and field service teams.",
+        content: "The feedback loop that turns good work into more tips — for any field service crew.",
       },
       { property: "og:url", content: "https://roadsidetips.lovable.app/" },
     ],
@@ -30,7 +30,7 @@ function Index() {
             <div className="grid h-8 w-8 place-items-center rounded-md bg-primary text-primary-foreground font-bold">
               B
             </div>
-            <span className="font-semibold">Blue Collar AI</span>
+            <span className="font-semibold">Blue Collar Tips</span>
           </div>
           <Link
             to="/auth"
@@ -41,17 +41,20 @@ function Index() {
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-6 py-20">
-        <span className="inline-block rounded-full bg-secondary/15 px-3 py-1 text-xs font-medium text-secondary">
-          For towing & field service
+          <span className="inline-block rounded-full bg-secondary/15 px-3 py-1 text-xs font-medium text-secondary">
+          For every field service crew
         </span>
         <h1 className="display mt-6 text-5xl font-bold leading-tight md:text-6xl">
-          Get paid in tips.
+          Get recognized.
           <br />
-          <span className="text-secondary">Get found on Google.</span>
+          <span className="text-secondary">Get tipped more.</span>
         </h1>
         <p className="mt-6 max-w-2xl text-lg text-muted-foreground">
-          A simple QR code at the end of every job. Customers rate your service, leave feedback,
-          and tip — all in one tap. Employees get paid, companies build reputation.
+          Blue Collar Tips is built for any field service employee whose company wants to
+          leverage technology to celebrate good work. One QR code at the end of every job —
+          customers rate, leave feedback, and tip in a single tap. The feedback gets you the tip,
+          more often. Towing, HVAC, plumbing, landscaping, cleaning, delivery, install &
+          repair — if you show up and do it right, this app makes sure someone notices.
         </p>
         <div className="mt-10 flex flex-wrap gap-3">
           <Link
@@ -103,7 +106,7 @@ function Index() {
         </div>
       </main>
       <footer className="border-t border-border py-8 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} Blue Collar AI
+        © {new Date().getFullYear()} Blue Collar Tips
       </footer>
     </div>
   );

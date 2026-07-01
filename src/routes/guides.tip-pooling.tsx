@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 export const Route = createFileRoute("/guides/tip-pooling")({
   head: () => ({
     meta: [
-      { title: "Tip Pooling for Field Service Teams — Blue Collar AI" },
+      { title: "Tip Pooling for Field Service Teams — Blue Collar Tips" },
       {
         name: "description",
         content:
@@ -30,8 +30,8 @@ export const Route = createFileRoute("/guides/tip-pooling")({
           headline: "Tip Pooling for Field Service Teams",
           description:
             "How automated tip pooling and the 80/10/10 split work for towing and field service companies.",
-          author: { "@type": "Organization", name: "Blue Collar AI" },
-          publisher: { "@type": "Organization", name: "Blue Collar AI" },
+          author: { "@type": "Organization", name: "Blue Collar Tips" },
+          publisher: { "@type": "Organization", name: "Blue Collar Tips" },
           mainEntityOfPage: "https://roadsidetips.lovable.app/guides/tip-pooling",
         }),
       },
@@ -49,7 +49,7 @@ function TipPoolingGuide() {
             <div className="grid h-8 w-8 place-items-center rounded-md bg-primary font-bold text-primary-foreground">
               B
             </div>
-            <span className="font-semibold">Blue Collar AI</span>
+            <span className="font-semibold">Blue Collar Tips</span>
           </Link>
           <Link
             to="/auth"
@@ -110,7 +110,7 @@ function TipPoolingGuide() {
         <section className="mt-10 space-y-4">
           <h2 className="text-2xl font-semibold">The 80/10/10 split</h2>
           <p>
-            Blue Collar AI uses an 80/10/10 split as the default for towing companies, and
+            Blue Collar Tips uses an 80/10/10 split as the default for towing companies, and
             it's the model we recommend for most field service crews:
           </p>
           <div className="rounded-lg border border-border bg-card p-6">
@@ -150,7 +150,7 @@ function TipPoolingGuide() {
           <ul className="list-disc space-y-2 pl-6">
             <li>
               <strong>Document the formula in writing</strong> and have drivers acknowledge
-              it during onboarding. Blue Collar AI captures this at invite time.
+              it during onboarding. Blue Collar Tips captures this at invite time.
             </li>
             <li>
               <strong>Keep an immutable record of every tip and split.</strong> A scanned
@@ -198,7 +198,7 @@ function TipPoolingGuide() {
       </main>
 
       <footer className="border-t border-border py-8 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} Blue Collar AI
+        © {new Date().getFullYear()} Blue Collar Tips
       </footer>
     </div>
   );

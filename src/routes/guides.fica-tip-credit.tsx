@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 export const Route = createFileRoute("/guides/fica-tip-credit")({
   head: () => ({
     meta: [
-      { title: "FICA Tip Credit (Section 45B): Employer's Guide — Blue Collar AI" },
+      { title: "FICA Tip Credit (Section 45B): Employer's Guide — Blue Collar Tips" },
       {
         name: "description",
         content:
@@ -30,8 +30,8 @@ export const Route = createFileRoute("/guides/fica-tip-credit")({
           headline: "FICA Tip Credit (Section 45B): Employer's Guide",
           description:
             "How service business owners claim the Section 45B FICA tip credit on Form 8846.",
-          author: { "@type": "Organization", name: "Blue Collar AI" },
-          publisher: { "@type": "Organization", name: "Blue Collar AI" },
+          author: { "@type": "Organization", name: "Blue Collar Tips" },
+          publisher: { "@type": "Organization", name: "Blue Collar Tips" },
           mainEntityOfPage: "https://roadsidetips.lovable.app/guides/fica-tip-credit",
         }),
       },
@@ -49,7 +49,7 @@ function FicaTipCreditGuide() {
             <div className="grid h-8 w-8 place-items-center rounded-md bg-primary font-bold text-primary-foreground">
               B
             </div>
-            <span className="font-semibold">Blue Collar AI</span>
+            <span className="font-semibold">Blue Collar Tips</span>
           </Link>
           <Link
             to="/auth"
@@ -165,7 +165,7 @@ function FicaTipCreditGuide() {
             <li>P2P tips: same as cash — employee-reported, employer-logged.</li>
           </ul>
           <p>
-            Blue Collar AI captures every tip — card, cash, and P2P — with a per-driver
+            Blue Collar Tips captures every tip — card, cash, and P2P — with a per-driver
             ledger, timestamp, and customer rating link. When tax time comes, your CPA can
             pull a per-employee tip report in one click and drop the totals straight into
             Form 8846.
@@ -202,7 +202,7 @@ function FicaTipCreditGuide() {
         <section className="mt-12 rounded-lg border border-border bg-card p-6">
           <h2 className="text-xl font-semibold">Make tip documentation automatic</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Blue Collar AI logs every card, cash, and P2P tip per driver — the exact record
+            Blue Collar Tips logs every card, cash, and P2P tip per driver — the exact record
             your CPA needs for Form 8846.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
@@ -223,7 +223,7 @@ function FicaTipCreditGuide() {
       </main>
 
       <footer className="border-t border-border py-8 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} Blue Collar AI
+        © {new Date().getFullYear()} Blue Collar Tips
       </footer>
     </div>
   );

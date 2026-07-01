@@ -1000,3 +1000,101 @@ function ThankYouTemplatesPanel({ companyId }: { companyId: string }) {
     </form>
   );
 }
+
+function LocationsPanel({ companyId }: { companyId: string }) {
+  const list = useServerFn(listLocations);
+  const create = useServerFn(createLocation);
+  const del = useServerFn(deleteLocation);
+  const [items, setItems] = useState<Awaited<ReturnType<typeof listLocations>>>([]);
+  const [name, setName] = useState("");
+  const [addr, setAddr] = useState("");
+  const reload = async () => setItems(await list({ data: { companyId } }));
+  useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [companyId]);
+  return (
+    <div className="space-y-3">
+      <form
+        className="flex flex-wrap items-end gap-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!name.trim()) return;
+          await create({ data: { companyId, name: name.trim(), address: addr.trim() || null } });
+          setName(""); setAddr("");
+          await reload();
+        }}
+      >
+        <Input label="Location / crew name" value={name} onChange={setName} required />
+        <Input label="Address (optional)" value={addr} onChange={setAddr} />
+        <button className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground">Add location</button>
+      </form>
+      {items.length === 0 ? (
+        <div className="text-sm text-muted-foreground">No locations yet — add one to group employees by yard or crew.</div>
+      ) : (
+        <ul className="divide-y divide-border text-sm">
+          {items.map((l) => (
+            <li key={l.id} className="flex items-center justify-between py-2">
+              <div>
+                <div className="font-medium">{l.name}</div>
+                {l.address && <div className="text-xs text-muted-foreground">{l.address}</div>}
+              </div>
+              <button
+                onClick={async () => { if (confirm(`Delete location "${l.name}"?`)) { await del({ data: { locationId: l.id } }); await reload(); } }}
+                className="rounded border border-border px-2 py-1 text-xs"
+              >Delete</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function ReviewLinksPanel({
+  companyId,
+  initial,
+  onSaved,
+}: {
+  companyId: string;
+  initial: { google: string; yelp: string; facebook: string };
+  onSaved: () => void;
+}) {
+  const save = useServerFn(updateReviewLinks);
+  const [google, setGoogle] = useState(initial.google);
+  const [yelp, setYelp] = useState(initial.yelp);
+  const [facebook, setFacebook] = useState(initial.facebook);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  return (
+    <form
+      className="grid gap-3 sm:grid-cols-2"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true); setMsg(null);
+        try {
+          await save({
+            data: {
+              companyId,
+              googleUrl: google.trim() || null,
+              yelpUrl: yelp.trim() || null,
+              facebookUrl: facebook.trim() || null,
+            },
+          });
+          setMsg("Saved ✓");
+          onSaved();
+        } catch (err) {
+          setMsg(err instanceof Error ? err.message : "Failed");
+        } finally { setBusy(false); }
+      }}
+    >
+      <Input label="Google review URL" value={google} onChange={setGoogle} placeholder="https://g.page/r/…/review" />
+      <Input label="Yelp review URL" value={yelp} onChange={setYelp} placeholder="https://www.yelp.com/writeareview/biz/…" />
+      <Input label="Facebook review URL" value={facebook} onChange={setFacebook} placeholder="https://www.facebook.com/…/reviews" />
+      <div className="sm:col-span-2 flex items-center gap-3">
+        <button disabled={busy} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">
+          {busy ? "Saving…" : "Save review links"}
+        </button>
+        {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
+        <span className="text-xs text-muted-foreground">Shown to happy customers (5★) after they submit a rating.</span>
+      </div>
+    </form>
+  );
+}

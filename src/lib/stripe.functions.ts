@@ -3,21 +3,38 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { TIP_MAX_CENTS, TIP_MIN_CENTS } from "./constants";
 
+async function resolveStripeDriver(userId: string, driverId?: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  let query = supabaseAdmin
+    .from("drivers")
+    .select("id, email, display_name, stripe_account_id, company_id, user_id")
+    .limit(1);
+  query = driverId ? query.eq("id", driverId) : query.eq("user_id", userId);
+  const { data: driver } = await query.maybeSingle();
+  if (!driver) throw new Error("No driver profile");
+  if (driver.user_id === userId) return driver;
+
+  const { data: roles } = await supabaseAdmin
+    .from("user_roles")
+    .select("role, company_id")
+    .eq("user_id", userId);
+  const ok = roles?.some(
+    (r) => r.role === "super_admin" || (r.role === "company_admin" && r.company_id === driver.company_id),
+  );
+  if (!ok) throw new Error("Forbidden");
+  return driver;
+}
+
 /** Driver-initiated Stripe Express onboarding. Returns a one-time AccountLink URL. */
 export const createDriverOnboardingLink = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ returnUrl: z.string().url() }).parse(d))
+  .inputValidator((d) => z.object({ returnUrl: z.string().url(), driverId: z.string().uuid().optional() }).parse(d))
   .handler(async ({ data, context }) => {
     const { getStripe } = await import("./stripe.server");
     const stripe = getStripe();
     if (!stripe) throw new Error("Stripe is not configured yet. Ask the platform admin to add STRIPE_SECRET_KEY.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: driver } = await supabaseAdmin
-      .from("drivers")
-      .select("id, email, display_name, stripe_account_id")
-      .eq("user_id", context.userId)
-      .maybeSingle();
-    if (!driver) throw new Error("No driver profile");
+    const driver = await resolveStripeDriver(context.userId, data.driverId);
 
     let accountId = driver.stripe_account_id;
     if (!accountId) {
@@ -42,16 +59,13 @@ export const createDriverOnboardingLink = createServerFn({ method: "POST" })
 /** Refresh Stripe status flags for the signed-in driver. */
 export const refreshStripeStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((d) => z.object({ driverId: z.string().uuid().optional() }).optional().parse(d))
+  .handler(async ({ data, context }) => {
     const { getStripe } = await import("./stripe.server");
     const stripe = getStripe();
     if (!stripe) return { enabled: false };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: driver } = await supabaseAdmin
-      .from("drivers")
-      .select("id, stripe_account_id")
-      .eq("user_id", context.userId)
-      .maybeSingle();
+    const driver = await resolveStripeDriver(context.userId, data?.driverId);
     if (!driver?.stripe_account_id) return { enabled: false };
     const acct = await stripe.accounts.retrieve(driver.stripe_account_id);
     await supabaseAdmin

@@ -89,7 +89,48 @@ function TipPage() {
             Your feedback helps {driver.display_name} and the {company.name} team keep raising the
             bar.
           </p>
-          {/* Future: Google review redirect button hooks in here */}
+          {stars >= 5 && (company.google_review_url || company.yelp_review_url || company.facebook_review_url) && (
+            <div className="mt-8 rounded-lg bg-white/10 p-4 text-left">
+              <div className="text-center text-sm opacity-90">
+                Loved us? Share a review — it takes 30 seconds and means the world:
+              </div>
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                {company.google_review_url && (
+                  <a
+                    href={company.google_review_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-md bg-white px-4 py-2 text-sm font-semibold"
+                    style={{ color: brand.primary }}
+                  >
+                    Review on Google
+                  </a>
+                )}
+                {company.yelp_review_url && (
+                  <a
+                    href={company.yelp_review_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-md bg-white px-4 py-2 text-sm font-semibold"
+                    style={{ color: brand.primary }}
+                  >
+                    Review on Yelp
+                  </a>
+                )}
+                {company.facebook_review_url && (
+                  <a
+                    href={company.facebook_review_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-md bg-white px-4 py-2 text-sm font-semibold"
+                    style={{ color: brand.primary }}
+                  >
+                    Review on Facebook
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );

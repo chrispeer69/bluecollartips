@@ -135,3 +135,23 @@ export const logManualTip = createServerFn({ method: "POST" })
     if (error) throw error;
     return { ok: true };
   });
+
+export const updateNotifyPrefs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({
+      driverId: z.string().uuid().optional(),
+      notifySms: z.boolean(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { driver } = await resolveAccessibleDriver(context.userId, data.driverId);
+    if (!driver) throw new Error("No driver profile");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("drivers")
+      .update({ notify_sms: data.notifySms })
+      .eq("id", driver.id);
+    if (error) throw error;
+    return { ok: true };
+  });

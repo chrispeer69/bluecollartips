@@ -87,6 +87,8 @@ export type Database = {
       companies: {
         Row: {
           created_at: string
+          facebook_review_url: string | null
+          google_review_url: string | null
           id: string
           logo_url: string | null
           name: string
@@ -101,9 +103,12 @@ export type Database = {
           thank_you_email_template: string
           thank_you_enabled: boolean
           thank_you_sms_template: string
+          yelp_review_url: string | null
         }
         Insert: {
           created_at?: string
+          facebook_review_url?: string | null
+          google_review_url?: string | null
           id?: string
           logo_url?: string | null
           name: string
@@ -118,9 +123,12 @@ export type Database = {
           thank_you_email_template?: string
           thank_you_enabled?: boolean
           thank_you_sms_template?: string
+          yelp_review_url?: string | null
         }
         Update: {
           created_at?: string
+          facebook_review_url?: string | null
+          google_review_url?: string | null
           id?: string
           logo_url?: string | null
           name?: string
@@ -135,6 +143,7 @@ export type Database = {
           thank_you_email_template?: string
           thank_you_enabled?: boolean
           thank_you_sms_template?: string
+          yelp_review_url?: string | null
         }
         Relationships: []
       }
@@ -208,6 +217,8 @@ export type Database = {
           email: string | null
           employee_id: string | null
           id: string
+          location_id: string | null
+          notify_sms: boolean
           paypal_handle: string | null
           phone: string | null
           photo_url: string | null
@@ -229,6 +240,8 @@ export type Database = {
           email?: string | null
           employee_id?: string | null
           id?: string
+          location_id?: string | null
+          notify_sms?: boolean
           paypal_handle?: string | null
           phone?: string | null
           photo_url?: string | null
@@ -250,6 +263,8 @@ export type Database = {
           email?: string | null
           employee_id?: string | null
           id?: string
+          location_id?: string | null
+          notify_sms?: boolean
           paypal_handle?: string | null
           phone?: string | null
           photo_url?: string | null
@@ -269,6 +284,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drivers_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           },
         ]
@@ -471,6 +493,38 @@ export type Database = {
           },
         ]
       }
+      locations: {
+        Row: {
+          address: string | null
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          address?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          address?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "locations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -492,6 +546,27 @@ export type Database = {
           id?: string
           phone?: string | null
           photo_url?: string | null
+        }
+        Relationships: []
+      }
+      rating_rate_limits: {
+        Row: {
+          count: number
+          driver_id: string
+          ip_hash: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          driver_id: string
+          ip_hash: string
+          window_start: string
+        }
+        Update: {
+          count?: number
+          driver_id?: string
+          ip_hash?: string
+          window_start?: string
         }
         Relationships: []
       }

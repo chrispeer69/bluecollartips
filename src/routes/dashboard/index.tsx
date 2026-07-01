@@ -25,21 +25,10 @@ function DashboardRouter() {
 
   useEffect(() => {
     (async () => {
-      let { data } = await supabase.auth.getSession();
+      const { data } = await supabase.auth.getSession();
       if (!data.session) {
-        if (import.meta.env.DEV) {
-          // Wait briefly for dev auto-login to establish a session.
-          const { ensureDevSession } = await import("@/lib/dev-auth");
-          await ensureDevSession();
-          for (let i = 0; i < 20 && !data.session; i++) {
-            await new Promise((r) => setTimeout(r, 150));
-            data = (await supabase.auth.getSession()).data;
-          }
-        }
-        if (!data.session) {
-          navigate({ to: "/auth" });
-          return;
-        }
+        navigate({ to: "/auth" });
+        return;
       }
       try {
         const ctx = await getRole();

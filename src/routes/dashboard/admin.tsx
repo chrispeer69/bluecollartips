@@ -19,6 +19,7 @@ import { createInvite, listInvites, revokeInvite } from "@/lib/invites.functions
 import { reconciliationOverview } from "@/lib/reconciliation.functions";
 import { platformOverview, suspendTenant } from "@/lib/platform.functions";
 import { sendTipLinkSms } from "@/lib/sms.functions";
+import { listLocations, createLocation, deleteLocation, setDriverLocation, updateReviewLinks } from "@/lib/locations.functions";
 
 export const Route = createFileRoute("/dashboard/admin")({
   head: () => ({
@@ -151,6 +152,8 @@ function AdminDashboard() {
               await load(companyId);
             }}
             companySlug={data.company.slug}
+            companyId={data.company.id}
+            onLocationChanged={() => load(companyId)}
           />
         </Section>
 
@@ -161,6 +164,22 @@ function AdminDashboard() {
               await updateCo({ data: { ...v, companyId: data.company!.id } });
               await load(companyId);
             }}
+          />
+        </Section>
+
+        <Section title="Locations / crews">
+          <LocationsPanel companyId={data.company.id} />
+        </Section>
+
+        <Section title="Review syndication links (Google / Yelp / Facebook)">
+          <ReviewLinksPanel
+            companyId={data.company.id}
+            initial={{
+              google: data.company.google_review_url ?? "",
+              yelp: data.company.yelp_review_url ?? "",
+              facebook: data.company.facebook_review_url ?? "",
+            }}
+            onSaved={() => load(companyId)}
           />
         </Section>
 

@@ -18,6 +18,7 @@ import { Route as GuidesTipPoolingRouteImport } from './routes/guides.tip-poolin
 import { Route as GuidesFicaTipCreditRouteImport } from './routes/guides.fica-tip-credit'
 import { Route as DashboardDriverRouteImport } from './routes/dashboard/driver'
 import { Route as DashboardAdminRouteImport } from './routes/dashboard/admin'
+import { Route as PrintEmployeeIdRouteImport } from './routes/print.employee.$id'
 import { Route as CompanySlugDDriverSlugRouteImport } from './routes/$companySlug/d/$driverSlug'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as ApiPublicWebhooksStripeRouteImport } from './routes/api/public/webhooks/stripe'
@@ -67,6 +68,11 @@ const DashboardAdminRoute = DashboardAdminRouteImport.update({
   path: '/dashboard/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrintEmployeeIdRoute = PrintEmployeeIdRouteImport.update({
+  id: '/print/employee/$id',
+  path: '/print/employee/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CompanySlugDDriverSlugRoute = CompanySlugDDriverSlugRouteImport.update({
   id: '/$companySlug/d/$driverSlug',
   path: '/$companySlug/d/$driverSlug',
@@ -95,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/join/$code': typeof JoinCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
+  '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
 }
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
   '/join/$code': typeof JoinCodeRoute
   '/dashboard': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
+  '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
 }
@@ -124,6 +132,7 @@ export interface FileRoutesById {
   '/join/$code': typeof JoinCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
+  '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
 }
@@ -140,6 +149,7 @@ export interface FileRouteTypes {
     | '/join/$code'
     | '/dashboard/'
     | '/$companySlug/d/$driverSlug'
+    | '/print/employee/$id'
     | '/api/public/webhooks/stripe'
     | '/lovable/email/queue/process'
   fileRoutesByTo: FileRoutesByTo
@@ -154,6 +164,7 @@ export interface FileRouteTypes {
     | '/join/$code'
     | '/dashboard'
     | '/$companySlug/d/$driverSlug'
+    | '/print/employee/$id'
     | '/api/public/webhooks/stripe'
     | '/lovable/email/queue/process'
   id:
@@ -168,6 +179,7 @@ export interface FileRouteTypes {
     | '/join/$code'
     | '/dashboard/'
     | '/$companySlug/d/$driverSlug'
+    | '/print/employee/$id'
     | '/api/public/webhooks/stripe'
     | '/lovable/email/queue/process'
   fileRoutesById: FileRoutesById
@@ -183,6 +195,7 @@ export interface RootRouteChildren {
   JoinCodeRoute: typeof JoinCodeRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   CompanySlugDDriverSlugRoute: typeof CompanySlugDDriverSlugRoute
+  PrintEmployeeIdRoute: typeof PrintEmployeeIdRoute
   ApiPublicWebhooksStripeRoute: typeof ApiPublicWebhooksStripeRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
 }
@@ -252,6 +265,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/print/employee/$id': {
+      id: '/print/employee/$id'
+      path: '/print/employee/$id'
+      fullPath: '/print/employee/$id'
+      preLoaderRoute: typeof PrintEmployeeIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/$companySlug/d/$driverSlug': {
       id: '/$companySlug/d/$driverSlug'
       path: '/$companySlug/d/$driverSlug'
@@ -287,6 +307,7 @@ const rootRouteChildren: RootRouteChildren = {
   JoinCodeRoute: JoinCodeRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   CompanySlugDDriverSlugRoute: CompanySlugDDriverSlugRoute,
+  PrintEmployeeIdRoute: PrintEmployeeIdRoute,
   ApiPublicWebhooksStripeRoute: ApiPublicWebhooksStripeRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
 }

@@ -13,9 +13,9 @@ export const Route = createFileRoute("/dashboard/driver")({
   head: () => ({
     meta: [
       { title: "My dashboard — Blue Collar AI" },
-      { name: "description", content: "View your ratings, track tips, share your QR code, and log cash or P2P tips from your Blue Collar AI driver dashboard." },
+      { name: "description", content: "View your ratings, track tips, share your QR code, and log cash or P2P tips from your Blue Collar AI employee dashboard." },
       { name: "robots", content: "noindex" },
-      { property: "og:title", content: "Driver dashboard — Blue Collar AI" },
+      { property: "og:title", content: "Employee dashboard — Blue Collar AI" },
       { property: "og:description", content: "Track your ratings and tips, share your QR code, and log cash or P2P tips." },
       { property: "og:url", content: "/dashboard/driver" },
     ],
@@ -56,7 +56,7 @@ function DriverDashboard() {
   if (!data?.driver) {
     return (
       <Center>
-        Your driver profile isn't set up yet. Ask your company admin to add you.
+        Your employee profile isn't set up yet. Ask your company admin to add you.
       </Center>
     );
   }
@@ -81,10 +81,10 @@ function DriverDashboard() {
       />
       <div className="mx-auto max-w-5xl space-y-6 px-4 py-6">
         {data.accessibleDrivers.length > 1 && (
-          <Section title="Developer driver access">
+          <Section title="Developer employee access">
             <div className="flex flex-wrap items-center gap-3 text-sm">
               <label className="flex-1 min-w-64">
-                View any driver dashboard
+                View any employee dashboard
                 <select
                   value={data.driver.id}
                   onChange={(e) => {
@@ -104,7 +104,7 @@ function DriverDashboard() {
                 </select>
               </label>
               <span className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-                Super admins and company admins can inspect driver views without being assigned to that driver.
+                Super admins and company admins can inspect employee views without being assigned to that employee.
               </span>
             </div>
           </Section>

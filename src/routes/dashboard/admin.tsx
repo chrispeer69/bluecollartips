@@ -24,10 +24,10 @@ export const Route = createFileRoute("/dashboard/admin")({
   head: () => ({
     meta: [
       { title: "Admin — Blue Collar AI" },
-      { name: "description", content: "Manage drivers, branding, invites, and tip reconciliation for your company on Blue Collar AI." },
+      { name: "description", content: "Manage employees, branding, invites, and tip reconciliation for your company on Blue Collar AI." },
       { name: "robots", content: "noindex" },
       { property: "og:title", content: "Admin — Blue Collar AI" },
-      { property: "og:description", content: "Manage drivers, branding, invites, and tip reconciliation for your company." },
+      { property: "og:description", content: "Manage employees, branding, invites, and tip reconciliation for your company." },
       { property: "og:url", content: "/dashboard/admin" },
     ],
   }),
@@ -132,18 +132,18 @@ function AdminDashboard() {
         <div className="grid gap-4 sm:grid-cols-4">
           <Stat label="Tips (all-time)" value={dollars(totals.gross)} />
           <Stat label="Company 10%" value={dollars(totals.company)} />
-          <Stat label="Drivers" value={String(data.drivers.length)} />
+          <Stat label="Employees" value={String(data.drivers.length)} />
           <Stat label="Avg rating" value={ratingStats.avg ? ratingStats.avg.toFixed(2) + " ★" : "—"} />
         </div>
 
-        <Section title="Drivers">
+        <Section title="Employees">
           <DriverRoster
             drivers={data.drivers}
             ratingsByDriver={ratingStats.byDriver}
             tipsByDriver={totals.byDriver}
             onCreate={async (v) => {
               const r = await createDrv({ data: { ...v, companyId: data.company!.id } });
-              alert(`Driver created. Invite code (send to driver): ${r.inviteCode}`);
+              alert(`Employee created. Invite code (send to employee): ${r.inviteCode}`);
               await load(companyId);
             }}
             onStatus={async (driverId, status) => {
@@ -265,7 +265,7 @@ function DriverRoster({
     <>
       <div className="mb-3 flex justify-end">
         <button onClick={() => setOpen((v) => !v)} className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground">
-          {open ? "Cancel" : "Add driver"}
+          {open ? "Cancel" : "Add employee"}
         </button>
       </div>
       {open && (
@@ -296,7 +296,7 @@ function DriverRoster({
         </form>
       )}
       {drivers.length === 0 ? (
-        <div className="text-sm text-muted-foreground">No drivers yet. Add one to get started.</div>
+        <div className="text-sm text-muted-foreground">No employees yet. Add one to get started.</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -409,7 +409,7 @@ function DriverQRModal({ driverName, url, onClose }: { driverName: string; url: 
               Download QR (PNG)
             </button>
             <a
-              href={`sms:?&body=${encodeURIComponent(`Thanks for choosing us! Rate & tip your driver: ${url}`)}`}
+              href={`sms:?&body=${encodeURIComponent(`Thanks for choosing us! Rate Rate & tip your driver: tip us: ${url}`)}`}
               className="rounded-md bg-secondary px-3 py-2 text-sm text-secondary-foreground"
             >
               Open in Messages
@@ -529,7 +529,7 @@ function FlagsList({
         <li key={f.id} className="py-3 text-sm">
           <div className="flex items-center justify-between">
             <div>
-              <span className="font-medium">{byId.get(f.driver_id) ?? "Driver"}</span>
+              <span className="font-medium">{byId.get(f.driver_id) ?? "Employee"}</span>
               <span className="ml-2 text-muted-foreground">{f.reason}</span>
             </div>
             <select
@@ -664,7 +664,7 @@ function InvitesPanel({ companyId }: { companyId: string }) {
         <label className="text-sm">
           Role
           <select value={role} onChange={(e) => setRole(e.target.value as typeof role)} className="mt-1 block rounded-md border border-input bg-background px-3 py-2 text-sm">
-            <option value="driver">Driver</option>
+            <option value="driver">Employee</option>
             <option value="company_admin">Company admin</option>
           </select>
         </label>
@@ -720,7 +720,7 @@ function ReconciliationPanel({ companyId, drivers }: { companyId: string; driver
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="text-left text-xs uppercase text-muted-foreground">
-          <tr><th className="py-2">Driver</th><th>Total tips</th><th>Manual</th><th>Unverified</th><th>Unverified $</th><th>Unverified %</th></tr>
+          <tr><th className="py-2">Employee</th><th>Total tips</th><th>Manual</th><th>Unverified</th><th>Unverified $</th><th>Unverified %</th></tr>
         </thead>
         <tbody className="divide-y divide-border">
           {rows.map((r) => (
@@ -736,7 +736,7 @@ function ReconciliationPanel({ companyId, drivers }: { companyId: string; driver
         </tbody>
       </table>
       <p className="mt-2 text-xs text-muted-foreground">
-        Drivers above 20% unverified are highlighted; consider following up.
+        Employees above 20% unverified are highlighted; consider following up.
       </p>
     </div>
   );
@@ -748,7 +748,7 @@ function AdminSmsPanel({ drivers }: { drivers: Data["drivers"] }) {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
-  if (!drivers.length) return <div className="text-sm text-muted-foreground">Add a driver first.</div>;
+  if (!drivers.length) return <div className="text-sm text-muted-foreground">Add an employee first.</div>;
   return (
     <form
       className="flex flex-wrap items-end gap-2"
@@ -793,7 +793,7 @@ function PlatformPanel() {
         <Stat label="Gross tips" value={dollars(data.grossTotal)} />
         <Stat label="Platform 10%" value={dollars(data.platformTotal)} />
         <Stat label="Tenants" value={String(data.tenants.length)} />
-        <Stat label="Drivers" value={String(data.driverCount)} />
+        <Stat label="Employees" value={String(data.driverCount)} />
       </div>
       <div className="text-xs text-muted-foreground">
         Integrations · Stripe: <span className={data.integrations.stripe ? "text-emerald-600" : ""}>{data.integrations.stripe ? "connected" : "not connected"}</span>{" "}

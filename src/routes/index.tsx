@@ -51,7 +51,7 @@ function Index() {
         </h1>
         <p className="mt-6 max-w-2xl text-lg text-muted-foreground">
           A simple QR code at the end of every job. Customers rate your service, leave feedback,
-          and tip — all in one tap. Drivers get paid, companies build reputation.
+          and tip — all in one tap. Employees get paid, companies build reputation.
         </p>
         <div className="mt-10 flex flex-wrap gap-3">
           <Link
@@ -84,7 +84,7 @@ function Index() {
           {[
             {
               t: "1. Show the QR",
-              d: "Driver shows a personal QR code at the end of every job — sticker, clipboard, or business card.",
+              d: "Employee shows a personal QR code at the end of every job — sticker, clipboard, or business card.",
             },
             {
               t: "2. Rate & tip",
@@ -92,7 +92,7 @@ function Index() {
             },
             {
               t: "3. Split & track",
-              d: "Every tip splits 80/10/10 automatically. Drivers and admins see live earnings.",
+              d: "Every tip splits 80/10/10 automatically. Employees and admins see live earnings.",
             },
           ].map((s) => (
             <div key={s.t} className="rounded-lg border border-border bg-card p-6">

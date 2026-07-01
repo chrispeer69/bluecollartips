@@ -884,7 +884,7 @@ function ThankYouTemplatesPanel({ companyId }: { companyId: string }) {
     >
       <p className="text-xs text-muted-foreground">
         Sent automatically when a customer leaves a rating and provides a phone or email.
-        Available placeholders: <code>{"{{customer_name}}"}</code>, <code>{"{{driver_name}}"}</code>,
+        Available placeholders: <code>{"{{customer_name}}"}</code>, <code>{"{{employee_name}}"}</code>,
         <code>{"{{company_name}}"}</code>, <code>{"{{stars}}"}</code>, <code>{"{{tip_amount}}"}</code>,
         <code>{"{{tip_line}}"}</code>.
       </p>

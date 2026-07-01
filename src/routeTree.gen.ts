@@ -19,6 +19,7 @@ import { Route as GuidesFicaTipCreditRouteImport } from './routes/guides.fica-ti
 import { Route as DashboardDriverRouteImport } from './routes/dashboard/driver'
 import { Route as DashboardAdminRouteImport } from './routes/dashboard/admin'
 import { Route as PrintEmployeeIdRouteImport } from './routes/print.employee.$id'
+import { Route as ApiPublicBootstrapSuperAdminRouteImport } from './routes/api/public/bootstrap-super-admin'
 import { Route as CompanySlugDDriverSlugRouteImport } from './routes/$companySlug/d/$driverSlug'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as ApiPublicWebhooksStripeRouteImport } from './routes/api/public/webhooks/stripe'
@@ -73,6 +74,12 @@ const PrintEmployeeIdRoute = PrintEmployeeIdRouteImport.update({
   path: '/print/employee/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicBootstrapSuperAdminRoute =
+  ApiPublicBootstrapSuperAdminRouteImport.update({
+    id: '/api/public/bootstrap-super-admin',
+    path: '/api/public/bootstrap-super-admin',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const CompanySlugDDriverSlugRoute = CompanySlugDDriverSlugRouteImport.update({
   id: '/$companySlug/d/$driverSlug',
   path: '/$companySlug/d/$driverSlug',
@@ -101,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/join/$code': typeof JoinCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
+  '/api/public/bootstrap-super-admin': typeof ApiPublicBootstrapSuperAdminRoute
   '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -116,6 +124,7 @@ export interface FileRoutesByTo {
   '/join/$code': typeof JoinCodeRoute
   '/dashboard': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
+  '/api/public/bootstrap-super-admin': typeof ApiPublicBootstrapSuperAdminRoute
   '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -132,6 +141,7 @@ export interface FileRoutesById {
   '/join/$code': typeof JoinCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
+  '/api/public/bootstrap-super-admin': typeof ApiPublicBootstrapSuperAdminRoute
   '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -149,6 +159,7 @@ export interface FileRouteTypes {
     | '/join/$code'
     | '/dashboard/'
     | '/$companySlug/d/$driverSlug'
+    | '/api/public/bootstrap-super-admin'
     | '/print/employee/$id'
     | '/api/public/webhooks/stripe'
     | '/lovable/email/queue/process'
@@ -164,6 +175,7 @@ export interface FileRouteTypes {
     | '/join/$code'
     | '/dashboard'
     | '/$companySlug/d/$driverSlug'
+    | '/api/public/bootstrap-super-admin'
     | '/print/employee/$id'
     | '/api/public/webhooks/stripe'
     | '/lovable/email/queue/process'
@@ -179,6 +191,7 @@ export interface FileRouteTypes {
     | '/join/$code'
     | '/dashboard/'
     | '/$companySlug/d/$driverSlug'
+    | '/api/public/bootstrap-super-admin'
     | '/print/employee/$id'
     | '/api/public/webhooks/stripe'
     | '/lovable/email/queue/process'
@@ -195,6 +208,7 @@ export interface RootRouteChildren {
   JoinCodeRoute: typeof JoinCodeRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   CompanySlugDDriverSlugRoute: typeof CompanySlugDDriverSlugRoute
+  ApiPublicBootstrapSuperAdminRoute: typeof ApiPublicBootstrapSuperAdminRoute
   PrintEmployeeIdRoute: typeof PrintEmployeeIdRoute
   ApiPublicWebhooksStripeRoute: typeof ApiPublicWebhooksStripeRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
@@ -272,6 +286,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrintEmployeeIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/bootstrap-super-admin': {
+      id: '/api/public/bootstrap-super-admin'
+      path: '/api/public/bootstrap-super-admin'
+      fullPath: '/api/public/bootstrap-super-admin'
+      preLoaderRoute: typeof ApiPublicBootstrapSuperAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/$companySlug/d/$driverSlug': {
       id: '/$companySlug/d/$driverSlug'
       path: '/$companySlug/d/$driverSlug'
@@ -307,6 +328,7 @@ const rootRouteChildren: RootRouteChildren = {
   JoinCodeRoute: JoinCodeRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   CompanySlugDDriverSlugRoute: CompanySlugDDriverSlugRoute,
+  ApiPublicBootstrapSuperAdminRoute: ApiPublicBootstrapSuperAdminRoute,
   PrintEmployeeIdRoute: PrintEmployeeIdRoute,
   ApiPublicWebhooksStripeRoute: ApiPublicWebhooksStripeRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
@@ -314,13 +336,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

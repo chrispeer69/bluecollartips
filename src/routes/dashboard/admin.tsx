@@ -764,7 +764,7 @@ function AdminSmsPanel({ drivers }: { drivers: Data["drivers"] }) {
       }}
     >
       <label className="text-sm">
-        Driver
+        Employee
         <select value={driverId} onChange={(e) => setDriverId(e.target.value)} className="mt-1 block rounded-md border border-input bg-background px-3 py-2 text-sm">
           {drivers.map((d) => <option key={d.id} value={d.id}>{d.display_name}</option>)}
         </select>

@@ -2,16 +2,31 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
+async function canAccessDriver(userId: string, driver: { user_id: string | null; company_id: string }) {
+  if (driver.user_id === userId) return true;
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: roles } = await supabaseAdmin
+    .from("user_roles")
+    .select("role, company_id")
+    .eq("user_id", userId);
+  return roles?.some(
+    (r) => r.role === "super_admin" || (r.role === "company_admin" && r.company_id === driver.company_id),
+  ) ?? false;
+}
+
 export const listUnverifiedTips = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((d) => z.object({ driverId: z.string().uuid().optional() }).optional().parse(d))
+  .handler(async ({ data: input, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: driver } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("drivers")
-      .select("id")
-      .eq("user_id", context.userId)
-      .maybeSingle();
+      .select("id, user_id, company_id")
+      .limit(1);
+    query = input?.driverId ? query.eq("id", input.driverId) : query.eq("user_id", context.userId);
+    const { data: driver } = await query.maybeSingle();
     if (!driver) return { items: [] };
+    if (!(await canAccessDriver(context.userId, driver))) return { items: [] };
     const { data } = await supabaseAdmin
       .from("tips")
       .select("id, amount_cents, source, customer_name, created_at, note")
@@ -37,10 +52,10 @@ export const confirmCashTip = createServerFn({ method: "POST" })
     if (!tip) throw new Error("Not found");
     const { data: driver } = await supabaseAdmin
       .from("drivers")
-      .select("user_id")
+      .select("user_id, company_id")
       .eq("id", tip.driver_id)
       .maybeSingle();
-    if (driver?.user_id !== context.userId) throw new Error("Forbidden");
+    if (!driver || !(await canAccessDriver(context.userId, driver))) throw new Error("Forbidden");
     await supabaseAdmin
       .from("tips")
       .update({ verified: true, verified_at: new Date().toISOString() })
@@ -71,10 +86,10 @@ export const disputeCashTip = createServerFn({ method: "POST" })
     if (!tip) throw new Error("Not found");
     const { data: driver } = await supabaseAdmin
       .from("drivers")
-      .select("user_id")
+      .select("user_id, company_id")
       .eq("id", tip.driver_id)
       .maybeSingle();
-    if (driver?.user_id !== context.userId) throw new Error("Forbidden");
+    if (!driver || !(await canAccessDriver(context.userId, driver))) throw new Error("Forbidden");
     await supabaseAdmin
       .from("tips")
       .update({ disputed: true, disputed_at: new Date().toISOString() })

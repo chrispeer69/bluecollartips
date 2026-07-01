@@ -32,13 +32,18 @@ function DriverDashboard() {
   const [loading, setLoading] = useState(true);
   const [showQR, setShowQR] = useState(false);
 
-  const load = async () => {
-    const { data: session } = await supabase.auth.getSession();
+  const load = async (driverId?: string) => {
+    let { data: session } = await supabase.auth.getSession();
+    if (!session.session && import.meta.env.DEV) {
+      const { ensureDevSession } = await import("@/lib/dev-auth");
+      await ensureDevSession();
+      session = (await supabase.auth.getSession()).data;
+    }
     if (!session.session) {
       navigate({ to: "/auth" });
       return;
     }
-    const d = await getDash();
+    const d = await getDash(driverId ? { data: { driverId } } : undefined);
     setData(d);
     setLoading(false);
   };
@@ -68,13 +73,43 @@ function DriverDashboard() {
     <div className="min-h-screen bg-background">
       <TopBar
         title={data.driver.display_name}
-        subtitle={data.driver.companies?.name ?? ""}
+        subtitle={`${data.driver.companies?.name ?? ""}${data.viewingAsAdmin ? " · Developer access" : ""}`}
         onSignOut={async () => {
           await supabase.auth.signOut();
           navigate({ to: "/" });
         }}
       />
       <div className="mx-auto max-w-5xl space-y-6 px-4 py-6">
+        {data.accessibleDrivers.length > 1 && (
+          <Section title="Developer driver access">
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <label className="flex-1 min-w-64">
+                View any driver dashboard
+                <select
+                  value={data.driver.id}
+                  onChange={(e) => {
+                    setLoading(true);
+                    load(e.target.value);
+                  }}
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  {data.accessibleDrivers.map((driver) => {
+                    const company = Array.isArray(driver.companies) ? driver.companies[0] : driver.companies;
+                    return (
+                      <option key={driver.id} value={driver.id}>
+                        {driver.display_name} · {company?.name ?? "Company"} · {driver.status}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+              <span className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                Super admins and company admins can inspect driver views without being assigned to that driver.
+              </span>
+            </div>
+          </Section>
+        )}
+
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Stat label="Tips this week (net)" value={dollars(totals.weekNet)} />
           <Stat label="Tips this month (net)" value={dollars(totals.monthNet)} />
@@ -126,13 +161,13 @@ function DriverDashboard() {
 
         {showQR && <FullscreenQR url={tipUrl} onClose={() => setShowQR(false)} />}
 
-        <LogTipPanel onLogged={load} />
+        <LogTipPanel driverId={data.driver.id} onLogged={() => load(data.driver.id)} />
 
         <StripePanel driverId={data.driver.id} stripeEnabled={!!data.driver.stripe_charges_enabled} />
 
         <SmsPanel driverId={data.driver.id} />
 
-        <UnverifiedPanel onChange={load} />
+        <UnverifiedPanel driverId={data.driver.id} onChange={() => load(data.driver.id)} />
 
         <Section title="Recent tips">
           <TipsTable tips={data.tips} />
@@ -205,7 +240,7 @@ function FullscreenQR({ url, onClose }: { url: string; onClose: () => void }) {
   );
 }
 
-function LogTipPanel({ onLogged }: { onLogged: () => void }) {
+function LogTipPanel({ driverId, onLogged }: { driverId: string; onLogged: () => void }) {
   const logTip = useServerFn(logManualTip);
   const [amount, setAmount] = useState("");
   const [source, setSource] = useState<"cash" | "venmo" | "cashapp" | "zelle" | "paypal" | "other">("cash");
@@ -230,6 +265,7 @@ function LogTipPanel({ onLogged }: { onLogged: () => void }) {
           source,
           customerName: customerName.trim() || null,
           note: note.trim() || null,
+          driverId,
         },
       });
       setAmount("");
@@ -411,7 +447,6 @@ export function Stat({ label, value, hint }: { label: string; value: string; hin
 }
 
 function StripePanel({ driverId, stripeEnabled }: { driverId: string; stripeEnabled: boolean }) {
-  void driverId;
   const onboard = useServerFn(createDriverOnboardingLink);
   const refresh = useServerFn(refreshStripeStatus);
   const [busy, setBusy] = useState(false);
@@ -432,7 +467,7 @@ function StripePanel({ driverId, stripeEnabled }: { driverId: string; stripeEnab
               setBusy(true);
               setMsg(null);
               try {
-                const r = await onboard({ data: { returnUrl: window.location.href } });
+                const r = await onboard({ data: { returnUrl: window.location.href, driverId } });
                 window.location.href = r.url;
               } catch (e) {
                 setMsg(e instanceof Error ? e.message : "Stripe not configured");
@@ -449,7 +484,7 @@ function StripePanel({ driverId, stripeEnabled }: { driverId: string; stripeEnab
             onClick={async () => {
               setBusy(true);
               try {
-                const r = await refresh();
+                const r = await refresh({ data: { driverId } });
                 setMsg(r.enabled ? "Refreshed." : "Stripe is not configured by the platform yet.");
               } finally {
                 setBusy(false);
@@ -509,12 +544,12 @@ function SmsPanel({ driverId }: { driverId: string }) {
   );
 }
 
-function UnverifiedPanel({ onChange }: { onChange: () => void }) {
+function UnverifiedPanel({ driverId, onChange }: { driverId: string; onChange: () => void }) {
   const list = useServerFn(listUnverifiedTips);
   const confirm = useServerFn(confirmCashTip);
   const dispute = useServerFn(disputeCashTip);
   const [items, setItems] = useState<Awaited<ReturnType<typeof listUnverifiedTips>>["items"]>([]);
-  const reload = async () => setItems((await list()).items);
+  const reload = async () => setItems((await list({ data: { driverId } })).items);
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps

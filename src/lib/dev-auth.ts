@@ -5,13 +5,17 @@ import { supabase } from "@/integrations/supabase/client";
 const DEV_EMAIL = "dev@bluecollar.local";
 const DEV_PASSWORD = "dev-password-123!";
 
-let started = false;
+let sessionPromise: Promise<void> | null = null;
 
 export async function ensureDevSession(): Promise<void> {
   if (!import.meta.env.DEV) return;
-  if (started) return;
-  started = true;
+  if (sessionPromise) return sessionPromise;
 
+  sessionPromise = establishDevSession();
+  return sessionPromise;
+}
+
+async function establishDevSession(): Promise<void> {
   const { data } = await supabase.auth.getSession();
   if (data.session) return;
 

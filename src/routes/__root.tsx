@@ -11,8 +11,6 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { DevTenantSwitcher } from "../components/DevTenantSwitcher";
-import { DevNavMenu } from "../components/DevNavMenu";
 
 function NotFoundComponent() {
   return (
@@ -121,18 +119,10 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
-  useEffect(() => {
-    if (import.meta.env.DEV) {
-      import("@/lib/dev-auth").then((m) => m.ensureDevSession());
-    }
-  }, []);
-
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
-      {import.meta.env.DEV && <DevTenantSwitcher />}
-      {import.meta.env.DEV && <DevNavMenu />}
     </QueryClientProvider>
   );
 }

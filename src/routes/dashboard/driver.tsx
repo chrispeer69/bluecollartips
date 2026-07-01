@@ -34,12 +34,7 @@ function DriverDashboard() {
   const [showQR, setShowQR] = useState(false);
 
   const load = async (driverId?: string) => {
-    let { data: session } = await supabase.auth.getSession();
-    if (!session.session && import.meta.env.DEV) {
-      const { ensureDevSession } = await import("@/lib/dev-auth");
-      await ensureDevSession();
-      session = (await supabase.auth.getSession()).data;
-    }
+    const { data: session } = await supabase.auth.getSession();
     if (!session.session) {
       navigate({ to: "/auth" });
       return;

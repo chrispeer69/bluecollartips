@@ -19,6 +19,7 @@ import { createInvite, listInvites, revokeInvite } from "@/lib/invites.functions
 import { reconciliationOverview } from "@/lib/reconciliation.functions";
 import { platformOverview, suspendTenant } from "@/lib/platform.functions";
 import { sendTipLinkSms } from "@/lib/sms.functions";
+import { listLocations, createLocation, deleteLocation, setDriverLocation, updateReviewLinks } from "@/lib/locations.functions";
 
 export const Route = createFileRoute("/dashboard/admin")({
   head: () => ({
@@ -151,6 +152,8 @@ function AdminDashboard() {
               await load(companyId);
             }}
             companySlug={data.company.slug}
+            companyId={data.company.id}
+            onLocationChanged={() => load(companyId)}
           />
         </Section>
 
@@ -161,6 +164,22 @@ function AdminDashboard() {
               await updateCo({ data: { ...v, companyId: data.company!.id } });
               await load(companyId);
             }}
+          />
+        </Section>
+
+        <Section title="Locations / crews">
+          <LocationsPanel companyId={data.company.id} />
+        </Section>
+
+        <Section title="Review syndication links (Google / Yelp / Facebook)">
+          <ReviewLinksPanel
+            companyId={data.company.id}
+            initial={{
+              google: data.company.google_review_url ?? "",
+              yelp: data.company.yelp_review_url ?? "",
+              facebook: data.company.facebook_review_url ?? "",
+            }}
+            onSaved={() => load(companyId)}
           />
         </Section>
 
@@ -247,6 +266,8 @@ function DriverRoster({
   onCreate,
   onStatus,
   companySlug,
+  companyId,
+  onLocationChanged,
 }: {
   drivers: Data["drivers"];
   ratingsByDriver: Map<string, { sum: number; n: number }>;
@@ -254,6 +275,8 @@ function DriverRoster({
   onCreate: (v: { displayName: string; email?: string | null; phone?: string | null; employeeId?: string | null }) => Promise<void>;
   onStatus: (id: string, s: "pending" | "active" | "deactivated") => Promise<void>;
   companySlug: string;
+  companyId: string;
+  onLocationChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -261,6 +284,13 @@ function DriverRoster({
   const [phone, setPhone] = useState("");
   const [empId, setEmpId] = useState("");
   const [qrFor, setQrFor] = useState<{ name: string; url: string } | null>(null);
+  const [qrDriverId, setQrDriverId] = useState<string | null>(null);
+  const listLocs = useServerFn(listLocations);
+  const setLoc = useServerFn(setDriverLocation);
+  const [locations, setLocations] = useState<Awaited<ReturnType<typeof listLocations>>>([]);
+  useEffect(() => {
+    listLocs({ data: { companyId } }).then(setLocations).catch(() => setLocations([]));
+  }, [companyId, listLocs]);
   return (
     <>
       <div className="mb-3 flex justify-end">
@@ -304,6 +334,7 @@ function DriverRoster({
               <tr>
                 <th className="py-2">Name</th>
                 <th>Status</th>
+                <th>Location</th>
                 <th>Tip link</th>
                 <th className="text-right">Avg ★</th>
                 <th className="text-right">Gross tips</th>
@@ -321,6 +352,20 @@ function DriverRoster({
                       <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize">{d.status}</span>
                     </td>
                     <td>
+                      <select
+                        value={d.location_id ?? ""}
+                        onChange={async (e) => {
+                          const v = e.target.value || null;
+                          await setLoc({ data: { driverId: d.id, locationId: v } });
+                          onLocationChanged();
+                        }}
+                        className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+                      >
+                        <option value="">—</option>
+                        {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                      </select>
+                    </td>
+                    <td>
                       <a
                         className="text-xs text-secondary underline"
                         href={`/${companySlug}/d/${d.slug}`}
@@ -334,12 +379,13 @@ function DriverRoster({
                     <td className="text-right">
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                          setQrDriverId(d.id);
                           setQrFor({
                             name: d.display_name,
                             url: `${window.location.origin}/${companySlug}/d/${d.slug}`,
-                          })
-                        }
+                          });
+                        }}
                         className="mr-2 rounded-md border border-border px-2 py-1 text-xs"
                       >
                         QR / Link
@@ -361,12 +407,19 @@ function DriverRoster({
           </table>
         </div>
       )}
-      {qrFor && <DriverQRModal driverName={qrFor.name} url={qrFor.url} onClose={() => setQrFor(null)} />}
+      {qrFor && qrDriverId && (
+        <DriverQRModal
+          driverId={qrDriverId}
+          driverName={qrFor.name}
+          url={qrFor.url}
+          onClose={() => { setQrFor(null); setQrDriverId(null); }}
+        />
+      )}
     </>
   );
 }
 
-function DriverQRModal({ driverName, url, onClose }: { driverName: string; url: string; onClose: () => void }) {
+function DriverQRModal({ driverId, driverName, url, onClose }: { driverId: string; driverName: string; url: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   const download = () => {
     const canvas = document.getElementById("admin-driver-qr") as HTMLCanvasElement | null;
@@ -413,6 +466,20 @@ function DriverQRModal({ driverName, url, onClose }: { driverName: string; url: 
               className="rounded-md bg-secondary px-3 py-2 text-sm text-secondary-foreground"
             >
               Open in Messages
+            </a>
+            <a
+              href={`/print/employee/${driverId}?mode=poster`}
+              target="_blank" rel="noopener noreferrer"
+              className="rounded-md border border-border px-3 py-2 text-sm"
+            >
+              Print branded poster
+            </a>
+            <a
+              href={`/print/employee/${driverId}?mode=statement`}
+              target="_blank" rel="noopener noreferrer"
+              className="rounded-md border border-border px-3 py-2 text-sm"
+            >
+              Print payout statement
             </a>
           </div>
           <p className="text-center text-xs text-muted-foreground">
@@ -929,6 +996,104 @@ function ThankYouTemplatesPanel({ companyId }: { companyId: string }) {
           {busy ? "Saving…" : "Save templates"}
         </button>
         {saved && <span className="text-xs text-muted-foreground">Saved.</span>}
+      </div>
+    </form>
+  );
+}
+
+function LocationsPanel({ companyId }: { companyId: string }) {
+  const list = useServerFn(listLocations);
+  const create = useServerFn(createLocation);
+  const del = useServerFn(deleteLocation);
+  const [items, setItems] = useState<Awaited<ReturnType<typeof listLocations>>>([]);
+  const [name, setName] = useState("");
+  const [addr, setAddr] = useState("");
+  const reload = async () => setItems(await list({ data: { companyId } }));
+  useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [companyId]);
+  return (
+    <div className="space-y-3">
+      <form
+        className="flex flex-wrap items-end gap-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!name.trim()) return;
+          await create({ data: { companyId, name: name.trim(), address: addr.trim() || null } });
+          setName(""); setAddr("");
+          await reload();
+        }}
+      >
+        <Input label="Location / crew name" value={name} onChange={setName} required />
+        <Input label="Address (optional)" value={addr} onChange={setAddr} />
+        <button className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground">Add location</button>
+      </form>
+      {items.length === 0 ? (
+        <div className="text-sm text-muted-foreground">No locations yet — add one to group employees by yard or crew.</div>
+      ) : (
+        <ul className="divide-y divide-border text-sm">
+          {items.map((l) => (
+            <li key={l.id} className="flex items-center justify-between py-2">
+              <div>
+                <div className="font-medium">{l.name}</div>
+                {l.address && <div className="text-xs text-muted-foreground">{l.address}</div>}
+              </div>
+              <button
+                onClick={async () => { if (confirm(`Delete location "${l.name}"?`)) { await del({ data: { locationId: l.id } }); await reload(); } }}
+                className="rounded border border-border px-2 py-1 text-xs"
+              >Delete</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function ReviewLinksPanel({
+  companyId,
+  initial,
+  onSaved,
+}: {
+  companyId: string;
+  initial: { google: string; yelp: string; facebook: string };
+  onSaved: () => void;
+}) {
+  const save = useServerFn(updateReviewLinks);
+  const [google, setGoogle] = useState(initial.google);
+  const [yelp, setYelp] = useState(initial.yelp);
+  const [facebook, setFacebook] = useState(initial.facebook);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  return (
+    <form
+      className="grid gap-3 sm:grid-cols-2"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true); setMsg(null);
+        try {
+          await save({
+            data: {
+              companyId,
+              googleUrl: google.trim() || null,
+              yelpUrl: yelp.trim() || null,
+              facebookUrl: facebook.trim() || null,
+            },
+          });
+          setMsg("Saved ✓");
+          onSaved();
+        } catch (err) {
+          setMsg(err instanceof Error ? err.message : "Failed");
+        } finally { setBusy(false); }
+      }}
+    >
+      <Input label="Google review URL" value={google} onChange={setGoogle} placeholder="https://g.page/r/…/review" />
+      <Input label="Yelp review URL" value={yelp} onChange={setYelp} placeholder="https://www.yelp.com/writeareview/biz/…" />
+      <Input label="Facebook review URL" value={facebook} onChange={setFacebook} placeholder="https://www.facebook.com/…/reviews" />
+      <div className="sm:col-span-2 flex items-center gap-3">
+        <button disabled={busy} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">
+          {busy ? "Saving…" : "Save review links"}
+        </button>
+        {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
+        <span className="text-xs text-muted-foreground">Shown to happy customers (5★) after they submit a rating.</span>
       </div>
     </form>
   );

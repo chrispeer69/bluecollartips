@@ -63,6 +63,26 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
             } catch (e) {
               console.error("thank-you (stripe webhook) failed", e);
             }
+            // Notify the employee and send the customer a receipt.
+            try {
+              const { notifyEmployee, sendCustomerReceipt } = await import("@/lib/notify.server");
+              await notifyEmployee(supabaseAdmin, {
+                companyId,
+                driverId,
+                kind: "tip",
+                amountCents: pi.amount,
+                stars: pi.metadata?.stars ? Number(pi.metadata.stars) : null,
+                customerName: pi.metadata?.customer_name || null,
+              });
+              await sendCustomerReceipt(supabaseAdmin, {
+                companyId,
+                driverId,
+                customerPhone: pi.metadata?.customer_phone || null,
+                amountCents: pi.amount,
+              });
+            } catch (e) {
+              console.error("notify/receipt (stripe webhook) failed", e);
+            }
           }
         } else if (event.type === "account.updated") {
           const acct = event.data.object as {

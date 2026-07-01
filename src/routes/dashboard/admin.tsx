@@ -266,6 +266,8 @@ function DriverRoster({
   onCreate,
   onStatus,
   companySlug,
+  companyId,
+  onLocationChanged,
 }: {
   drivers: Data["drivers"];
   ratingsByDriver: Map<string, { sum: number; n: number }>;
@@ -273,6 +275,8 @@ function DriverRoster({
   onCreate: (v: { displayName: string; email?: string | null; phone?: string | null; employeeId?: string | null }) => Promise<void>;
   onStatus: (id: string, s: "pending" | "active" | "deactivated") => Promise<void>;
   companySlug: string;
+  companyId: string;
+  onLocationChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -280,6 +284,13 @@ function DriverRoster({
   const [phone, setPhone] = useState("");
   const [empId, setEmpId] = useState("");
   const [qrFor, setQrFor] = useState<{ name: string; url: string } | null>(null);
+  const [qrDriverId, setQrDriverId] = useState<string | null>(null);
+  const listLocs = useServerFn(listLocations);
+  const setLoc = useServerFn(setDriverLocation);
+  const [locations, setLocations] = useState<Awaited<ReturnType<typeof listLocations>>>([]);
+  useEffect(() => {
+    listLocs({ data: { companyId } }).then(setLocations).catch(() => setLocations([]));
+  }, [companyId, listLocs]);
   return (
     <>
       <div className="mb-3 flex justify-end">
@@ -323,6 +334,7 @@ function DriverRoster({
               <tr>
                 <th className="py-2">Name</th>
                 <th>Status</th>
+                <th>Location</th>
                 <th>Tip link</th>
                 <th className="text-right">Avg ★</th>
                 <th className="text-right">Gross tips</th>
@@ -340,6 +352,20 @@ function DriverRoster({
                       <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize">{d.status}</span>
                     </td>
                     <td>
+                      <select
+                        value={d.location_id ?? ""}
+                        onChange={async (e) => {
+                          const v = e.target.value || null;
+                          await setLoc({ data: { driverId: d.id, locationId: v } });
+                          onLocationChanged();
+                        }}
+                        className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+                      >
+                        <option value="">—</option>
+                        {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                      </select>
+                    </td>
+                    <td>
                       <a
                         className="text-xs text-secondary underline"
                         href={`/${companySlug}/d/${d.slug}`}
@@ -353,12 +379,13 @@ function DriverRoster({
                     <td className="text-right">
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                          setQrDriverId(d.id);
                           setQrFor({
                             name: d.display_name,
                             url: `${window.location.origin}/${companySlug}/d/${d.slug}`,
-                          })
-                        }
+                          });
+                        }}
                         className="mr-2 rounded-md border border-border px-2 py-1 text-xs"
                       >
                         QR / Link
@@ -380,12 +407,19 @@ function DriverRoster({
           </table>
         </div>
       )}
-      {qrFor && <DriverQRModal driverName={qrFor.name} url={qrFor.url} onClose={() => setQrFor(null)} />}
+      {qrFor && qrDriverId && (
+        <DriverQRModal
+          driverId={qrDriverId}
+          driverName={qrFor.name}
+          url={qrFor.url}
+          onClose={() => { setQrFor(null); setQrDriverId(null); }}
+        />
+      )}
     </>
   );
 }
 
-function DriverQRModal({ driverName, url, onClose }: { driverName: string; url: string; onClose: () => void }) {
+function DriverQRModal({ driverId, driverName, url, onClose }: { driverId: string; driverName: string; url: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   const download = () => {
     const canvas = document.getElementById("admin-driver-qr") as HTMLCanvasElement | null;
@@ -432,6 +466,20 @@ function DriverQRModal({ driverName, url, onClose }: { driverName: string; url: 
               className="rounded-md bg-secondary px-3 py-2 text-sm text-secondary-foreground"
             >
               Open in Messages
+            </a>
+            <a
+              href={`/print/employee/${driverId}?mode=poster`}
+              target="_blank" rel="noopener noreferrer"
+              className="rounded-md border border-border px-3 py-2 text-sm"
+            >
+              Print branded poster
+            </a>
+            <a
+              href={`/print/employee/${driverId}?mode=statement`}
+              target="_blank" rel="noopener noreferrer"
+              className="rounded-md border border-border px-3 py-2 text-sm"
+            >
+              Print payout statement
             </a>
           </div>
           <p className="text-center text-xs text-muted-foreground">

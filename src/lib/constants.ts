@@ -1,5 +1,5 @@
 // Revenue split is fixed platform-wide. Change here to change everywhere.
-// 80% driver / 10% company / 10% Blue Collar AI platform.
+// 80% driver / 10% company / 10% Blue Collar Tips platform.
 export const SPLIT = { driver: 80, company: 10, platform: 10 } as const;
 
 export const TIP_MIN_CENTS = 100; // $1

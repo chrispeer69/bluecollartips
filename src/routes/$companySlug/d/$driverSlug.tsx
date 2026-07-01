@@ -8,10 +8,10 @@ import { StripeCardPanel } from "@/components/StripeCardPanel";
 export const Route = createFileRoute("/$companySlug/d/$driverSlug")({
   head: ({ params }) => ({
     meta: [
-      { title: "Rate your service — Blue Collar AI" },
-      { name: "description", content: "Rate your service, leave feedback, and tip your service pro securely by card or P2P — powered by Blue Collar AI." },
+      { title: "Rate your service — Blue Collar Tips" },
+      { name: "description", content: "Rate your service, leave feedback, and tip your service pro securely by card or P2P — powered by Blue Collar Tips." },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { property: "og:title", content: "Rate your service — Blue Collar AI" },
+      { property: "og:title", content: "Rate your service — Blue Collar Tips" },
       { property: "og:description", content: "Rate your service, leave feedback, and tip securely by card or P2P." },
       { property: "og:url", content: `https://roadsidetips.lovable.app/${params.companySlug}/d/${params.driverSlug}` },
     ],
@@ -445,7 +445,7 @@ function TipPage() {
         </button>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          Powered by Blue Collar AI
+          Powered by Blue Collar Tips
         </p>
       </form>
     </div>

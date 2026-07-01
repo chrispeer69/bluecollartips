@@ -1,10 +1,10 @@
-# Blue Collar AI
+# Blue Collar Tips
 
 > Review, reputation, and tipping platform for towing companies and other blue-collar service crews.
 
-Blue Collar AI lets service drivers collect customer ratings, feedback, and tips through a branded public page — shared by QR code or text link — while company admins manage drivers, branding, and tip reconciliation.
+Blue Collar Tips lets service drivers collect customer ratings, feedback, and tips through a branded public page — shared by QR code or text link — while company admins manage drivers, branding, and tip reconciliation.
 
 ## Pages
 
-- [Home](/): What Blue Collar AI does and who it's for.
+- [Home](/): What Blue Collar Tips does and who it's for.
 - [Sign in or sign up](/auth): Create an account or redeem a company invite.

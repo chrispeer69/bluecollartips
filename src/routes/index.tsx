@@ -3,13 +3,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Blue Collar AI — Tips & Reputation for Service Pros" },
+      { title: "Blue Collar Tips — Tips & Reputation for Service Pros" },
       {
         name: "description",
         content:
           "A tip and review platform built for towing companies and blue-collar service teams. Capture ratings, collect tips, and grow your reputation.",
       },
-      { property: "og:title", content: "Blue Collar AI — Tips & Reputation for Service Pros" },
+      { property: "og:title", content: "Blue Collar Tips — Tips & Reputation for Service Pros" },
       {
         property: "og:description",
         content: "Tips and reviews for towing companies and field service teams.",
@@ -30,7 +30,7 @@ function Index() {
             <div className="grid h-8 w-8 place-items-center rounded-md bg-primary text-primary-foreground font-bold">
               B
             </div>
-            <span className="font-semibold">Blue Collar AI</span>
+            <span className="font-semibold">Blue Collar Tips</span>
           </div>
           <Link
             to="/auth"
@@ -103,7 +103,7 @@ function Index() {
         </div>
       </main>
       <footer className="border-t border-border py-8 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} Blue Collar AI
+        © {new Date().getFullYear()} Blue Collar Tips
       </footer>
     </div>
   );

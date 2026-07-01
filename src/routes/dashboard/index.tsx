@@ -7,11 +7,11 @@ import { getMyRoleContext } from "@/lib/auth.functions";
 export const Route = createFileRoute("/dashboard/")({
   head: () => ({
     meta: [
-      { title: "Dashboard — Blue Collar AI" },
-      { name: "description", content: "Sign in to your Blue Collar AI dashboard to view ratings, tips, and team activity for your towing or service company." },
+      { title: "Dashboard — Blue Collar Tips" },
+      { name: "description", content: "Sign in to your Blue Collar Tips dashboard to view ratings, tips, and team activity for your towing or service company." },
       { name: "robots", content: "noindex" },
-      { property: "og:title", content: "Dashboard — Blue Collar AI" },
-      { property: "og:description", content: "Your Blue Collar AI dashboard for ratings, tips, and team activity." },
+      { property: "og:title", content: "Dashboard — Blue Collar Tips" },
+      { property: "og:description", content: "Your Blue Collar Tips dashboard for ratings, tips, and team activity." },
       { property: "og:url", content: "/dashboard" },
     ],
   }),

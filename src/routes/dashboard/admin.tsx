@@ -24,10 +24,10 @@ import { listLocations, createLocation, deleteLocation, setDriverLocation, updat
 export const Route = createFileRoute("/dashboard/admin")({
   head: () => ({
     meta: [
-      { title: "Admin — Blue Collar AI" },
-      { name: "description", content: "Manage employees, branding, invites, and tip reconciliation for your company on Blue Collar AI." },
+      { title: "Admin — Blue Collar Tips" },
+      { name: "description", content: "Manage employees, branding, invites, and tip reconciliation for your company on Blue Collar Tips." },
       { name: "robots", content: "noindex" },
-      { property: "og:title", content: "Admin — Blue Collar AI" },
+      { property: "og:title", content: "Admin — Blue Collar Tips" },
       { property: "og:description", content: "Manage employees, branding, invites, and tip reconciliation for your company." },
       { property: "og:url", content: "/dashboard/admin" },
     ],
@@ -78,7 +78,7 @@ function AdminDashboard() {
   if (!data?.company) {
     return (
       <div className="min-h-screen bg-background">
-        <TopBar title="Blue Collar AI" subtitle="Super admin" onSignOut={signOut(navigate)} />
+        <TopBar title="Blue Collar Tips" subtitle="Super admin" onSignOut={signOut(navigate)} />
         <div className="mx-auto max-w-3xl p-6">
           <NewCompanyForm onCreate={async (v) => {
             const r = await newCo({ data: v });
@@ -97,7 +97,7 @@ function AdminDashboard() {
     <div className="min-h-screen bg-background">
       <TopBar
         title={data.company.name}
-        subtitle={data.isSuper ? "Blue Collar AI · Super admin" : "Company admin"}
+        subtitle={data.isSuper ? "Blue Collar Tips · Super admin" : "Company admin"}
         onSignOut={signOut(navigate)}
       />
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-6">

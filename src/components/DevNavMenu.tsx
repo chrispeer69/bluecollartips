@@ -64,7 +64,7 @@ export function DevNavMenu() {
             </Link>
           ) : (
             <span className="block px-3 py-2 text-xs text-slate-400">
-              No driver yet — create one in Admin
+              No employee yet — create one in Admin
             </span>
           )}
         </div>

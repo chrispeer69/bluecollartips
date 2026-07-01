@@ -9,10 +9,10 @@ export const Route = createFileRoute("/$companySlug/d/$driverSlug")({
   head: ({ params }) => ({
     meta: [
       { title: "Rate your service — Blue Collar AI" },
-      { name: "description", content: "Rate your service, leave feedback, and tip your driver securely by card or P2P — powered by Blue Collar AI." },
+      { name: "description", content: "Rate your service, leave feedback, and tip your service pro securely by card or P2P — powered by Blue Collar AI." },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { property: "og:title", content: "Rate your service — Blue Collar AI" },
-      { property: "og:description", content: "Rate your driver, leave feedback, and tip securely by card or P2P." },
+      { property: "og:description", content: "Rate your service, leave feedback, and tip securely by card or P2P." },
       { property: "og:url", content: `https://roadsidetips.lovable.app/${params.companySlug}/d/${params.driverSlug}` },
     ],
     links: [{ rel: "canonical", href: `https://roadsidetips.lovable.app/${params.companySlug}/d/${params.driverSlug}` }],
@@ -63,7 +63,7 @@ function TipPage() {
         <div>
           <h1 className="text-2xl font-semibold">Link not active</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            This tip link isn't available. Please ask the driver for an updated link.
+            This tip link isn't available. Please ask your service provider for an updated link.
           </p>
         </div>
       </div>
@@ -172,7 +172,7 @@ function TipPage() {
             />
           )}
           <div className="text-left">
-            <div className="text-xs uppercase tracking-wider opacity-80">Your driver</div>
+            <div className="text-xs uppercase tracking-wider opacity-80">Your service pro</div>
             <div className="text-lg font-semibold">{driver.display_name}</div>
           </div>
         </div>
@@ -380,7 +380,7 @@ function TipPage() {
               </div>
               {tipSource && tipSource !== "stripe" && (
                 <p className="mt-3 text-xs text-muted-foreground">
-                  You'll be sent to the {tipSource} app to complete the tip. Your driver will
+                  You'll be sent to the {tipSource} app to complete the tip. Your service pro will
                   manually confirm receipt — the rating is recorded either way.
                 </p>
               )}

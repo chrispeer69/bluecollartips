@@ -55,7 +55,7 @@ function JoinPage() {
           {company?.logo_url && <img src={company.logo_url} alt={company.name} className="mx-auto h-14" />}
           <h1 className="display mt-4 text-3xl font-bold">Welcome to {company?.name}</h1>
           <p className="mt-2 opacity-90">
-            You've been invited to join as a <span className="font-semibold uppercase">{state.role.replace("_", " ")}</span>.
+            You've been invited to join as a <span className="font-semibold uppercase">{state.role === "driver" ? "employee" : state.role.replace("_", " ")}</span>.
           </p>
         </div>
       </div>

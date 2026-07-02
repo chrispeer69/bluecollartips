@@ -65,6 +65,10 @@ function Index() {
           </Link>
           <a
             href="#how"
+            onClick={(e) => {
+              e.preventDefault();
+              document.getElementById("how")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
             className="rounded-md border border-border bg-card px-6 py-3 font-medium hover:bg-muted"
           >
             How it works

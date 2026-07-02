@@ -50,11 +50,10 @@ function Index() {
           <span className="text-secondary">Get tipped more.</span>
         </h1>
         <p className="mt-6 max-w-2xl text-lg text-muted-foreground">
-          Blue Collar Tips is built for any field service employee whose company wants to
-          leverage technology to celebrate good work. One QR code at the end of every job —
-          customers rate, leave feedback, and tip in a single tap. The feedback gets you the tip,
-          more often. Towing, HVAC, plumbing, landscaping, cleaning, delivery, install &
-          repair — if you show up and do it right, this app makes sure someone notices.
+          Built for field service crews backed by companies that celebrate good work.
+          One QR at the end of the job — rate, review, tip in a tap. Feedback drives
+          tips, and tips follow great work. Towing, HVAC, plumbing, landscaping,
+          cleaning, delivery, install & repair — show up, do it right, get noticed.
         </p>
         <div className="mt-10 flex flex-wrap gap-3">
           <Link

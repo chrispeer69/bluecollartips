@@ -623,7 +623,7 @@ function NewCompanyForm({ onCreate }: { onCreate: (v: { name: string; adminEmail
     <div className="rounded-xl border border-border bg-card p-6">
       <h2 className="text-lg font-semibold">No tenant yet</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        As the platform super admin, create your first towing company tenant.
+        As the platform super admin, create your first company tenant.
       </p>
       <form
         className="mt-4 grid gap-3 sm:grid-cols-2"

@@ -180,7 +180,7 @@ function AdminDashboard() {
             tipsByDriver={totals.byDriver}
             onCreate={async (v) => {
               const r = await createDrv({ data: { ...v, companyId: data.company!.id } });
-              showInvite(`Invite for ${v.full_name || "employee"}`, r.inviteCode);
+              showInvite(`Invite for ${v.displayName || "employee"}`, r.inviteCode);
               await load(companyId);
             }}
             onStatus={async (driverId, status) => {

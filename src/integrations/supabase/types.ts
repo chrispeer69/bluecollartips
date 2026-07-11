@@ -86,12 +86,15 @@ export type Database = {
       }
       companies: {
         Row: {
+          company_pct: number
           created_at: string
+          driver_pct: number
           facebook_review_url: string | null
           google_review_url: string | null
           id: string
           logo_url: string | null
           name: string
+          platform_pct: number
           primary_color: string | null
           secondary_color: string | null
           slug: string
@@ -106,12 +109,15 @@ export type Database = {
           yelp_review_url: string | null
         }
         Insert: {
+          company_pct?: number
           created_at?: string
+          driver_pct?: number
           facebook_review_url?: string | null
           google_review_url?: string | null
           id?: string
           logo_url?: string | null
           name: string
+          platform_pct?: number
           primary_color?: string | null
           secondary_color?: string | null
           slug: string
@@ -126,12 +132,15 @@ export type Database = {
           yelp_review_url?: string | null
         }
         Update: {
+          company_pct?: number
           created_at?: string
+          driver_pct?: number
           facebook_review_url?: string | null
           google_review_url?: string | null
           id?: string
           logo_url?: string | null
           name?: string
+          platform_pct?: number
           primary_color?: string | null
           secondary_color?: string | null
           slug?: string

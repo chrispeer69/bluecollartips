@@ -3,6 +3,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 
+const APP_BASE_URL =
+  process.env.APP_BASE_URL ?? "https://roadsidetips.lovable.app";
+
 export const listInvites = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
@@ -33,6 +36,8 @@ export const createInvite = createServerFn({ method: "POST" })
         companyId: z.string().uuid(),
         role: z.enum(["company_admin", "driver"]),
         email: z.string().email().optional().nullable(),
+        phone: z.string().trim().max(40).optional().nullable(),
+        recipientName: z.string().trim().max(120).optional().nullable(),
       })
       .parse(d),
   )
@@ -47,15 +52,65 @@ export const createInvite = createServerFn({ method: "POST" })
     );
     if (!ok) throw new Error("Forbidden");
     const code = randomBytes(6).toString("hex").toUpperCase();
-    await supabaseAdmin.from("invites").insert({
+    const { data: inviteRow } = await supabaseAdmin.from("invites").insert({
       company_id: data.companyId,
       code,
       role: data.role,
       email: data.email ?? null,
       created_by: context.userId,
       expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-    });
-    return { code };
+    }).select("id").single();
+
+    const inviteUrl = `${APP_BASE_URL}/join/${code}`;
+    let emailed = false;
+    let texted = false;
+    let deliveryError: string | null = null;
+
+    const { data: company } = await supabaseAdmin
+      .from("companies")
+      .select("name")
+      .eq("id", data.companyId)
+      .maybeSingle();
+    const companyName = company?.name ?? "your company";
+
+    if (data.email) {
+      try {
+        const { enqueueTransactionalEmail } = await import(
+          "@/lib/email/invite.server"
+        );
+        await enqueueTransactionalEmail({
+          to: data.email,
+          templateData: {
+            recipientName: data.recipientName ?? undefined,
+            companyName,
+            inviteUrl,
+            inviteCode: code,
+            role: data.role,
+          },
+          idempotencyKey: `invite-${inviteRow?.id ?? code}`,
+        });
+        emailed = true;
+      } catch (err) {
+        deliveryError = err instanceof Error ? err.message : "Email send failed";
+        console.error("createInvite email failed", err);
+      }
+    }
+
+    if (data.phone) {
+      try {
+        const { sendInviteSms } = await import("@/lib/sms.functions");
+        await sendInviteSms.__handler({
+          data: { toPhone: data.phone, companyName, inviteUrl, role: data.role },
+          context,
+        } as any);
+        texted = true;
+      } catch (err) {
+        deliveryError = err instanceof Error ? err.message : "SMS send failed";
+        console.error("createInvite sms failed", err);
+      }
+    }
+
+    return { code, inviteUrl, emailed, texted, error: deliveryError };
   });
 
 export const revokeInvite = createServerFn({ method: "POST" })

@@ -4,6 +4,9 @@ import { z } from "zod";
 import { slugify } from "./constants";
 import { randomBytes } from "crypto";
 
+const APP_BASE_URL =
+  process.env.APP_BASE_URL ?? "https://roadsidetips.lovable.app";
+
 function generateInviteCode() {
   return randomBytes(6).toString("hex").toUpperCase();
 }
@@ -114,7 +117,35 @@ export const createDriver = createServerFn({ method: "POST" })
       created_by: context.userId,
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
-    return { ok: true, driverId: driver.id, inviteCode: code };
+
+    let emailed = false;
+    if (data.email) {
+      try {
+        const { enqueueTransactionalEmail } = await import(
+          "@/lib/email/invite.server"
+        );
+        const { data: company } = await supabaseAdmin
+          .from("companies")
+          .select("name")
+          .eq("id", data.companyId)
+          .maybeSingle();
+        await enqueueTransactionalEmail({
+          to: data.email,
+          templateData: {
+            recipientName: data.displayName,
+            companyName: company?.name ?? "your company",
+            inviteUrl: `${APP_BASE_URL}/join/${code}`,
+            inviteCode: code,
+            role: "driver",
+          },
+          idempotencyKey: `driver-invite-${driver.id}-${code}`,
+        });
+        emailed = true;
+      } catch (err) {
+        console.error("Failed to send driver invite email", err);
+      }
+    }
+    return { ok: true, driverId: driver.id, inviteCode: code, emailed };
   });
 
 export const setDriverStatus = createServerFn({ method: "POST" })
@@ -243,7 +274,27 @@ export const createCompany = createServerFn({ method: "POST" })
       created_by: context.userId,
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
-    return { ok: true, companyId: company.id, slug: company.slug, inviteCode: code };
+
+    let emailed = false;
+    try {
+      const { enqueueTransactionalEmail } = await import(
+        "@/lib/email/invite.server"
+      );
+      await enqueueTransactionalEmail({
+        to: data.adminEmail,
+        templateData: {
+          companyName: data.name,
+          inviteUrl: `${APP_BASE_URL}/join/${code}`,
+          inviteCode: code,
+          role: "company_admin",
+        },
+        idempotencyKey: `company-invite-${company.id}-${code}`,
+      });
+      emailed = true;
+    } catch (err) {
+      console.error("Failed to send company invite email", err);
+    }
+    return { ok: true, companyId: company.id, slug: company.slug, inviteCode: code, emailed };
   });
 
 export const getThankYouTemplates = createServerFn({ method: "POST" })

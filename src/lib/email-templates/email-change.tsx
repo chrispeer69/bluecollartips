@@ -12,44 +12,57 @@ import {
   Text,
 } from '@react-email/components'
 
-interface InviteEmailProps {
+interface EmailChangeEmailProps {
   siteName: string
-  siteUrl: string
+  // oldEmail is the user's current address (HookData.OldEmail). For the
+  // NEW-recipient half of a secure email_change fanout, `email` equals the
+  // recipient (NEW), so the "from" line must render oldEmail to read
+  // "from OLD to NEW" instead of "from NEW to NEW".
+  oldEmail: string
+  email: string
+  newEmail: string
   confirmationUrl: string
 }
 
-export const InviteEmail = ({
+export const EmailChangeEmail = ({
   siteName,
-  siteUrl,
+  oldEmail,
+  newEmail,
   confirmationUrl,
-}: InviteEmailProps) => (
+}: EmailChangeEmailProps) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>You've been invited to join {siteName}</Preview>
+    <Preview>Confirm your email change for {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>You've been invited</Heading>
+        <Heading style={h1}>Confirm your email change</Heading>
         <Text style={text}>
-          You've been invited to join{' '}
-          <Link href={siteUrl} style={link}>
-            <strong>{siteName}</strong>
+          You requested to change your email address for {siteName} from{' '}
+          <Link href={`mailto:${oldEmail}`} style={link}>
+            {oldEmail}
+          </Link>{' '}
+          to{' '}
+          <Link href={`mailto:${newEmail}`} style={link}>
+            {newEmail}
           </Link>
-          . Click the button below to accept the invitation and create your
-          account.
+          .
+        </Text>
+        <Text style={text}>
+          Click the button below to confirm this change:
         </Text>
         <Button style={button} href={confirmationUrl}>
-          Accept Invitation
+          Confirm Email Change
         </Button>
         <Text style={footer}>
-          If you weren't expecting this invitation, you can safely ignore this
-          email.
+          If you didn't request this change, please secure your account
+          immediately.
         </Text>
       </Container>
     </Body>
   </Html>
 )
 
-export default InviteEmail
+export default EmailChangeEmail
 
 const main = { backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }
 const container = { padding: '20px 25px' }

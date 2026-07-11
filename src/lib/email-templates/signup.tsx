@@ -12,44 +12,51 @@ import {
   Text,
 } from '@react-email/components'
 
-interface InviteEmailProps {
+interface SignupEmailProps {
   siteName: string
   siteUrl: string
+  recipient: string
   confirmationUrl: string
 }
 
-export const InviteEmail = ({
+export const SignupEmail = ({
   siteName,
   siteUrl,
+  recipient,
   confirmationUrl,
-}: InviteEmailProps) => (
+}: SignupEmailProps) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>You've been invited to join {siteName}</Preview>
+    <Preview>Confirm your email for {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>You've been invited</Heading>
+        <Heading style={h1}>Confirm your email</Heading>
         <Text style={text}>
-          You've been invited to join{' '}
+          Thanks for signing up for{' '}
           <Link href={siteUrl} style={link}>
             <strong>{siteName}</strong>
           </Link>
-          . Click the button below to accept the invitation and create your
-          account.
+          !
+        </Text>
+        <Text style={text}>
+          Please confirm your email address (
+          <Link href={`mailto:${recipient}`} style={link}>
+            {recipient}
+          </Link>
+          ) by clicking the button below:
         </Text>
         <Button style={button} href={confirmationUrl}>
-          Accept Invitation
+          Verify Email
         </Button>
         <Text style={footer}>
-          If you weren't expecting this invitation, you can safely ignore this
-          email.
+          If you didn't create an account, you can safely ignore this email.
         </Text>
       </Container>
     </Body>
   </Html>
 )
 
-export default InviteEmail
+export default SignupEmail
 
 const main = { backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }
 const container = { padding: '20px 25px' }

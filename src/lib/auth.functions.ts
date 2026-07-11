@@ -63,17 +63,8 @@ export const claimRole = createServerFn({ method: "POST" })
       return { role: invite.role, companyId: invite.company_id };
     }
 
-    // No code: bootstrap super_admin if none exists yet
-    const { count } = await supabaseAdmin
-      .from("user_roles")
-      .select("*", { count: "exact", head: true })
-      .eq("role", "super_admin");
-    if (!count) {
-      await supabaseAdmin.from("user_roles").insert({ user_id: userId, role: "super_admin" });
-      return { role: "super_admin" as const, companyId: null };
-    }
     throw new Error(
-      "No invite code provided. Ask your company admin for one, or contact Blue Collar Tips.",
+      "No invite code provided. Ask your company admin for one, or register your company instead.",
     );
   });
 

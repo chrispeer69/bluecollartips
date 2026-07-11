@@ -746,6 +746,9 @@ function InvitesPanel({ companyId }: { companyId: string }) {
   const [items, setItems] = useState<Awaited<ReturnType<typeof listInvites>>["items"]>([]);
   const [role, setRole] = useState<"driver" | "company_admin">("driver");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
   const reload = async () => setItems((await list({ data: { companyId } })).items);
   useEffect(() => {
     reload();
@@ -757,11 +760,34 @@ function InvitesPanel({ companyId }: { companyId: string }) {
         className="mb-3 flex flex-wrap items-end gap-2"
         onSubmit={async (e) => {
           e.preventDefault();
-          const r = await create({ data: { companyId, role, email: email || null } });
-          setEmail("");
-          const origin = typeof window !== "undefined" ? window.location.origin : "";
-          alert(`Invite created.\nCode: ${r.code}\nShare link: ${origin}/join/${r.code}`);
-          await reload();
+          setBusy(true);
+          try {
+            const r = await create({
+              data: {
+                companyId,
+                role,
+                email: email || null,
+                phone: phone || null,
+                recipientName: name || null,
+              },
+            });
+            const bits = [
+              `Invite code: ${r.code}`,
+              `Link: ${r.inviteUrl}`,
+              r.emailed ? "✓ Email sent" : email ? "⚠ Email not sent" : "",
+              r.texted ? "✓ Text sent" : phone ? "⚠ Text not sent" : "",
+              r.error ?? "",
+            ].filter(Boolean);
+            alert(bits.join("\n"));
+            setEmail("");
+            setPhone("");
+            setName("");
+            await reload();
+          } catch (err) {
+            alert(err instanceof Error ? err.message : "Failed to create invite");
+          } finally {
+            setBusy(false);
+          }
         }}
       >
         <label className="text-sm">
@@ -771,8 +797,12 @@ function InvitesPanel({ companyId }: { companyId: string }) {
             <option value="company_admin">Company admin</option>
           </select>
         </label>
+        <Input label="Name (optional)" value={name} onChange={setName} />
         <Input label="Email (optional)" value={email} onChange={setEmail} type="email" />
-        <button className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground">Generate invite</button>
+        <Input label="Phone (optional)" value={phone} onChange={setPhone} type="tel" placeholder="+1 555 555 5555" />
+        <button disabled={busy} className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-60">
+          {busy ? "Sending…" : "Send invite"}
+        </button>
       </form>
       {items.length === 0 ? (
         <div className="text-sm text-muted-foreground">No invites yet.</div>

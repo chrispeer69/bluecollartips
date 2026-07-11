@@ -98,12 +98,54 @@ export const createInvite = createServerFn({ method: "POST" })
 
     if (data.phone) {
       try {
-        const { sendInviteSms } = await import("@/lib/sms.functions");
-        await sendInviteSms.__handler({
-          data: { toPhone: data.phone, companyName, inviteUrl, role: data.role },
-          context,
-        } as any);
-        texted = true;
+        const to = normalizeE164(data.phone);
+        if (!to) throw new Error("Invalid phone number");
+        const body =
+          data.role === "driver"
+            ? `${companyName} added you as a driver on Blue Collar Tips. Activate your account: ${inviteUrl}`
+            : `You're invited to manage ${companyName} on Blue Collar Tips. Activate: ${inviteUrl}`;
+        const lovableKey = process.env.LOVABLE_API_KEY;
+        const twilioKey = process.env.TWILIO_API_KEY;
+        const fromNumber = process.env.TWILIO_FROM_NUMBER;
+        let status: string = "skipped";
+        let providerSid: string | null = null;
+        let sendErr: string | null = null;
+        if (!lovableKey || !twilioKey || !fromNumber) {
+          sendErr = "Twilio not connected — SMS not sent.";
+        } else {
+          const resp = await fetch(
+            "https://connector-gateway.lovable.dev/twilio/Messages.json",
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${lovableKey}`,
+                "X-Connection-Api-Key": twilioKey,
+                "Content-Type": "application/x-www-form-urlencoded",
+              },
+              body: new URLSearchParams({ To: to, From: fromNumber, Body: body }),
+            },
+          );
+          const json = (await resp.json()) as { sid?: string; message?: string };
+          if (!resp.ok) {
+            status = "failed";
+            sendErr = json.message ?? `Twilio ${resp.status}`;
+          } else {
+            status = "sent";
+            providerSid = json.sid ?? null;
+            texted = true;
+          }
+        }
+        await supabaseAdmin.from("sms_deliveries").insert({
+          company_id: data.companyId,
+          driver_id: null,
+          to_phone: to,
+          body,
+          provider_sid: providerSid,
+          status,
+          error: sendErr,
+          sent_by: context.userId,
+        });
+        if (sendErr && !texted) deliveryError = sendErr;
       } catch (err) {
         deliveryError = err instanceof Error ? err.message : "SMS send failed";
         console.error("createInvite sms failed", err);

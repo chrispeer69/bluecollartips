@@ -49,6 +49,12 @@ function AdminDashboard() {
   const [data, setData] = useState<Data | null>(null);
   const [companyId, setCompanyId] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
+  const [inviteInfo, setInviteInfo] = useState<{ label: string; url: string; code: string } | null>(null);
+
+  function showInvite(label: string, code: string) {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    setInviteInfo({ label, code, url: `${origin}/join/${code}` });
+  }
 
   async function load(id?: string) {
     const { data: session } = await supabase.auth.getSession();
@@ -82,7 +88,7 @@ function AdminDashboard() {
         <div className="mx-auto max-w-3xl p-6">
           <NewCompanyForm onCreate={async (v) => {
             const r = await newCo({ data: v });
-            alert(`Company created. Admin invite code: ${r.inviteCode}`);
+            showInvite(`Invite for ${v.name} admin`, r.inviteCode);
             await load(r.companyId);
           }} />
         </div>
@@ -101,6 +107,36 @@ function AdminDashboard() {
         onSignOut={signOut(navigate)}
       />
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-6">
+        {inviteInfo && (
+          <div className="rounded-lg border border-primary/40 bg-primary/5 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 space-y-2">
+                <div className="text-sm font-medium">{inviteInfo.label} — send this link</div>
+                <div className="rounded-md border border-border bg-background p-2 font-mono text-xs break-all">
+                  {inviteInfo.url}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Invite code: <span className="font-mono">{inviteInfo.code}</span> · Text or email this link to the recipient. They'll sign up and be joined automatically.
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => { navigator.clipboard?.writeText(inviteInfo.url); }}
+                  className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground"
+                >
+                  Copy link
+                </button>
+                <button
+                  onClick={() => setInviteInfo(null)}
+                  className="rounded-md border border-border px-3 py-1.5 text-xs"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {data.isSuper && data.companies && data.companies.length > 0 && (
           <Section title="Tenant">
             <div className="flex flex-wrap items-center gap-3">
@@ -122,7 +158,7 @@ function AdminDashboard() {
               <NewCompanyInline
                 onCreate={async (v) => {
                   const r = await newCo({ data: v });
-                  alert(`Company created. Admin invite code: ${r.inviteCode}`);
+                  showInvite(`Invite for ${v.name} admin`, r.inviteCode);
                   await load(r.companyId);
                 }}
               />
@@ -144,7 +180,7 @@ function AdminDashboard() {
             tipsByDriver={totals.byDriver}
             onCreate={async (v) => {
               const r = await createDrv({ data: { ...v, companyId: data.company!.id } });
-              alert(`Employee created. Invite code (send to employee): ${r.inviteCode}`);
+              showInvite(`Invite for ${v.displayName || "employee"}`, r.inviteCode);
               await load(companyId);
             }}
             onStatus={async (driverId, status) => {

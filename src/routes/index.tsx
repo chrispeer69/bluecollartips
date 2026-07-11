@@ -107,9 +107,28 @@ function Index() {
             </div>
           ))}
         </div>
+
+        <section className="mt-24 rounded-lg border border-border bg-card p-8">
+          <span className="inline-block rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+            White-label ready
+          </span>
+          <h2 className="mt-4 text-2xl font-semibold">Run it under your own brand</h2>
+          <p className="mt-3 max-w-3xl text-muted-foreground">
+            Blue Collar Tips is fully white-label. Any company can launch it with their
+            own name, logo, colors, and support contact — customers see your brand end
+            to end while the platform handles ratings, tips, splits, and payouts in the
+            background.
+          </p>
+        </section>
       </main>
       <footer className="border-t border-border py-8 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} Blue Collar Tips
+        <p>
+          Blue Collar Tips is a product of{" "}
+          <span className="font-medium text-foreground">Blue Collar AI, Inc.</span>
+        </p>
+        <p className="mt-1">
+          © {new Date().getFullYear()} Blue Collar AI, Inc. All rights reserved.
+        </p>
       </footer>
     </div>
   );

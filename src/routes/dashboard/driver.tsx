@@ -734,12 +734,12 @@ export function TopBar({
 }) {
   return (
     <header className="border-b border-border bg-card">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-        <div>
-          <div className="text-xs uppercase tracking-wider text-muted-foreground">{subtitle}</div>
-          <div className="font-semibold">{title}</div>
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+        <div className="min-w-0">
+          <div className="truncate text-xs uppercase tracking-wider text-muted-foreground">{subtitle}</div>
+          <div className="truncate font-semibold">{title}</div>
         </div>
-        <button onClick={onSignOut} className="rounded-md border border-border px-3 py-1.5 text-sm">
+        <button onClick={onSignOut} className="shrink-0 rounded-md border border-border px-3 py-1.5 text-sm">
           Sign out
         </button>
       </div>

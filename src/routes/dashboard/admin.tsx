@@ -110,7 +110,7 @@ function AdminDashboard() {
         {inviteInfo && (
           <div className="rounded-lg border border-primary/40 bg-primary/5 p-4">
             <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 space-y-2">
+              <div className="min-w-0 flex-1 space-y-2">
                 <div className="text-sm font-medium">{inviteInfo.label} — send this link</div>
                 <div className="rounded-md border border-border bg-background p-2 font-mono text-xs break-all">
                   {inviteInfo.url}
@@ -370,9 +370,9 @@ function DriverRoster({
               <tr>
                 <th className="py-2">Name</th>
                 <th>Status</th>
-                <th>Location</th>
-                <th>Tip link</th>
-                <th className="text-right">Avg ★</th>
+                <th className="hidden sm:table-cell">Location</th>
+                <th className="hidden md:table-cell">Tip link</th>
+                <th className="hidden sm:table-cell text-right">Avg ★</th>
                 <th className="text-right">Gross tips</th>
                 <th></th>
               </tr>
@@ -387,7 +387,7 @@ function DriverRoster({
                     <td>
                       <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize">{d.status}</span>
                     </td>
-                    <td>
+                    <td className="hidden sm:table-cell">
                       <select
                         value={d.location_id ?? ""}
                         onChange={async (e) => {
@@ -401,7 +401,7 @@ function DriverRoster({
                         {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                       </select>
                     </td>
-                    <td>
+                    <td className="hidden md:table-cell">
                       <a
                         className="text-xs text-secondary underline"
                         href={`/${companySlug}/d/${d.slug}`}
@@ -410,7 +410,7 @@ function DriverRoster({
                         /{companySlug}/d/{d.slug}
                       </a>
                     </td>
-                    <td className="text-right">{avg}</td>
+                    <td className="hidden sm:table-cell text-right">{avg}</td>
                     <td className="text-right">{dollars(tipsByDriver.get(d.id) ?? 0)}</td>
                     <td className="text-right">
                       <button
@@ -630,15 +630,15 @@ function FlagsList({
     <ul className="divide-y divide-border">
       {flags.map((f) => (
         <li key={f.id} className="py-3 text-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="font-medium">{byId.get(f.driver_id) ?? "Employee"}</span>
-              <span className="ml-2 text-muted-foreground">{f.reason}</span>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-medium">{byId.get(f.driver_id) ?? "Employee"}</div>
+              <div className="text-xs text-muted-foreground">{f.reason}</div>
             </div>
             <select
               value={f.status}
               onChange={(e) => onResolve(f.id, e.target.value as "open" | "resolved" | "violation")}
-              className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+              className="shrink-0 rounded-md border border-input bg-background px-2 py-1 text-xs"
             >
               <option value="open">open</option>
               <option value="resolved">resolved</option>
@@ -780,7 +780,7 @@ function InvitesPanel({ companyId }: { companyId: string }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-xs uppercase text-muted-foreground">
-              <tr><th className="py-2">Code</th><th>Role</th><th>Email</th><th>Status</th><th>Expires</th><th></th></tr>
+              <tr><th className="py-2">Code</th><th>Role</th><th className="hidden sm:table-cell">Email</th><th>Status</th><th className="hidden md:table-cell">Expires</th><th></th></tr>
             </thead>
             <tbody className="divide-y divide-border">
               {items.map((i) => {
@@ -791,9 +791,9 @@ function InvitesPanel({ companyId }: { companyId: string }) {
                   <tr key={i.id}>
                     <td className="py-2"><span className="font-mono">{i.code}</span></td>
                     <td className="capitalize">{i.role.replace("_", " ")}</td>
-                    <td>{i.email ?? "—"}</td>
+                    <td className="hidden sm:table-cell">{i.email ?? "—"}</td>
                     <td><span className="rounded-full bg-muted px-2 py-0.5 text-xs">{status}</span></td>
-                    <td className="text-xs">{i.expires_at ? new Date(i.expires_at).toLocaleDateString() : "—"}</td>
+                    <td className="hidden md:table-cell text-xs">{i.expires_at ? new Date(i.expires_at).toLocaleDateString() : "—"}</td>
                     <td className="text-right">
                       <button onClick={() => navigator.clipboard.writeText(`${origin}/join/${i.code}`)} className="rounded border border-border px-2 py-1 text-xs">Copy link</button>
                       {status === "active" && (
@@ -823,16 +823,16 @@ function ReconciliationPanel({ companyId, drivers }: { companyId: string; driver
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="text-left text-xs uppercase text-muted-foreground">
-          <tr><th className="py-2">Employee</th><th>Total tips</th><th>Manual</th><th>Unverified</th><th>Unverified $</th><th>Unverified %</th></tr>
+          <tr><th className="py-2">Employee</th><th>Total tips</th><th className="hidden sm:table-cell">Manual</th><th>Unverified</th><th className="hidden sm:table-cell">Unverified $</th><th>Unverified %</th></tr>
         </thead>
         <tbody className="divide-y divide-border">
           {rows.map((r) => (
             <tr key={r.driverId} className={r.unverifiedPct > 20 ? "bg-destructive/5" : undefined}>
               <td className="py-2 font-medium">{byId.get(r.driverId) ?? "—"}</td>
               <td>{r.total}</td>
-              <td>{r.manual}</td>
+              <td className="hidden sm:table-cell">{r.manual}</td>
               <td>{r.unverified}</td>
-              <td>{dollars(r.amountUnverified)}</td>
+              <td className="hidden sm:table-cell">{dollars(r.amountUnverified)}</td>
               <td className={r.unverifiedPct > 20 ? "font-semibold text-destructive" : ""}>{r.unverifiedPct}%</td>
             </tr>
           ))}
@@ -905,18 +905,18 @@ function PlatformPanel() {
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="text-left text-xs uppercase text-muted-foreground">
-            <tr><th className="py-2">Tenant</th><th>Status</th><th>Tips</th><th>Gross</th><th>Co share</th><th>Platform 10%</th><th>Pending co payout</th><th></th></tr>
+            <tr><th className="py-2">Tenant</th><th>Status</th><th className="hidden sm:table-cell">Tips</th><th>Gross</th><th className="hidden md:table-cell">Co share</th><th className="hidden md:table-cell">Platform 10%</th><th className="hidden lg:table-cell">Pending co payout</th><th></th></tr>
           </thead>
           <tbody className="divide-y divide-border">
             {data.tenants.map((t) => (
               <tr key={t.id}>
                 <td className="py-2 font-medium">{t.name}</td>
                 <td><span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize">{t.status}</span></td>
-                <td>{t.count}</td>
+                <td className="hidden sm:table-cell">{t.count}</td>
                 <td>{dollars(t.gross)}</td>
-                <td>{dollars(t.companyShare)}</td>
-                <td>{dollars(t.platformShare)}</td>
-                <td>{dollars(t.pendingCompany)}</td>
+                <td className="hidden md:table-cell">{dollars(t.companyShare)}</td>
+                <td className="hidden md:table-cell">{dollars(t.platformShare)}</td>
+                <td className="hidden lg:table-cell">{dollars(t.pendingCompany)}</td>
                 <td className="text-right">
                   <button
                     onClick={async () => {

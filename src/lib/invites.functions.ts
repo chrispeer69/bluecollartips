@@ -6,6 +6,15 @@ import { randomBytes } from "crypto";
 const APP_BASE_URL =
   process.env.APP_BASE_URL ?? "https://roadsidetips.lovable.app";
 
+function normalizeE164(phone: string): string | null {
+  const cleaned = phone.replace(/[^\d+]/g, "");
+  if (!cleaned) return null;
+  if (cleaned.startsWith("+")) return cleaned;
+  if (cleaned.length === 10) return "+1" + cleaned;
+  if (cleaned.length === 11 && cleaned.startsWith("1")) return "+" + cleaned;
+  return null;
+}
+
 export const listInvites = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))

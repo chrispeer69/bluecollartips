@@ -29,6 +29,7 @@ import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/e
 import { Route as LovableEmailAuthWebhookRouteImport } from './routes/lovable/email/auth/webhook'
 import { Route as LovableEmailAuthPreviewRouteImport } from './routes/lovable/email/auth/preview'
 import { Route as ApiPublicWebhooksStripeRouteImport } from './routes/api/public/webhooks/stripe'
+import { Route as ApiPublicWebhooksGhlRouteImport } from './routes/api/public/webhooks/ghl'
 
 const UnsubscribeRoute = UnsubscribeRouteImport.update({
   id: '/unsubscribe',
@@ -133,6 +134,11 @@ const ApiPublicWebhooksStripeRoute = ApiPublicWebhooksStripeRouteImport.update({
   path: '/api/public/webhooks/stripe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicWebhooksGhlRoute = ApiPublicWebhooksGhlRouteImport.update({
+  id: '/api/public/webhooks/ghl',
+  path: '/api/public/webhooks/ghl',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -149,6 +155,7 @@ export interface FileRoutesByFullPath {
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/print/employee/$id': typeof PrintEmployeeIdRoute
+  '/api/public/webhooks/ghl': typeof ApiPublicWebhooksGhlRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
@@ -171,6 +178,7 @@ export interface FileRoutesByTo {
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/print/employee/$id': typeof PrintEmployeeIdRoute
+  '/api/public/webhooks/ghl': typeof ApiPublicWebhooksGhlRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
@@ -194,6 +202,7 @@ export interface FileRoutesById {
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/print/employee/$id': typeof PrintEmployeeIdRoute
+  '/api/public/webhooks/ghl': typeof ApiPublicWebhooksGhlRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
@@ -218,6 +227,7 @@ export interface FileRouteTypes {
     | '/$companySlug/d/$driverSlug'
     | '/lovable/email/suppression'
     | '/print/employee/$id'
+    | '/api/public/webhooks/ghl'
     | '/api/public/webhooks/stripe'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
@@ -240,6 +250,7 @@ export interface FileRouteTypes {
     | '/$companySlug/d/$driverSlug'
     | '/lovable/email/suppression'
     | '/print/employee/$id'
+    | '/api/public/webhooks/ghl'
     | '/api/public/webhooks/stripe'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
@@ -262,6 +273,7 @@ export interface FileRouteTypes {
     | '/$companySlug/d/$driverSlug'
     | '/lovable/email/suppression'
     | '/print/employee/$id'
+    | '/api/public/webhooks/ghl'
     | '/api/public/webhooks/stripe'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
@@ -285,6 +297,7 @@ export interface RootRouteChildren {
   CompanySlugDDriverSlugRoute: typeof CompanySlugDDriverSlugRoute
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
   PrintEmployeeIdRoute: typeof PrintEmployeeIdRoute
+  ApiPublicWebhooksGhlRoute: typeof ApiPublicWebhooksGhlRoute
   ApiPublicWebhooksStripeRoute: typeof ApiPublicWebhooksStripeRoute
   LovableEmailAuthPreviewRoute: typeof LovableEmailAuthPreviewRoute
   LovableEmailAuthWebhookRoute: typeof LovableEmailAuthWebhookRoute
@@ -435,6 +448,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWebhooksStripeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/webhooks/ghl': {
+      id: '/api/public/webhooks/ghl'
+      path: '/api/public/webhooks/ghl'
+      fullPath: '/api/public/webhooks/ghl'
+      preLoaderRoute: typeof ApiPublicWebhooksGhlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -453,6 +473,7 @@ const rootRouteChildren: RootRouteChildren = {
   CompanySlugDDriverSlugRoute: CompanySlugDDriverSlugRoute,
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
   PrintEmployeeIdRoute: PrintEmployeeIdRoute,
+  ApiPublicWebhooksGhlRoute: ApiPublicWebhooksGhlRoute,
   ApiPublicWebhooksStripeRoute: ApiPublicWebhooksStripeRoute,
   LovableEmailAuthPreviewRoute: LovableEmailAuthPreviewRoute,
   LovableEmailAuthWebhookRoute: LovableEmailAuthWebhookRoute,
@@ -463,13 +484,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

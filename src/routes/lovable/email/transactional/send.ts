@@ -59,6 +59,25 @@ export const Route = createFileRoute("/lovable/email/transactional/send")({
           return Response.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        // Authorization: only super_admin or company_admin may trigger sends
+        // through this HTTP route. Server-side callers that need to send email
+        // as part of trusted flows (e.g., createInvite) should call
+        // enqueueTransactionalEmail() directly instead of hitting this route.
+        const { data: isAuthorized, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .in('role', ['super_admin', 'company_admin'])
+          .maybeSingle()
+
+        if (roleError || !isAuthorized) {
+          console.warn('Forbidden email send attempt', {
+            user_id: user.id,
+            has_role_error: !!roleError,
+          })
+          return Response.json({ error: 'Forbidden' }, { status: 403 })
+        }
+
         // Parse request body
         let templateName: string
         let recipientEmail: string

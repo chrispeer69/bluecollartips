@@ -243,6 +243,15 @@ function AdminDashboard() {
           <InvitesPanel companyId={data.company.id} />
         </Section>
 
+        <Section title="Tip disputes & refunds">
+          <DisputesPanel
+            companyId={data.company.id}
+            tips={data.tips}
+            drivers={data.drivers}
+            onChanged={() => load(companyId)}
+          />
+        </Section>
+
         <Section title="Reconciliation (last 30 days)">
           <ReconciliationPanel companyId={data.company.id} drivers={data.drivers} />
         </Section>

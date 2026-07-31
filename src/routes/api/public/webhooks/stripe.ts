@@ -78,6 +78,7 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
                 companyId,
                 driverId,
                 customerPhone: pi.metadata?.customer_phone || null,
+                customerEmail: pi.metadata?.customer_email || null,
                 amountCents: pi.amount,
               });
             } catch (e) {

@@ -34,6 +34,27 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
+  async function onForgotPassword() {
+    setError(null);
+    setInfo(null);
+    if (!email.trim()) {
+      setError("Enter your email above first, then tap “Forgot password”.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      setInfo("Check your email for a link to set a new password.");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Could not send reset email");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -233,9 +254,19 @@ function AuthPage() {
           </button>
         </form>
 
+        {mode === "signin" && (
+          <button
+            type="button"
+            onClick={onForgotPassword}
+            className="mt-4 block text-sm text-muted-foreground hover:underline"
+          >
+            Forgot password?
+          </button>
+        )}
+
         <button
           type="button"
-          className="mt-4 text-sm text-muted-foreground hover:underline"
+          className="mt-2 block text-sm text-muted-foreground hover:underline"
           onClick={() => {
             setMode(mode === "signin" ? "signup" : "signin");
             setError(null);
@@ -246,6 +277,18 @@ function AuthPage() {
             ? "Don't have an account? Create one"
             : "Already have an account? Sign in"}
         </button>
+
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          By continuing you agree to our{" "}
+          <Link to="/terms" className="underline">
+            Terms
+          </Link>{" "}
+          and{" "}
+          <Link to="/privacy" className="underline">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </div>
     </div>
   );

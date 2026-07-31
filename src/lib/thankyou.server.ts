@@ -128,8 +128,30 @@ export async function sendThankYou(
   if (ctx.customerEmail) {
     const subject = renderTemplate(company.thank_you_email_subject, vars);
     const body = renderTemplate(company.thank_you_email_template, vars);
-    let status = "skipped";
-    const error = "Email provider not connected — logged only";
+    let status = "queued";
+    let error: string | null = null;
+    try {
+      const { enqueueTransactionalEmail } = await import("@/lib/email/invite.server");
+      const res = await enqueueTransactionalEmail({
+        to: ctx.customerEmail,
+        templateName: "notice",
+        idempotencyKey: `thankyou-${ctx.ratingId ?? ctx.driverId}-${Date.now()}`,
+        templateData: {
+          subject,
+          companyName: company.name,
+          heading: subject,
+          preview: subject,
+          lines: body.split(/\n+/).map((l) => l.trim()).filter(Boolean),
+        },
+      });
+      if (res && res.queued === false) {
+        status = "skipped";
+        error = res.reason ?? "suppressed";
+      }
+    } catch (e) {
+      status = "failed";
+      error = e instanceof Error ? e.message : "Email send failed";
+    }
     await admin.from("email_deliveries").insert({
       company_id: ctx.companyId,
       driver_id: ctx.driverId,

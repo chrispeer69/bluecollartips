@@ -129,6 +129,14 @@ function Index() {
         <p className="mt-1">
           © {new Date().getFullYear()} Blue Collar AI, Inc. All rights reserved.
         </p>
+        <p className="mt-3 flex justify-center gap-4">
+          <Link to="/privacy" className="hover:underline">
+            Privacy
+          </Link>
+          <Link to="/terms" className="hover:underline">
+            Terms
+          </Link>
+        </p>
       </footer>
     </div>
   );

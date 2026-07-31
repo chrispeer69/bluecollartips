@@ -727,6 +727,7 @@ export type Database = {
           company_id: string
           created_at: string
           customer_name: string | null
+          dispute_reason: string | null
           disputed: boolean
           disputed_at: string | null
           driver_amount_cents: number
@@ -736,8 +737,12 @@ export type Database = {
           note: string | null
           platform_amount_cents: number
           rating_id: string | null
+          refund_amount_cents: number | null
+          refund_reason: string | null
+          refunded_at: string | null
           source: Database["public"]["Enums"]["tip_source"]
           stripe_payment_intent_id: string | null
+          stripe_refund_id: string | null
           stripe_status: string | null
           verified: boolean
           verified_at: string | null
@@ -748,6 +753,7 @@ export type Database = {
           company_id: string
           created_at?: string
           customer_name?: string | null
+          dispute_reason?: string | null
           disputed?: boolean
           disputed_at?: string | null
           driver_amount_cents: number
@@ -757,8 +763,12 @@ export type Database = {
           note?: string | null
           platform_amount_cents: number
           rating_id?: string | null
+          refund_amount_cents?: number | null
+          refund_reason?: string | null
+          refunded_at?: string | null
           source: Database["public"]["Enums"]["tip_source"]
           stripe_payment_intent_id?: string | null
+          stripe_refund_id?: string | null
           stripe_status?: string | null
           verified?: boolean
           verified_at?: string | null
@@ -769,6 +779,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           customer_name?: string | null
+          dispute_reason?: string | null
           disputed?: boolean
           disputed_at?: string | null
           driver_amount_cents?: number
@@ -778,8 +789,12 @@ export type Database = {
           note?: string | null
           platform_amount_cents?: number
           rating_id?: string | null
+          refund_amount_cents?: number | null
+          refund_reason?: string | null
+          refunded_at?: string | null
           source?: Database["public"]["Enums"]["tip_source"]
           stripe_payment_intent_id?: string | null
+          stripe_refund_id?: string | null
           stripe_status?: string | null
           verified?: boolean
           verified_at?: string | null

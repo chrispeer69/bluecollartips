@@ -1174,3 +1174,191 @@ function ReviewLinksPanel({
     </form>
   );
 }
+function DisputesPanel({
+  companyId,
+  tips,
+  drivers,
+  onChanged,
+}: {
+  companyId: string;
+  tips: Data["tips"];
+  drivers: Data["drivers"];
+  onChanged: () => void;
+}) {
+  const list = useServerFn(listTipDisputes);
+  const flag = useServerFn(flagTipDispute);
+  const clear = useServerFn(clearTipDispute);
+  const refund = useServerFn(refundTip);
+  const [items, setItems] = useState<Awaited<ReturnType<typeof listTipDisputes>>["items"]>([]);
+  const [tipId, setTipId] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const byId = new Map(drivers.map((d) => [d.id, d.display_name]));
+
+  const reload = async () => {
+    const r = await list({ data: { companyId } });
+    setItems(r.items);
+  };
+  useEffect(() => {
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId]);
+
+  async function run(fn: () => Promise<unknown>, ok: string) {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await fn();
+      setMsg(ok);
+      await reload();
+      onChanged();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const openTips = tips.filter((t) => !items.some((i) => i.id === t.id));
+
+  return (
+    <div className="space-y-5">
+      <form
+        className="flex flex-wrap items-end gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!tipId || reason.trim().length < 3) {
+            setMsg("Pick a tip and give a reason (3+ characters).");
+            return;
+          }
+          run(() => flag({ data: { tipId, reason: reason.trim() } }), "Tip flagged — employee notified.").then(() => {
+            setReason("");
+            setTipId("");
+          });
+        }}
+      >
+        <label className="text-sm">
+          Flag a tip
+          <select
+            value={tipId}
+            onChange={(e) => setTipId(e.target.value)}
+            className="mt-1 block max-w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="">Select a tip…</option>
+            {openTips.map((t) => (
+              <option key={t.id} value={t.id}>
+                {dollars(t.amount_cents)} · {byId.get(t.driver_id) ?? "—"} · {t.source} ·{" "}
+                {new Date(t.created_at).toLocaleDateString()}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Input label="Reason" value={reason} onChange={setReason} />
+        <button
+          disabled={busy}
+          className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-60"
+        >
+          Flag tip
+        </button>
+      </form>
+
+      {msg && <div className="text-xs text-muted-foreground">{msg}</div>}
+
+      {!items.length ? (
+        <div className="text-sm text-muted-foreground">No flagged or refunded tips.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="py-2">Employee</th>
+                <th>Amount</th>
+                <th className="hidden sm:table-cell">Source</th>
+                <th>Status</th>
+                <th className="hidden md:table-cell">Reason</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {items.map((t) => {
+                const refunded = !!t.refunded_at;
+                return (
+                  <tr key={t.id} className={refunded ? undefined : "bg-destructive/5"}>
+                    <td className="py-2 font-medium">{byId.get(t.driver_id) ?? "—"}</td>
+                    <td>
+                      {dollars(t.amount_cents)}
+                      {refunded && t.refund_amount_cents ? (
+                        <span className="block text-xs text-muted-foreground">
+                          refunded {dollars(t.refund_amount_cents)}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="hidden sm:table-cell capitalize">{t.source}</td>
+                    <td>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
+                        {refunded ? "Refunded" : "Flagged"}
+                      </span>
+                    </td>
+                    <td className="hidden max-w-[16rem] truncate md:table-cell text-muted-foreground">
+                      {t.refund_reason || t.dispute_reason || "—"}
+                    </td>
+                    <td className="whitespace-nowrap text-right">
+                      {!refunded && (
+                        <>
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              run(() => clear({ data: { tipId: t.id } }), "Dispute cleared — tip verified.")
+                            }
+                            className="rounded border border-border px-2 py-1 text-xs disabled:opacity-60"
+                          >
+                            Clear
+                          </button>{" "}
+                          <button
+                            disabled={busy}
+                            onClick={() => {
+                              const input = window.prompt(
+                                `Refund amount in dollars (max ${(t.amount_cents / 100).toFixed(2)}):`,
+                                (t.amount_cents / 100).toFixed(2),
+                              );
+                              if (input === null) return;
+                              const cents = Math.round(Number(input) * 100);
+                              if (!Number.isFinite(cents) || cents <= 0) {
+                                setMsg("Enter a valid refund amount.");
+                                return;
+                              }
+                              run(
+                                () =>
+                                  refund({
+                                    data: {
+                                      tipId: t.id,
+                                      amountCents: cents,
+                                      reason: t.dispute_reason ?? undefined,
+                                    },
+                                  }),
+                                "Refund issued — employee and customer notified.",
+                              );
+                            }}
+                            className="rounded bg-destructive px-2 py-1 text-xs text-destructive-foreground disabled:opacity-60"
+                          >
+                            Refund
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Flagged tips are held out of verified totals. Card tips refund through the processor; cash and app
+            tips are reversed in-app. Both paths notify the employee, and refunds also notify the customer when
+            we have their contact info.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}

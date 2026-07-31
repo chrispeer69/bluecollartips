@@ -447,6 +447,14 @@ function TipPage() {
         <p className="mt-6 text-center text-xs text-muted-foreground">
           Powered by Blue Collar Tips
         </p>
+        <p className="mt-2 flex justify-center gap-3 text-xs text-muted-foreground">
+          <a href="/privacy" className="underline">
+            Privacy
+          </a>
+          <a href="/terms" className="underline">
+            Terms
+          </a>
+        </p>
       </form>
     </div>
   );

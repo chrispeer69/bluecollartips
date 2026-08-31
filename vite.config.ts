@@ -12,4 +12,9 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Default target is Cloudflare's Workers module format, which Railway can't run directly.
+  // Pin to Nitro's node-server preset so `.output/server/index.mjs` is a standalone Node HTTP server.
+  nitro: {
+    preset: "node-server",
+  },
 });

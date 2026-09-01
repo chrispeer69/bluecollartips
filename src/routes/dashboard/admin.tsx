@@ -512,18 +512,23 @@ function DriverRoster({
                       <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize">{d.status}</span>
                     </td>
                     <td className="hidden sm:table-cell">
-                      <select
-                        value={d.location_id ?? ""}
-                        onChange={async (e) => {
-                          const v = e.target.value || null;
-                          await setLoc({ data: { driverId: d.id, locationId: v } });
-                          onLocationChanged();
-                        }}
-                        className="rounded-md border border-input bg-background px-2 py-1 text-xs"
-                      >
-                        <option value="">—</option>
-                        {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-                      </select>
+                      {locations.length ? (
+                        <select
+                          value={d.location_id ?? ""}
+                          aria-label={`Location for ${d.display_name}`}
+                          onChange={async (e) => {
+                            const v = e.target.value || null;
+                            await setLoc({ data: { driverId: d.id, locationId: v } });
+                            onLocationChanged();
+                          }}
+                          className="max-w-36 rounded-md border border-input bg-background px-2 py-1 text-xs"
+                        >
+                          <option value="">Not assigned</option>
+                          {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                        </select>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Not assigned</span>
+                      )}
                     </td>
                     <td className="hidden md:table-cell">
                       <a

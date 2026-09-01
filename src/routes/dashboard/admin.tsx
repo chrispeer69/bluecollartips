@@ -1063,11 +1063,24 @@ function PlatformPanel() {
   if (!data) return <div className="text-sm text-muted-foreground">Loading…</div>;
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-5">
         <Stat label="Gross tips" value={dollars(data.grossTotal)} />
         <Stat label="Platform 10%" value={dollars(data.platformTotal)} />
         <Stat label="Tenants" value={String(data.tenants.length)} />
         <Stat label="Employees" value={String(data.driverCount)} />
+        <Stat label="Registered users" value={String(data.userCount)} />
+      </div>
+      <div className="rounded-lg border border-border p-4">
+        <h3 className="font-semibold">Employee earnings breakdown</h3>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Employee</th><th>Company</th><th>Tips</th><th>Gross</th><th>Platform share</th></tr></thead><tbody className="divide-y divide-border">
+            {data.employees.map((employee) => <tr key={employee.id}><td className="py-2 font-medium">{employee.display_name}</td><td>{Array.isArray(employee.companies) ? employee.companies[0]?.name : employee.companies?.name}</td><td>{employee.count}</td><td>{dollars(employee.gross)}</td><td>{dollars(employee.platformShare)}</td></tr>)}
+          </tbody></table>
+        </div>
+      </div>
+      <div className="rounded-lg border border-border p-4">
+        <h3 className="font-semibold">Registered users</h3>
+        <div className="mt-3 overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Name</th><th>Email</th><th>Created</th></tr></thead><tbody className="divide-y divide-border">{data.users.map((user) => <tr key={user.id}><td className="py-2">{user.full_name}</td><td>{user.email}</td><td>{new Date(user.created_at).toLocaleDateString()}</td></tr>)}</tbody></table></div>
       </div>
       <div className="text-xs text-muted-foreground">
         Integrations · Stripe: <span className={data.integrations.stripe ? "text-emerald-600" : ""}>{data.integrations.stripe ? "connected" : "not connected"}</span>{" "}

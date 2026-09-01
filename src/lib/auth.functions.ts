@@ -6,6 +6,7 @@ import { sql } from "@/db/client.server";
 import { createSession, destroySession, getSessionUser, hashPassword, verifyPassword } from "@/auth/session.server";
 import { randomBytes, createHash } from "node:crypto";
 import { sendEmail } from "@/lib/email/send.server";
+import { provisionConfiguredSuperAdmin } from "@/auth/superadmin.server";
 
 export const getCurrentUser = createServerFn({ method: "GET" }).handler(async () => {
   const user = await getSessionUser();
@@ -18,6 +19,7 @@ export const signIn = createServerFn({ method: "POST" })
     const rows = await sql()`select id, password_hash from users where lower(email) = lower(${data.email.trim()}) limit 1`;
     const user = rows[0];
     if (!user || !(await verifyPassword(data.password, user.password_hash))) throw new Error("Invalid email or password");
+    await provisionConfiguredSuperAdmin(user.id, data.email);
     await createSession(user.id);
     return { ok: true };
   });
@@ -28,6 +30,7 @@ export const signUp = createServerFn({ method: "POST" })
     const passwordHash = await hashPassword(data.password);
     try {
       const rows = await sql()`insert into users (email, password_hash, full_name) values (${data.email.toLowerCase().trim()}, ${passwordHash}, ${data.fullName}) returning id`;
+      await provisionConfiguredSuperAdmin(rows[0].id, data.email);
       await createSession(rows[0].id);
       return { ok: true };
     } catch (error: any) {

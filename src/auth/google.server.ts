@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { sql } from "@/db/client.server";
 import { createSessionCookieHeader } from "./session.server";
 import { slugify } from "@/lib/constants";
+import { provisionConfiguredSuperAdmin } from "./superadmin.server";
 
 const COOKIE = "bct_google_oauth";
 const MAX_AGE = 10 * 60;
@@ -102,9 +103,7 @@ export async function googleCallback(request: Request) {
       await sql()`insert into oauth_accounts (user_id, provider, provider_account_id) values (${userId}, 'google', ${googleSubject}) on conflict do nothing`;
     }
     if (!userId) throw new Error("Google account could not be linked");
-    if (process.env.BOOTSTRAP_ADMIN_EMAIL?.toLowerCase() === googleEmail.toLowerCase()) {
-      await sql()`insert into user_roles (user_id, company_id, role) values (${userId}, null, 'super_admin') on conflict do nothing`;
-    }
+    await provisionConfiguredSuperAdmin(userId, googleEmail);
     await applyOnboarding(userId, googleEmail, intent);
     const sessionCookie = await createSessionCookieHeader(userId);
     return new Response(null, { status: 302, headers: { Location: "/dashboard", "Set-Cookie": sessionCookie } });

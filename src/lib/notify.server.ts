@@ -1,7 +1,6 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
-const TWILIO_GATEWAY = "https://connector-gateway.lovable.dev/twilio";
-const SITE_URL = "https://roadsidetips.lovable.app";
+import { db } from "@/db/client.server";
+import { sendSms } from "@/lib/sms/send.server";
+const SITE_URL = process.env.APP_BASE_URL ?? "http://localhost:3000";
 
 async function sendNotice(args: {
   to: string;
@@ -45,33 +44,12 @@ function e164(phone: string | null | undefined): string | null {
 }
 
 async function twilioSend(to: string, body: string): Promise<{ status: string; sid: string | null; error: string | null }> {
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  const twilioKey = process.env.TWILIO_API_KEY;
-  const fromNumber = process.env.TWILIO_FROM_NUMBER;
-  if (!lovableKey || !twilioKey || !fromNumber) {
-    return { status: "skipped", sid: null, error: "Twilio not connected" };
-  }
-  try {
-    const resp = await fetch(`${TWILIO_GATEWAY}/Messages.json`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": twilioKey,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({ To: to, From: fromNumber, Body: body }),
-    });
-    const json = (await resp.json()) as { sid?: string; message?: string };
-    if (!resp.ok) return { status: "failed", sid: null, error: json.message ?? `Twilio ${resp.status}` };
-    return { status: "sent", sid: json.sid ?? null, error: null };
-  } catch (e) {
-    return { status: "failed", sid: null, error: e instanceof Error ? e.message : "send failed" };
-  }
+  return sendSms(to, body);
 }
 
 /** Notify the employee of a new tip or rating via SMS if opted in. */
 export async function notifyEmployee(
-  admin: SupabaseClient,
+  admin: typeof db,
   args: { companyId: string; driverId: string; kind: "tip" | "rating"; amountCents?: number | null; stars?: number | null; customerName?: string | null },
 ): Promise<void> {
   const { data: driver } = await admin
@@ -126,7 +104,7 @@ export async function notifyEmployee(
 
 /** Send a card-tip receipt via SMS to the customer's phone (if provided). */
 export async function sendCustomerReceipt(
-  admin: SupabaseClient,
+  admin: typeof db,
   args: {
     companyId: string;
     driverId: string;
@@ -183,7 +161,7 @@ type TipPartyArgs = {
   customerEmail?: string | null;
 };
 
-async function tipParties(admin: SupabaseClient, companyId: string, driverId: string) {
+async function tipParties(admin: typeof db, companyId: string, driverId: string) {
   const [{ data: company }, { data: driver }] = await Promise.all([
     admin.from("companies").select("name").eq("id", companyId).maybeSingle(),
     admin.from("drivers").select("display_name, email, phone, notify_sms").eq("id", driverId).maybeSingle(),
@@ -195,7 +173,7 @@ async function tipParties(admin: SupabaseClient, companyId: string, driverId: st
 }
 
 /** Employee + admin-facing notice that a tip was flagged for review. */
-export async function notifyTipDisputed(admin: SupabaseClient, args: TipPartyArgs): Promise<void> {
+export async function notifyTipDisputed(admin: typeof db, args: TipPartyArgs): Promise<void> {
   const { companyName, driver } = await tipParties(admin, args.companyId, args.driverId);
   if (!driver) return;
   const amt = `$${(args.amountCents / 100).toFixed(2)}`;
@@ -234,7 +212,7 @@ export async function notifyTipDisputed(admin: SupabaseClient, args: TipPartyArg
 }
 
 /** Notifies the employee and (when known) the customer that a tip was refunded. */
-export async function notifyTipRefunded(admin: SupabaseClient, args: TipPartyArgs): Promise<void> {
+export async function notifyTipRefunded(admin: typeof db, args: TipPartyArgs): Promise<void> {
   const { companyName, driver } = await tipParties(admin, args.companyId, args.driverId);
   const amt = `$${(args.amountCents / 100).toFixed(2)}`;
 

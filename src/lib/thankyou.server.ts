@@ -1,6 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
-const TWILIO_GATEWAY = "https://connector-gateway.lovable.dev/twilio";
+import { db } from "@/db/client.server";
+import { sendSms } from "./sms/send.server";
 
 function e164(phone: string): string | null {
   const cleaned = phone.replace(/[^\d+]/g, "");
@@ -32,7 +31,7 @@ export interface ThankYouContext {
 }
 
 export async function sendThankYou(
-  admin: SupabaseClient,
+  admin: typeof db,
   ctx: ThankYouContext,
 ): Promise<{ smsStatus?: string; emailStatus?: string }> {
   if (!ctx.customerPhone && !ctx.customerEmail) return {};
@@ -76,39 +75,14 @@ export async function sendThankYou(
     let error: string | null = null;
     let providerSid: string | null = null;
 
-    const lovableKey = process.env.LOVABLE_API_KEY;
-    const twilioKey = process.env.TWILIO_API_KEY;
-    const fromNumber = process.env.TWILIO_FROM_NUMBER;
-
     if (!to) {
       status = "failed";
       error = "Invalid phone";
-    } else if (!lovableKey || !twilioKey || !fromNumber) {
-      status = "skipped";
-      error = "Twilio not connected — logged only";
     } else {
-      try {
-        const resp = await fetch(`${TWILIO_GATEWAY}/Messages.json`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${lovableKey}`,
-            "X-Connection-Api-Key": twilioKey,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: new URLSearchParams({ To: to, From: fromNumber, Body: body }),
-        });
-        const json = (await resp.json()) as { sid?: string; message?: string };
-        if (!resp.ok) {
-          status = "failed";
-          error = json.message ?? `Twilio ${resp.status}`;
-        } else {
-          providerSid = json.sid ?? null;
-          status = "sent";
-        }
-      } catch (e) {
-        status = "failed";
-        error = e instanceof Error ? e.message : "Send failed";
-      }
+      const result = await sendSms(to, body);
+      status = result.status;
+      error = result.error;
+      providerSid = result.sid;
     }
 
     await admin.from("sms_deliveries").insert({

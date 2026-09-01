@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { QRCodeCanvas } from "qrcode.react";
-import { supabase } from "@/integrations/supabase/client";
+import { auth } from "@/auth/client";
 import {
   createCompany,
   createDriver,
@@ -21,6 +21,8 @@ import { platformOverview, suspendTenant } from "@/lib/platform.functions";
 import { sendTipLinkSms } from "@/lib/sms.functions";
 import { listTipDisputes, flagTipDispute, clearTipDispute, refundTip } from "@/lib/disputes.functions";
 import { listLocations, createLocation, deleteLocation, setDriverLocation, updateReviewLinks } from "@/lib/locations.functions";
+import { DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
+import { Building2, CreditCard, LayoutDashboard, MessageSquareText, Settings, ShieldCheck, Users } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/admin")({
   head: () => ({
@@ -36,7 +38,16 @@ export const Route = createFileRoute("/dashboard/admin")({
   component: AdminDashboard,
 });
 
-type Data = Awaited<ReturnType<typeof getAdminDashboard>>;
+type Data = any;
+type AdminPage = "overview" | "employees" | "feedback" | "payments" | "settings" | "platform";
+const adminNav: DashboardNavItem<AdminPage>[] = [
+  { id: "overview", label: "Overview", icon: LayoutDashboard, group: "Workspace" },
+  { id: "employees", label: "Employees", icon: Users, group: "Manage" },
+  { id: "feedback", label: "Ratings & feedback", icon: MessageSquareText },
+  { id: "payments", label: "Tips & reconciliation", icon: CreditCard, group: "Money" },
+  { id: "settings", label: "Company settings", icon: Settings, group: "Configure" },
+  { id: "platform", label: "Platform", icon: ShieldCheck, group: "Blue Collar Tips" },
+];
 
 function AdminDashboard() {
   const navigate = useNavigate();
@@ -50,6 +61,8 @@ function AdminDashboard() {
   const [data, setData] = useState<Data | null>(null);
   const [companyId, setCompanyId] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [page, setPage] = useState<AdminPage>("overview");
   const [inviteInfo, setInviteInfo] = useState<{ label: string; url: string; code: string } | null>(null);
 
   function showInvite(label: string, code: string) {
@@ -58,30 +71,80 @@ function AdminDashboard() {
   }
 
   async function load(id?: string) {
-    const { data: session } = await supabase.auth.getSession();
-    if (!session.session) {
-      navigate({ to: "/auth" });
-      return;
+    setLoadError(null);
+    try {
+      const { data: session } = await auth.getSession();
+      if (!session.session) {
+        navigate({ to: "/auth" });
+        return;
+      }
+      let effectiveId = id;
+      let usedStoredTenant = false;
+      if (!effectiveId && import.meta.env.DEV) {
+        const stored = typeof window !== "undefined" ? localStorage.getItem("devTenantId") : null;
+        if (stored) {
+          effectiveId = stored;
+          usedStoredTenant = true;
+        }
+      }
+
+      let d;
+      try {
+        d = await get({ data: { companyId: effectiveId } });
+      } catch (error) {
+        // A recreated/reseeded local DB makes a remembered tenant UUID stale.
+        if (!usedStoredTenant) throw error;
+        localStorage.removeItem("devTenantId");
+        d = await get({ data: {} });
+      }
+
+      setData(d);
+      if (d.company) setCompanyId(d.company.id);
+      if (import.meta.env.DEV && d.company) {
+        try { localStorage.setItem("devTenantId", d.company.id); } catch { /* ignore */ }
+      }
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Could not load the admin dashboard.");
+    } finally {
+      setLoading(false);
     }
-    let effectiveId = id;
-    if (!effectiveId && import.meta.env.DEV) {
-      const stored = typeof window !== "undefined" ? localStorage.getItem("devTenantId") : null;
-      if (stored) effectiveId = stored;
-    }
-    const d = await get({ data: { companyId: effectiveId } });
-    setData(d);
-    if (d.company) setCompanyId(d.company.id);
-    if (import.meta.env.DEV && d.company) {
-      try { localStorage.setItem("devTenantId", d.company.id); } catch { /* ignore */ }
-    }
-    setLoading(false);
   }
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading) return <Center>Loading…</Center>;
+  if (loading) return <Center>Loading admin dashboard…</Center>;
+  if (loadError) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-6 text-center">
+        <div className="max-w-md rounded-lg border border-border bg-card p-6 shadow-sm">
+          <h1 className="text-lg font-semibold">Could not load the admin dashboard</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{loadError}</p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <button
+              onClick={() => { setLoading(true); load(); }}
+              className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => navigate({ to: "/" })}
+              className="rounded-md border border-border px-4 py-2 text-sm"
+            >
+              Home
+            </button>
+            <button
+              onClick={async () => { await auth.signOut(); navigate({ to: "/auth" }); }}
+              className="rounded-md border border-border px-4 py-2 text-sm"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (!data?.company) {
     return (
       <div className="min-h-screen bg-background">
@@ -100,14 +163,30 @@ function AdminDashboard() {
   const totals = sumTips(data.tips);
   const ratingStats = ratingAgg(data.ratings, data.drivers);
 
+  const visibleNav = data.isSuper ? adminNav : adminNav.filter((item) => item.id !== "platform");
+  const pageTitle = visibleNav.find((item) => item.id === page)?.label ?? "Overview";
   return (
-    <div className="min-h-screen bg-background">
-      <TopBar
-        title={data.company.name}
-        subtitle={data.isSuper ? "Blue Collar Tips · Super admin" : "Company admin"}
-        onSignOut={signOut(navigate)}
-      />
-      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6">
+    <DashboardShell
+      title={data.company.name}
+      subtitle={data.isSuper ? "Super admin" : "Company admin"}
+      pageTitle={pageTitle}
+      active={page}
+      items={visibleNav}
+      onChange={setPage}
+      onSignOut={signOut(navigate)}
+      workspace={
+        <label className="block rounded-xl border border-sidebar-border bg-card p-3">
+          <span className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground"><Building2 size={14} /> Workspace</span>
+          {data.isSuper && data.companies?.length ? (
+            <WorkspaceSelect
+              value={companyId ?? data.company.id}
+              onChange={(value) => { setCompanyId(value); setLoading(true); load(value); }}
+              options={data.companies.map((c) => ({ value: c.id, label: c.name, detail: "Company workspace" }))}
+            />
+          ) : <span className="mt-1 block truncate text-sm font-semibold">{data.company.name}</span>}
+        </label>
+      }
+    >
         {inviteInfo && (
           <div className="rounded-lg border border-primary/40 bg-primary/5 p-4">
             <div className="flex items-start justify-between gap-3">
@@ -138,7 +217,7 @@ function AdminDashboard() {
           </div>
         )}
 
-        {data.isSuper && data.companies && data.companies.length > 0 && (
+        {page === "platform" && data.isSuper && data.companies && data.companies.length > 0 && (
           <Section title="Tenant">
             <div className="flex flex-wrap items-center gap-3">
               <select
@@ -167,14 +246,14 @@ function AdminDashboard() {
           </Section>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-4">
+        {page === "overview" && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Stat label="Tips (all-time)" value={dollars(totals.gross)} />
           <Stat label="Company 10%" value={dollars(totals.company)} />
           <Stat label="Employees" value={String(data.drivers.length)} />
           <Stat label="Avg rating" value={ratingStats.avg ? ratingStats.avg.toFixed(2) + " ★" : "—"} />
-        </div>
+        </div>}
 
-        <Section title="Employees">
+        {page === "employees" && <Section title="Employees">
           <DriverRoster
             drivers={data.drivers}
             ratingsByDriver={ratingStats.byDriver}
@@ -192,9 +271,9 @@ function AdminDashboard() {
             companyId={data.company.id}
             onLocationChanged={() => load(companyId)}
           />
-        </Section>
+        </Section>}
 
-        <Section title="Branding">
+        {page === "settings" && <Section title="Branding">
           <BrandingForm
             initial={data.company}
             onSave={async (v) => {
@@ -202,13 +281,13 @@ function AdminDashboard() {
               await load(companyId);
             }}
           />
-        </Section>
+        </Section>}
 
-        <Section title="Locations / crews">
+        {page === "employees" && <Section title="Locations / crews">
           <LocationsPanel companyId={data.company.id} />
-        </Section>
+        </Section>}
 
-        <Section title="Review syndication links (Google / Yelp / Facebook)">
+        {page === "settings" && <Section title="Review syndication links (Google / Yelp / Facebook)">
           <ReviewLinksPanel
             companyId={data.company.id}
             initial={{
@@ -218,17 +297,17 @@ function AdminDashboard() {
             }}
             onSaved={() => load(companyId)}
           />
-        </Section>
+        </Section>}
 
-        <Section title="Automatic thank-you messages">
+        {page === "settings" && <Section title="Automatic thank-you messages">
           <ThankYouTemplatesPanel companyId={data.company.id} />
-        </Section>
+        </Section>}
 
-        <Section title="Recent ratings & feedback">
+        {(page === "overview" || page === "feedback") && <Section title="Recent ratings & feedback">
           <FeedbackList ratings={data.ratings} drivers={data.drivers} />
-        </Section>
+        </Section>}
 
-        <Section title="Discrepancy flags">
+        {page === "feedback" && <Section title="Discrepancy flags">
           <FlagsList
             flags={data.flags}
             drivers={data.drivers}
@@ -237,42 +316,41 @@ function AdminDashboard() {
               await load(companyId);
             }}
           />
-        </Section>
+        </Section>}
 
-        <Section title="Invites">
+        {page === "employees" && <Section title="Invites">
           <InvitesPanel companyId={data.company.id} />
-        </Section>
+        </Section>}
 
-        <Section title="Tip disputes & refunds">
+        {page === "payments" && <Section title="Tip disputes & refunds">
           <DisputesPanel
             companyId={data.company.id}
             tips={data.tips}
             drivers={data.drivers}
             onChanged={() => load(companyId)}
           />
-        </Section>
+        </Section>}
 
-        <Section title="Reconciliation (last 30 days)">
+        {page === "payments" && <Section title="Reconciliation (last 30 days)">
           <ReconciliationPanel companyId={data.company.id} drivers={data.drivers} />
-        </Section>
+        </Section>}
 
-        <Section title="SMS a tip link to a customer">
+        {page === "employees" && <Section title="SMS a tip link to a customer">
           <AdminSmsPanel drivers={data.drivers} />
-        </Section>
+        </Section>}
 
-        {data.isSuper && (
+        {page === "platform" && data.isSuper && (
           <Section title="Platform overview (super admin)">
             <PlatformPanel />
           </Section>
         )}
-      </div>
-    </div>
+    </DashboardShell>
   );
 }
 
 function signOut(nav: ReturnType<typeof useNavigate>) {
   return async () => {
-    await supabase.auth.signOut();
+    await auth.signOut();
     nav({ to: "/" });
   };
 }
@@ -339,7 +417,13 @@ function DriverRoster({
   }, [companyId, listLocs]);
   return (
     <>
-      <div className="mb-3 flex justify-end">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="font-medium">Employee QR codes</div>
+          <p className="text-xs text-muted-foreground">
+            Each code opens that employee's public rating and tip page.
+          </p>
+        </div>
         <button onClick={() => setOpen((v) => !v)} className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground">
           {open ? "Cancel" : "Add employee"}
         </button>
@@ -374,7 +458,37 @@ function DriverRoster({
       {drivers.length === 0 ? (
         <div className="text-sm text-muted-foreground">No employees yet. Add one to get started.</div>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+          <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {drivers.map((d) => {
+              const path = `/${companySlug}/d/${d.slug}`;
+              const url = typeof window !== "undefined" ? `${window.location.origin}${path}` : path;
+              return (
+                <button
+                  key={`qr-${d.id}`}
+                  type="button"
+                  onClick={() => {
+                    setQrDriverId(d.id);
+                    setQrFor({ name: d.display_name, url });
+                  }}
+                  className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/60 hover:bg-muted/40"
+                  aria-label={`Open QR code for ${d.display_name}`}
+                >
+                  <span className="shrink-0 rounded-md bg-white p-1.5">
+                    <QRCodeCanvas value={url} size={76} includeMargin={false} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block font-medium">{d.display_name}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{path}</span>
+                    <span className="mt-1 block text-xs font-medium text-primary">
+                      View, download or print QR →
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-xs uppercase text-muted-foreground">
               <tr>
@@ -451,7 +565,8 @@ function DriverRoster({
               })}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
       {qrFor && qrDriverId && (
         <DriverQRModal
@@ -610,7 +725,7 @@ function FeedbackList({ ratings, drivers }: { ratings: Data["ratings"]; drivers:
             <div>
               <span className="text-secondary">{"★".repeat(r.stars)}</span>
               <span className="text-muted-foreground">{"★".repeat(5 - r.stars)}</span>
-              <span className="ml-2 text-xs text-muted-foreground">{byId.get(r.driver_id)}</span>
+              <span className="ml-2 text-xs text-muted-foreground">{String(byId.get(r.driver_id) ?? "")}</span>
               {r.flagged && (
                 <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-xs text-destructive">low rating</span>
               )}
@@ -642,7 +757,7 @@ function FlagsList({
         <li key={f.id} className="py-3 text-sm">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <div className="truncate font-medium">{byId.get(f.driver_id) ?? "Employee"}</div>
+              <div className="truncate font-medium">{String(byId.get(f.driver_id) ?? "Employee")}</div>
               <div className="text-xs text-muted-foreground">{f.reason}</div>
             </div>
             <select
@@ -868,7 +983,7 @@ function ReconciliationPanel({ companyId, drivers }: { companyId: string; driver
         <tbody className="divide-y divide-border">
           {rows.map((r) => (
             <tr key={r.driverId} className={r.unverifiedPct > 20 ? "bg-destructive/5" : undefined}>
-              <td className="py-2 font-medium">{byId.get(r.driverId) ?? "—"}</td>
+              <td className="py-2 font-medium">{String(byId.get(r.driverId) ?? "—")}</td>
               <td>{r.total}</td>
               <td className="hidden sm:table-cell">{r.manual}</td>
               <td>{r.unverified}</td>
@@ -1285,7 +1400,7 @@ function DisputesPanel({
                 const refunded = !!t.refunded_at;
                 return (
                   <tr key={t.id} className={refunded ? undefined : "bg-destructive/5"}>
-                    <td className="py-2 font-medium">{byId.get(t.driver_id) ?? "—"}</td>
+                    <td className="py-2 font-medium">{String(byId.get(t.driver_id) ?? "—")}</td>
                     <td>
                       {dollars(t.amount_cents)}
                       {refunded && t.refund_amount_cents ? (

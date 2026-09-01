@@ -1,19 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuth } from "@/auth/middleware";
 import { z } from "zod";
 import { slugify } from "./constants";
 import { randomBytes } from "crypto";
 
 const APP_BASE_URL =
-  process.env.APP_BASE_URL ?? "https://roadsidetips.lovable.app";
+  process.env.APP_BASE_URL ?? "https://bluecollartips.app";
 
 function generateInviteCode() {
   return randomBytes(6).toString("hex").toUpperCase();
 }
 
 async function assertCompanyAdmin(userId: string, companyId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await supabaseAdmin
+  const { db } = await import("@/db/client.server");
+  const { data } = await db
     .from("user_roles")
     .select("role, company_id")
     .eq("user_id", userId);
@@ -27,12 +27,12 @@ async function assertCompanyAdmin(userId: string, companyId: string) {
 }
 
 export const getAdminDashboard = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) => z.object({ companyId: z.string().uuid().optional() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: roles } = await supabaseAdmin
+    const { userId } = context;
+    const { db } = await import("@/db/client.server");
+    const { data: roles } = await db
       .from("user_roles")
       .select("role, company_id")
       .eq("user_id", userId);
@@ -40,43 +40,43 @@ export const getAdminDashboard = createServerFn({ method: "POST" })
     let companyId = data.companyId ?? roles?.find((r) => r.role === "company_admin")?.company_id;
     if (!companyId) {
       // Super admin without a selection: default to first company
-      const { data: first } = await supabaseAdmin.from("companies").select("id").limit(1).maybeSingle();
+      const { data: first } = await db.from("companies").select("id").limit(1).maybeSingle();
       companyId = first?.id ?? undefined;
     }
     if (!companyId) return { isSuper, company: null, drivers: [], ratings: [], tips: [], flags: [] };
     await assertCompanyAdmin(userId, companyId);
 
     const [{ data: company }, { data: drivers }, { data: ratings }, { data: tips }, { data: flags }, { data: companies }] = await Promise.all([
-      supabase.from("companies").select("*").eq("id", companyId).maybeSingle(),
-      supabase
+      db.from("companies").select("*").eq("id", companyId).maybeSingle(),
+      db
         .from("drivers")
         .select("*")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false }),
-      supabase
+      db
         .from("ratings")
         .select("id, stars, feedback, customer_name, driver_id, created_at, flagged")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
         .limit(200),
-      supabase
+      db
         .from("tips")
         .select("id, amount_cents, source, customer_name, driver_id, company_amount_cents, platform_amount_cents, created_at")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
         .limit(200),
-      supabase
+      db
         .from("discrepancy_flags")
         .select("*")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false }),
-      isSuper ? supabaseAdmin.from("companies").select("id, name, slug") : Promise.resolve({ data: null }),
+      isSuper ? db.from("companies").select("id, name, slug") : Promise.resolve({ data: null }),
     ]);
     return { isSuper, company, drivers: drivers ?? [], ratings: ratings ?? [], tips: tips ?? [], flags: flags ?? [], companies: companies ?? null };
   });
 
 export const createDriver = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z
       .object({
@@ -90,10 +90,10 @@ export const createDriver = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertCompanyAdmin(context.userId, data.companyId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { db } = await import("@/db/client.server");
     const baseSlug = slugify(data.displayName);
     const slug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
-    const { data: driver, error } = await supabaseAdmin
+    const { data: driver, error } = await db
       .from("drivers")
       .insert({
         company_id: data.companyId,
@@ -109,7 +109,7 @@ export const createDriver = createServerFn({ method: "POST" })
     if (error) throw error;
 
     const code = generateInviteCode();
-    await supabaseAdmin.from("invites").insert({
+    await db.from("invites").insert({
       company_id: data.companyId,
       code,
       role: "driver",
@@ -124,7 +124,7 @@ export const createDriver = createServerFn({ method: "POST" })
         const { enqueueTransactionalEmail } = await import(
           "@/lib/email/invite.server"
         );
-        const { data: company } = await supabaseAdmin
+        const { data: company } = await db
           .from("companies")
           .select("name")
           .eq("id", data.companyId)
@@ -149,7 +149,7 @@ export const createDriver = createServerFn({ method: "POST" })
   });
 
 export const setDriverStatus = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z
       .object({
@@ -159,15 +159,15 @@ export const setDriverStatus = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: driver } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { data: driver } = await db
       .from("drivers")
       .select("company_id")
       .eq("id", data.driverId)
       .maybeSingle();
     if (!driver) throw new Error("Not found");
     await assertCompanyAdmin(context.userId, driver.company_id);
-    const { error } = await supabaseAdmin
+    const { error } = await db
       .from("drivers")
       .update({ status: data.status })
       .eq("id", data.driverId);
@@ -176,7 +176,7 @@ export const setDriverStatus = createServerFn({ method: "POST" })
   });
 
 export const updateCompanyBranding = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z
       .object({
@@ -192,8 +192,8 @@ export const updateCompanyBranding = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertCompanyAdmin(context.userId, data.companyId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { error } = await db
       .from("companies")
       .update({
         name: data.name,
@@ -209,7 +209,7 @@ export const updateCompanyBranding = createServerFn({ method: "POST" })
   });
 
 export const resolveFlag = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z
       .object({
@@ -220,15 +220,15 @@ export const resolveFlag = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: flag } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { data: flag } = await db
       .from("discrepancy_flags")
       .select("company_id")
       .eq("id", data.flagId)
       .maybeSingle();
     if (!flag) throw new Error("Not found");
     await assertCompanyAdmin(context.userId, flag.company_id);
-    const { error } = await supabaseAdmin
+    const { error } = await db
       .from("discrepancy_flags")
       .update({
         status: data.status,
@@ -241,7 +241,7 @@ export const resolveFlag = createServerFn({ method: "POST" })
   });
 
 export const createCompany = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z
       .object({
@@ -251,22 +251,22 @@ export const createCompany = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: roles } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { data: roles } = await db
       .from("user_roles")
       .select("role")
       .eq("user_id", context.userId)
       .eq("role", "super_admin");
     if (!roles?.length) throw new Error("Forbidden");
     const slug = `${slugify(data.name)}-${Math.random().toString(36).slice(2, 5)}`;
-    const { data: company, error } = await supabaseAdmin
+    const { data: company, error } = await db
       .from("companies")
       .insert({ name: data.name, slug })
       .select("id, slug")
       .single();
     if (error) throw error;
     const code = generateInviteCode();
-    await supabaseAdmin.from("invites").insert({
+    await db.from("invites").insert({
       company_id: company.id,
       code,
       role: "company_admin",
@@ -298,12 +298,12 @@ export const createCompany = createServerFn({ method: "POST" })
   });
 
 export const getThankYouTemplates = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     await assertCompanyAdmin(context.userId, data.companyId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: row } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { data: row } = await db
       .from("companies")
       .select(
         "thank_you_enabled, thank_you_sms_template, thank_you_email_subject, thank_you_email_template",
@@ -314,7 +314,7 @@ export const getThankYouTemplates = createServerFn({ method: "POST" })
   });
 
 export const updateThankYouTemplates = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z
       .object({
@@ -328,8 +328,8 @@ export const updateThankYouTemplates = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertCompanyAdmin(context.userId, data.companyId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { error } = await db
       .from("companies")
       .update({
         thank_you_enabled: data.enabled,

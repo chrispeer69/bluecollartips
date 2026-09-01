@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuth } from "@/auth/middleware";
 import { z } from "zod";
+import { sendSms } from "./sms/send.server";
 
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/twilio";
 
 function e164(phone: string): string | null {
   const cleaned = phone.replace(/[^\d+]/g, "");
@@ -14,7 +14,7 @@ function e164(phone: string): string | null {
 }
 
 export const sendTipLinkSms = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z
       .object({
@@ -27,9 +27,9 @@ export const sendTipLinkSms = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const to = e164(data.toPhone);
     if (!to) throw new Error("Invalid phone number. Use a US number or include country code.");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { db } = await import("@/db/client.server");
 
-    const { data: driver } = await supabaseAdmin
+    const { data: driver } = await db
       .from("drivers")
       .select("id, company_id, slug, display_name, user_id, companies(slug, name)")
       .eq("id", data.driverId)
@@ -38,7 +38,7 @@ export const sendTipLinkSms = createServerFn({ method: "POST" })
 
     // Authorization: driver self, or company admin / super admin
     if (driver.user_id !== context.userId) {
-      const { data: roles } = await supabaseAdmin
+      const { data: roles } = await db
         .from("user_roles")
         .select("role, company_id")
         .eq("user_id", context.userId);
@@ -53,43 +53,12 @@ export const sendTipLinkSms = createServerFn({ method: "POST" })
     const greeting = data.customerName ? `Hi ${data.customerName}, ` : "";
     const body = `${greeting}thanks for choosing ${driver.companies?.name ?? "us"}. Rate ${driver.display_name} or leave a tip: ${url}`;
 
-    const lovableKey = process.env.LOVABLE_API_KEY;
-    const twilioKey = process.env.TWILIO_API_KEY;
-    const fromNumber = process.env.TWILIO_FROM_NUMBER;
+    const result = await sendSms(to, body);
+    const providerSid = result.sid;
+    const status = result.status;
+    const error = result.error;
 
-    let providerSid: string | null = null;
-    let status = "queued";
-    let error: string | null = null;
-
-    if (!lovableKey || !twilioKey || !fromNumber) {
-      status = "skipped";
-      error = "Twilio not connected — message logged but not sent.";
-    } else {
-      try {
-        const resp = await fetch(`${GATEWAY_URL}/Messages.json`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${lovableKey}`,
-            "X-Connection-Api-Key": twilioKey,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: new URLSearchParams({ To: to, From: fromNumber, Body: body }),
-        });
-        const json = (await resp.json()) as { sid?: string; message?: string };
-        if (!resp.ok) {
-          status = "failed";
-          error = json.message ?? `Twilio ${resp.status}`;
-        } else {
-          providerSid = json.sid ?? null;
-          status = "sent";
-        }
-      } catch (e) {
-        status = "failed";
-        error = e instanceof Error ? e.message : "Send failed";
-      }
-    }
-
-    await supabaseAdmin.from("sms_deliveries").insert({
+    await db.from("sms_deliveries").insert({
       company_id: driver.company_id,
       driver_id: driver.id,
       to_phone: to,
@@ -104,18 +73,18 @@ export const sendTipLinkSms = createServerFn({ method: "POST" })
   });
 
 export const listDriverSms = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) => z.object({ driverId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: driver } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { data: driver } = await db
       .from("drivers")
       .select("company_id, user_id")
       .eq("id", data.driverId)
       .maybeSingle();
     if (!driver) return { items: [] };
     if (driver.user_id !== context.userId) {
-      const { data: roles } = await supabaseAdmin
+      const { data: roles } = await db
         .from("user_roles")
         .select("role, company_id")
         .eq("user_id", context.userId);
@@ -124,7 +93,7 @@ export const listDriverSms = createServerFn({ method: "POST" })
       );
       if (!ok) return { items: [] };
     }
-    const { data: items } = await supabaseAdmin
+    const { data: items } = await db
       .from("sms_deliveries")
       .select("id, to_phone, status, error, created_at, body")
       .eq("driver_id", data.driverId)

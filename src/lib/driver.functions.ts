@@ -1,11 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuth } from "@/auth/middleware";
 import { z } from "zod";
 import { TIP_MAX_CENTS, TIP_MIN_CENTS } from "./constants";
 
 async function getUserRoles(userId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await supabaseAdmin
+  const { db } = await import("@/db/client.server");
+  const { data } = await db
     .from("user_roles")
     .select("role, company_id")
     .eq("user_id", userId);
@@ -13,7 +13,7 @@ async function getUserRoles(userId: string) {
 }
 
 async function resolveAccessibleDriver(userId: string, requestedDriverId?: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { db } = await import("@/db/client.server");
   const roles = await getUserRoles(userId);
   const isSuper = roles.some((r) => r.role === "super_admin");
   const adminCompanyIds = roles
@@ -23,67 +23,87 @@ async function resolveAccessibleDriver(userId: string, requestedDriverId?: strin
   const canAccess = (driver: { user_id: string | null; company_id: string }) =>
     driver.user_id === userId || isSuper || adminCompanyIds.includes(driver.company_id);
 
+  const accessibleDrivers = await listAccessibleDrivers(userId, isSuper, adminCompanyIds);
+
   if (requestedDriverId) {
-    const { data: driver } = await supabaseAdmin
+    const { data: driver } = await db
       .from("drivers")
       .select("*, companies(name, slug, primary_color, secondary_color, logo_url)")
       .eq("id", requestedDriverId)
       .maybeSingle();
-    if (!driver || !canAccess(driver)) return { driver: null, roles, accessibleDrivers: [] };
-    return { driver, roles, accessibleDrivers: await listAccessibleDrivers(userId, isSuper, adminCompanyIds) };
+    if (!driver || !canAccess(driver)) return { driver: null, roles, accessibleDrivers };
+    return { driver, roles, accessibleDrivers };
   }
 
-  const { data: ownDriver } = await supabaseAdmin
-    .from("drivers")
-    .select("*, companies(name, slug, primary_color, secondary_color, logo_url)")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (ownDriver) {
-    return { driver: ownDriver, roles, accessibleDrivers: await listAccessibleDrivers(userId, isSuper, adminCompanyIds) };
+  const firstOwn = accessibleDrivers.find((driver) => driver.user_id === userId);
+  if (firstOwn) {
+    const { data: ownDriver } = await db
+      .from("drivers")
+      .select("*, companies(name, slug, primary_color, secondary_color, logo_url)")
+      .eq("id", firstOwn.id)
+      .maybeSingle();
+    return { driver: ownDriver, roles, accessibleDrivers };
   }
 
   if (isSuper || adminCompanyIds.length) {
-    let query = supabaseAdmin
+    let query = db
       .from("drivers")
       .select("*, companies(name, slug, primary_color, secondary_color, logo_url)")
       .order("created_at", { ascending: false })
       .limit(1);
     if (!isSuper) query = query.in("company_id", adminCompanyIds);
     const { data: firstDriver } = await query.maybeSingle();
-    return { driver: firstDriver ?? null, roles, accessibleDrivers: await listAccessibleDrivers(userId, isSuper, adminCompanyIds) };
+    return { driver: firstDriver ?? null, roles, accessibleDrivers };
   }
 
   return { driver: null, roles, accessibleDrivers: [] };
 }
 
 async function listAccessibleDrivers(userId: string, isSuper: boolean, adminCompanyIds: string[]) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  if (!isSuper && !adminCompanyIds.length) return [];
-  let query = supabaseAdmin
+  const { db } = await import("@/db/client.server");
+  const { data: own } = await db
     .from("drivers")
-    .select("id, display_name, status, company_id, companies(name, slug)")
+    .select("id, user_id, display_name, status, company_id, companies(name, slug)")
+    .eq("user_id", userId)
     .order("display_name", { ascending: true });
-  if (!isSuper) query = query.in("company_id", adminCompanyIds);
-  const { data } = await query;
-  return data ?? [];
+
+  let managed: any[] = [];
+  if (isSuper || adminCompanyIds.length) {
+    let query = db
+      .from("drivers")
+      .select("id, user_id, display_name, status, company_id, companies(name, slug)")
+      .order("display_name", { ascending: true });
+    if (!isSuper) query = query.in("company_id", adminCompanyIds);
+    const result = await query;
+    managed = result.data ?? [];
+  }
+
+  const unique = new Map<string, any>();
+  for (const driver of [...(own ?? []), ...managed]) unique.set(driver.id, driver);
+  return [...unique.values()].sort((a, b) => {
+    const companyA = a.companies?.name ?? "";
+    const companyB = b.companies?.name ?? "";
+    return companyA.localeCompare(companyB) || a.display_name.localeCompare(b.display_name);
+  });
 }
 
 export const getDriverDashboard = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) => z.object({ driverId: z.string().uuid().optional() }).optional().parse(d))
   .handler(async ({ data, context }) => {
     const { userId } = context;
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { db } = await import("@/db/client.server");
     const { driver, roles, accessibleDrivers } = await resolveAccessibleDriver(userId, data?.driverId);
-    if (!driver) return { driver: null, ratings: [], tips: [], flags: [], accessibleDrivers, viewingAsAdmin: false };
+    const { data: account } = await db.from("users").select("email").eq("id", userId).maybeSingle();
+    if (!driver) return { driver: null, ratings: [], tips: [], flags: [], accessibleDrivers, viewingAsAdmin: false, accountEmail: account?.email ?? null };
     const [{ data: ratings }, { data: tips }, { data: flags }] = await Promise.all([
-      supabaseAdmin
+      db
         .from("ratings")
         .select("id, stars, feedback, customer_name, created_at, flagged")
         .eq("driver_id", driver.id)
         .order("created_at", { ascending: false })
         .limit(100),
-      supabaseAdmin
+      db
         .from("tips")
         .select(
           "id, amount_cents, source, customer_name, driver_amount_cents, company_amount_cents, platform_amount_cents, created_at, note",
@@ -91,18 +111,50 @@ export const getDriverDashboard = createServerFn({ method: "GET" })
         .eq("driver_id", driver.id)
         .order("created_at", { ascending: false })
         .limit(200),
-      supabaseAdmin
+      db
         .from("discrepancy_flags")
         .select("id, reason, status, notes, created_at")
         .eq("driver_id", driver.id)
         .order("created_at", { ascending: false }),
     ]);
     const viewingAsAdmin = driver.user_id !== userId && roles.some((r) => r.role === "super_admin" || r.role === "company_admin");
-    return { driver, ratings: ratings ?? [], tips: tips ?? [], flags: flags ?? [], accessibleDrivers, viewingAsAdmin };
+    return { driver, ratings: ratings ?? [], tips: tips ?? [], flags: flags ?? [], accessibleDrivers, viewingAsAdmin, accountEmail: account?.email ?? null };
+  });
+
+export const updateDriverProfile = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({
+    driverId: z.string().uuid(),
+    displayName: z.string().trim().min(1).max(80),
+    phone: z.string().trim().max(40).optional().nullable(),
+    photoUrl: z.union([z.string().trim().url().max(1000), z.literal("")]).optional().nullable(),
+    venmoHandle: z.string().trim().max(100).optional().nullable(),
+    cashappHandle: z.string().trim().max(100).optional().nullable(),
+    zelleHandle: z.string().trim().max(150).optional().nullable(),
+    paypalHandle: z.string().trim().max(150).optional().nullable(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { driver } = await resolveAccessibleDriver(context.userId, data.driverId);
+    if (!driver) throw new Error("Employee profile not found or access denied");
+    const { db } = await import("@/db/client.server");
+    const { error } = await db.from("drivers").update({
+      display_name: data.displayName,
+      phone: data.phone || null,
+      photo_url: data.photoUrl || null,
+      venmo_handle: data.venmoHandle || null,
+      cashapp_handle: data.cashappHandle || null,
+      zelle_handle: data.zelleHandle || null,
+      paypal_handle: data.paypalHandle || null,
+    }).eq("id", driver.id);
+    if (error) throw new Error(error.message);
+    if (driver.user_id === context.userId) {
+      await db.from("users").update({ full_name: data.displayName, phone: data.phone || null }).eq("id", context.userId);
+    }
+    return { ok: true, slug: driver.slug };
   });
 
 export const logManualTip = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z
       .object({
@@ -119,8 +171,8 @@ export const logManualTip = createServerFn({ method: "POST" })
     const { driver } = await resolveAccessibleDriver(userId, data.driverId);
     if (!driver) throw new Error("No driver profile");
     if (driver.status !== "active") throw new Error("Driver account not active");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.from("tips").insert({
+    const { db } = await import("@/db/client.server");
+    const { error } = await db.from("tips").insert({
       company_id: driver.company_id,
       driver_id: driver.id,
       amount_cents: data.amountCents,
@@ -137,7 +189,7 @@ export const logManualTip = createServerFn({ method: "POST" })
   });
 
 export const updateNotifyPrefs = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z.object({
       driverId: z.string().uuid().optional(),
@@ -147,8 +199,8 @@ export const updateNotifyPrefs = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { driver } = await resolveAccessibleDriver(context.userId, data.driverId);
     if (!driver) throw new Error("No driver profile");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { error } = await db
       .from("drivers")
       .update({ notify_sms: data.notifySms })
       .eq("id", driver.id);

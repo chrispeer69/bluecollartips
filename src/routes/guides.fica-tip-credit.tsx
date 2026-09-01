@@ -16,10 +16,10 @@ export const Route = createFileRoute("/guides/fica-tip-credit")({
           "A practical guide to the FICA tip credit for towing and service business owners: who qualifies, how to calculate it, and how to document tips.",
       },
       { property: "og:type", content: "article" },
-      { property: "og:url", content: "https://roadsidetips.lovable.app/guides/fica-tip-credit" },
+      { property: "og:url", content: "https://bluecollartips.app/guides/fica-tip-credit" },
     ],
     links: [
-      { rel: "canonical", href: "https://roadsidetips.lovable.app/guides/fica-tip-credit" },
+      { rel: "canonical", href: "https://bluecollartips.app/guides/fica-tip-credit" },
     ],
     scripts: [
       {
@@ -32,7 +32,7 @@ export const Route = createFileRoute("/guides/fica-tip-credit")({
             "How service business owners claim the Section 45B FICA tip credit on Form 8846.",
           author: { "@type": "Organization", name: "Blue Collar Tips" },
           publisher: { "@type": "Organization", name: "Blue Collar Tips" },
-          mainEntityOfPage: "https://roadsidetips.lovable.app/guides/fica-tip-credit",
+          mainEntityOfPage: "https://bluecollartips.app/guides/fica-tip-credit",
         }),
       },
     ],

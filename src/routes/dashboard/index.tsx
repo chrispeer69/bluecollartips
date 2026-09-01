@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
+import { auth } from "@/auth/client";
 import { getMyRoleContext } from "@/lib/auth.functions";
 
 export const Route = createFileRoute("/dashboard/")({
@@ -25,7 +25,7 @@ function DashboardRouter() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.auth.getSession();
+      const { data } = await auth.getSession();
       if (!data.session) {
         navigate({ to: "/auth" });
         return;
@@ -56,7 +56,7 @@ function DashboardRouter() {
         <div className="mt-6 flex justify-center gap-3">
           <button
             onClick={async () => {
-              await supabase.auth.signOut();
+              await auth.signOut();
               navigate({ to: "/auth" });
             }}
             className="rounded-md border border-border px-4 py-2 text-sm"

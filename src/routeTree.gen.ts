@@ -9,54 +9,30 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
-import { Route as TermsRouteImport } from './routes/terms'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
-import { Route as JoinCodeRouteImport } from './routes/join.$code'
-import { Route as GuidesTipPoolingRouteImport } from './routes/guides.tip-pooling'
-import { Route as GuidesFicaTipCreditRouteImport } from './routes/guides.fica-tip-credit'
-import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
-import { Route as DashboardDriverRouteImport } from './routes/dashboard/driver'
 import { Route as DashboardAdminRouteImport } from './routes/dashboard/admin'
-import { Route as PrintEmployeeIdRouteImport } from './routes/print.employee.$id'
-import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
+import { Route as DashboardDriverRouteImport } from './routes/dashboard/driver'
+import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
+import { Route as GuidesFicaTipCreditRouteImport } from './routes/guides.fica-tip-credit'
+import { Route as GuidesTipPoolingRouteImport } from './routes/guides.tip-pooling'
+import { Route as JoinCodeRouteImport } from './routes/join.$code'
 import { Route as CompanySlugDDriverSlugRouteImport } from './routes/$companySlug/d/$driverSlug'
-import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
-import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
-import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
-import { Route as LovableEmailAuthWebhookRouteImport } from './routes/lovable/email/auth/webhook'
-import { Route as LovableEmailAuthPreviewRouteImport } from './routes/lovable/email/auth/preview'
-import { Route as ApiPublicWebhooksStripeRouteImport } from './routes/api/public/webhooks/stripe'
+import { Route as ApiAuthGoogleRouteImport } from './routes/api/auth/google'
+import { Route as PrintEmployeeIdRouteImport } from './routes/print.employee.$id'
+import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth/google/callback'
 import { Route as ApiPublicWebhooksGhlRouteImport } from './routes/api/public/webhooks/ghl'
+import { Route as ApiPublicWebhooksStripeRouteImport } from './routes/api/public/webhooks/stripe'
 
-const UnsubscribeRoute = UnsubscribeRouteImport.update({
-  id: '/unsubscribe',
-  path: '/unsubscribe',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TermsRoute = TermsRouteImport.update({
-  id: '/terms',
-  path: '/terms',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -64,9 +40,29 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UnsubscribeRoute = UnsubscribeRouteImport.update({
+  id: '/unsubscribe',
+  path: '/unsubscribe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardIndexRoute = DashboardIndexRouteImport.update({
@@ -74,24 +70,9 @@ const DashboardIndexRoute = DashboardIndexRouteImport.update({
   path: '/dashboard/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const JoinCodeRoute = JoinCodeRouteImport.update({
-  id: '/join/$code',
-  path: '/join/$code',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GuidesTipPoolingRoute = GuidesTipPoolingRouteImport.update({
-  id: '/guides/tip-pooling',
-  path: '/guides/tip-pooling',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GuidesFicaTipCreditRoute = GuidesFicaTipCreditRouteImport.update({
-  id: '/guides/fica-tip-credit',
-  path: '/guides/fica-tip-credit',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EmailUnsubscribeRoute = EmailUnsubscribeRouteImport.update({
-  id: '/email/unsubscribe',
-  path: '/email/unsubscribe',
+const DashboardAdminRoute = DashboardAdminRouteImport.update({
+  id: '/dashboard/admin',
+  path: '/dashboard/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardDriverRoute = DashboardDriverRouteImport.update({
@@ -99,19 +80,24 @@ const DashboardDriverRoute = DashboardDriverRouteImport.update({
   path: '/dashboard/driver',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardAdminRoute = DashboardAdminRouteImport.update({
-  id: '/dashboard/admin',
-  path: '/dashboard/admin',
+const EmailUnsubscribeRoute = EmailUnsubscribeRouteImport.update({
+  id: '/email/unsubscribe',
+  path: '/email/unsubscribe',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PrintEmployeeIdRoute = PrintEmployeeIdRouteImport.update({
-  id: '/print/employee/$id',
-  path: '/print/employee/$id',
+const GuidesFicaTipCreditRoute = GuidesFicaTipCreditRouteImport.update({
+  id: '/guides/fica-tip-credit',
+  path: '/guides/fica-tip-credit',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LovableEmailSuppressionRoute = LovableEmailSuppressionRouteImport.update({
-  id: '/lovable/email/suppression',
-  path: '/lovable/email/suppression',
+const GuidesTipPoolingRoute = GuidesTipPoolingRouteImport.update({
+  id: '/guides/tip-pooling',
+  path: '/guides/tip-pooling',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JoinCodeRoute = JoinCodeRouteImport.update({
+  id: '/join/$code',
+  path: '/join/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CompanySlugDDriverSlugRoute = CompanySlugDDriverSlugRouteImport.update({
@@ -119,42 +105,29 @@ const CompanySlugDDriverSlugRoute = CompanySlugDDriverSlugRouteImport.update({
   path: '/$companySlug/d/$driverSlug',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LovableEmailTransactionalSendRoute =
-  LovableEmailTransactionalSendRouteImport.update({
-    id: '/lovable/email/transactional/send',
-    path: '/lovable/email/transactional/send',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const LovableEmailTransactionalPreviewRoute =
-  LovableEmailTransactionalPreviewRouteImport.update({
-    id: '/lovable/email/transactional/preview',
-    path: '/lovable/email/transactional/preview',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const LovableEmailQueueProcessRoute =
-  LovableEmailQueueProcessRouteImport.update({
-    id: '/lovable/email/queue/process',
-    path: '/lovable/email/queue/process',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const LovableEmailAuthWebhookRoute = LovableEmailAuthWebhookRouteImport.update({
-  id: '/lovable/email/auth/webhook',
-  path: '/lovable/email/auth/webhook',
+const ApiAuthGoogleRoute = ApiAuthGoogleRouteImport.update({
+  id: '/api/auth/google',
+  path: '/api/auth/google',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LovableEmailAuthPreviewRoute = LovableEmailAuthPreviewRouteImport.update({
-  id: '/lovable/email/auth/preview',
-  path: '/lovable/email/auth/preview',
+const PrintEmployeeIdRoute = PrintEmployeeIdRouteImport.update({
+  id: '/print/employee/$id',
+  path: '/print/employee/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => ApiAuthGoogleRoute,
+} as any)
+const ApiPublicWebhooksGhlRoute = ApiPublicWebhooksGhlRouteImport.update({
+  id: '/api/public/webhooks/ghl',
+  path: '/api/public/webhooks/ghl',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicWebhooksStripeRoute = ApiPublicWebhooksStripeRouteImport.update({
   id: '/api/public/webhooks/stripe',
   path: '/api/public/webhooks/stripe',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicWebhooksGhlRoute = ApiPublicWebhooksGhlRouteImport.update({
-  id: '/api/public/webhooks/ghl',
-  path: '/api/public/webhooks/ghl',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -174,15 +147,11 @@ export interface FileRoutesByFullPath {
   '/join/$code': typeof JoinCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
-  '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/print/employee/$id': typeof PrintEmployeeIdRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/public/webhooks/ghl': typeof ApiPublicWebhooksGhlRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
-  '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
-  '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
-  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
-  '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
-  '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -200,15 +169,11 @@ export interface FileRoutesByTo {
   '/join/$code': typeof JoinCodeRoute
   '/dashboard': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
-  '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/print/employee/$id': typeof PrintEmployeeIdRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/public/webhooks/ghl': typeof ApiPublicWebhooksGhlRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
-  '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
-  '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
-  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
-  '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
-  '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -227,15 +192,11 @@ export interface FileRoutesById {
   '/join/$code': typeof JoinCodeRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
-  '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
+  '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/print/employee/$id': typeof PrintEmployeeIdRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/public/webhooks/ghl': typeof ApiPublicWebhooksGhlRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
-  '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
-  '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
-  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
-  '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
-  '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -255,15 +216,11 @@ export interface FileRouteTypes {
     | '/join/$code'
     | '/dashboard/'
     | '/$companySlug/d/$driverSlug'
-    | '/lovable/email/suppression'
+    | '/api/auth/google'
     | '/print/employee/$id'
+    | '/api/auth/google/callback'
     | '/api/public/webhooks/ghl'
     | '/api/public/webhooks/stripe'
-    | '/lovable/email/auth/preview'
-    | '/lovable/email/auth/webhook'
-    | '/lovable/email/queue/process'
-    | '/lovable/email/transactional/preview'
-    | '/lovable/email/transactional/send'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -281,15 +238,11 @@ export interface FileRouteTypes {
     | '/join/$code'
     | '/dashboard'
     | '/$companySlug/d/$driverSlug'
-    | '/lovable/email/suppression'
+    | '/api/auth/google'
     | '/print/employee/$id'
+    | '/api/auth/google/callback'
     | '/api/public/webhooks/ghl'
     | '/api/public/webhooks/stripe'
-    | '/lovable/email/auth/preview'
-    | '/lovable/email/auth/webhook'
-    | '/lovable/email/queue/process'
-    | '/lovable/email/transactional/preview'
-    | '/lovable/email/transactional/send'
   id:
     | '__root__'
     | '/'
@@ -307,15 +260,11 @@ export interface FileRouteTypes {
     | '/join/$code'
     | '/dashboard/'
     | '/$companySlug/d/$driverSlug'
-    | '/lovable/email/suppression'
+    | '/api/auth/google'
     | '/print/employee/$id'
+    | '/api/auth/google/callback'
     | '/api/public/webhooks/ghl'
     | '/api/public/webhooks/stripe'
-    | '/lovable/email/auth/preview'
-    | '/lovable/email/auth/webhook'
-    | '/lovable/email/queue/process'
-    | '/lovable/email/transactional/preview'
-    | '/lovable/email/transactional/send'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -334,52 +283,19 @@ export interface RootRouteChildren {
   JoinCodeRoute: typeof JoinCodeRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   CompanySlugDDriverSlugRoute: typeof CompanySlugDDriverSlugRoute
-  LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
+  ApiAuthGoogleRoute: typeof ApiAuthGoogleRouteWithChildren
   PrintEmployeeIdRoute: typeof PrintEmployeeIdRoute
   ApiPublicWebhooksGhlRoute: typeof ApiPublicWebhooksGhlRoute
   ApiPublicWebhooksStripeRoute: typeof ApiPublicWebhooksStripeRoute
-  LovableEmailAuthPreviewRoute: typeof LovableEmailAuthPreviewRoute
-  LovableEmailAuthWebhookRoute: typeof LovableEmailAuthWebhookRoute
-  LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
-  LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
-  LovableEmailTransactionalSendRoute: typeof LovableEmailTransactionalSendRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/unsubscribe': {
-      id: '/unsubscribe'
-      path: '/unsubscribe'
-      fullPath: '/unsubscribe'
-      preLoaderRoute: typeof UnsubscribeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/terms': {
-      id: '/terms'
-      path: '/terms'
-      fullPath: '/terms'
-      preLoaderRoute: typeof TermsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -389,11 +305,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/unsubscribe': {
+      id: '/unsubscribe'
+      path: '/unsubscribe'
+      fullPath: '/unsubscribe'
+      preLoaderRoute: typeof UnsubscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard/': {
@@ -403,32 +347,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/join/$code': {
-      id: '/join/$code'
-      path: '/join/$code'
-      fullPath: '/join/$code'
-      preLoaderRoute: typeof JoinCodeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/guides/tip-pooling': {
-      id: '/guides/tip-pooling'
-      path: '/guides/tip-pooling'
-      fullPath: '/guides/tip-pooling'
-      preLoaderRoute: typeof GuidesTipPoolingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/guides/fica-tip-credit': {
-      id: '/guides/fica-tip-credit'
-      path: '/guides/fica-tip-credit'
-      fullPath: '/guides/fica-tip-credit'
-      preLoaderRoute: typeof GuidesFicaTipCreditRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/email/unsubscribe': {
-      id: '/email/unsubscribe'
-      path: '/email/unsubscribe'
-      fullPath: '/email/unsubscribe'
-      preLoaderRoute: typeof EmailUnsubscribeRouteImport
+    '/dashboard/admin': {
+      id: '/dashboard/admin'
+      path: '/dashboard/admin'
+      fullPath: '/dashboard/admin'
+      preLoaderRoute: typeof DashboardAdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard/driver': {
@@ -438,25 +361,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardDriverRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/dashboard/admin': {
-      id: '/dashboard/admin'
-      path: '/dashboard/admin'
-      fullPath: '/dashboard/admin'
-      preLoaderRoute: typeof DashboardAdminRouteImport
+    '/email/unsubscribe': {
+      id: '/email/unsubscribe'
+      path: '/email/unsubscribe'
+      fullPath: '/email/unsubscribe'
+      preLoaderRoute: typeof EmailUnsubscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/print/employee/$id': {
-      id: '/print/employee/$id'
-      path: '/print/employee/$id'
-      fullPath: '/print/employee/$id'
-      preLoaderRoute: typeof PrintEmployeeIdRouteImport
+    '/guides/fica-tip-credit': {
+      id: '/guides/fica-tip-credit'
+      path: '/guides/fica-tip-credit'
+      fullPath: '/guides/fica-tip-credit'
+      preLoaderRoute: typeof GuidesFicaTipCreditRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/lovable/email/suppression': {
-      id: '/lovable/email/suppression'
-      path: '/lovable/email/suppression'
-      fullPath: '/lovable/email/suppression'
-      preLoaderRoute: typeof LovableEmailSuppressionRouteImport
+    '/guides/tip-pooling': {
+      id: '/guides/tip-pooling'
+      path: '/guides/tip-pooling'
+      fullPath: '/guides/tip-pooling'
+      preLoaderRoute: typeof GuidesTipPoolingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/join/$code': {
+      id: '/join/$code'
+      path: '/join/$code'
+      fullPath: '/join/$code'
+      preLoaderRoute: typeof JoinCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$companySlug/d/$driverSlug': {
@@ -466,39 +396,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CompanySlugDDriverSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/lovable/email/transactional/send': {
-      id: '/lovable/email/transactional/send'
-      path: '/lovable/email/transactional/send'
-      fullPath: '/lovable/email/transactional/send'
-      preLoaderRoute: typeof LovableEmailTransactionalSendRouteImport
+    '/api/auth/google': {
+      id: '/api/auth/google'
+      path: '/api/auth/google'
+      fullPath: '/api/auth/google'
+      preLoaderRoute: typeof ApiAuthGoogleRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/lovable/email/transactional/preview': {
-      id: '/lovable/email/transactional/preview'
-      path: '/lovable/email/transactional/preview'
-      fullPath: '/lovable/email/transactional/preview'
-      preLoaderRoute: typeof LovableEmailTransactionalPreviewRouteImport
+    '/print/employee/$id': {
+      id: '/print/employee/$id'
+      path: '/print/employee/$id'
+      fullPath: '/print/employee/$id'
+      preLoaderRoute: typeof PrintEmployeeIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/lovable/email/queue/process': {
-      id: '/lovable/email/queue/process'
-      path: '/lovable/email/queue/process'
-      fullPath: '/lovable/email/queue/process'
-      preLoaderRoute: typeof LovableEmailQueueProcessRouteImport
-      parentRoute: typeof rootRouteImport
+    '/api/auth/google/callback': {
+      id: '/api/auth/google/callback'
+      path: '/callback'
+      fullPath: '/api/auth/google/callback'
+      preLoaderRoute: typeof ApiAuthGoogleCallbackRouteImport
+      parentRoute: typeof ApiAuthGoogleRoute
     }
-    '/lovable/email/auth/webhook': {
-      id: '/lovable/email/auth/webhook'
-      path: '/lovable/email/auth/webhook'
-      fullPath: '/lovable/email/auth/webhook'
-      preLoaderRoute: typeof LovableEmailAuthWebhookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/lovable/email/auth/preview': {
-      id: '/lovable/email/auth/preview'
-      path: '/lovable/email/auth/preview'
-      fullPath: '/lovable/email/auth/preview'
-      preLoaderRoute: typeof LovableEmailAuthPreviewRouteImport
+    '/api/public/webhooks/ghl': {
+      id: '/api/public/webhooks/ghl'
+      path: '/api/public/webhooks/ghl'
+      fullPath: '/api/public/webhooks/ghl'
+      preLoaderRoute: typeof ApiPublicWebhooksGhlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/webhooks/stripe': {
@@ -508,15 +431,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWebhooksStripeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/webhooks/ghl': {
-      id: '/api/public/webhooks/ghl'
-      path: '/api/public/webhooks/ghl'
-      fullPath: '/api/public/webhooks/ghl'
-      preLoaderRoute: typeof ApiPublicWebhooksGhlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
+
+interface ApiAuthGoogleRouteChildren {
+  ApiAuthGoogleCallbackRoute: typeof ApiAuthGoogleCallbackRoute
+}
+
+const ApiAuthGoogleRouteChildren: ApiAuthGoogleRouteChildren = {
+  ApiAuthGoogleCallbackRoute: ApiAuthGoogleCallbackRoute,
+}
+
+const ApiAuthGoogleRouteWithChildren = ApiAuthGoogleRoute._addFileChildren(
+  ApiAuthGoogleRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -534,15 +462,10 @@ const rootRouteChildren: RootRouteChildren = {
   JoinCodeRoute: JoinCodeRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   CompanySlugDDriverSlugRoute: CompanySlugDDriverSlugRoute,
-  LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
+  ApiAuthGoogleRoute: ApiAuthGoogleRouteWithChildren,
   PrintEmployeeIdRoute: PrintEmployeeIdRoute,
   ApiPublicWebhooksGhlRoute: ApiPublicWebhooksGhlRoute,
   ApiPublicWebhooksStripeRoute: ApiPublicWebhooksStripeRoute,
-  LovableEmailAuthPreviewRoute: LovableEmailAuthPreviewRoute,
-  LovableEmailAuthWebhookRoute: LovableEmailAuthWebhookRoute,
-  LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
-  LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
-  LovableEmailTransactionalSendRoute: LovableEmailTransactionalSendRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

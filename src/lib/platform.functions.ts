@@ -1,10 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuth } from "@/auth/middleware";
 import { z } from "zod";
 
 async function assertSuper(userId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await supabaseAdmin
+  const { db } = await import("@/db/client.server");
+  const { data } = await db
     .from("user_roles")
     .select("role")
     .eq("user_id", userId)
@@ -14,19 +14,19 @@ async function assertSuper(userId: string) {
 }
 
 export const platformOverview = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .handler(async ({ context }) => {
     await assertSuper(context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { db } = await import("@/db/client.server");
     const [{ data: tenants }, { data: tips }, { count: drivers }] = await Promise.all([
-      supabaseAdmin
+      db
         .from("companies")
         .select("id, name, slug, status, created_at, primary_color")
         .order("created_at", { ascending: false }),
-      supabaseAdmin
+      db
         .from("tips")
         .select("amount_cents, company_amount_cents, platform_amount_cents, company_id, source, verified, created_at"),
-      supabaseAdmin.from("drivers").select("*", { count: "exact", head: true }),
+      db.from("drivers").select("*", { count: "exact", head: true }),
     ]);
 
     const byCompany = new Map<string, { gross: number; companyShare: number; platformShare: number; count: number; pendingCompany: number }>();
@@ -58,13 +58,13 @@ export const platformOverview = createServerFn({ method: "GET" })
   });
 
 export const suspendTenant = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z.object({ companyId: z.string().uuid(), status: z.enum(["active", "suspended"]) }).parse(d),
   )
   .handler(async ({ data, context }) => {
     await assertSuper(context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin.from("companies").update({ status: data.status }).eq("id", data.companyId);
+    const { db } = await import("@/db/client.server");
+    await db.from("companies").update({ status: data.status }).eq("id", data.companyId);
     return { ok: true };
   });

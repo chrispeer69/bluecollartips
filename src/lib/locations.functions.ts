@@ -1,10 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuth } from "@/auth/middleware";
 import { z } from "zod";
 
 async function assertCompanyAdmin(userId: string, companyId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await supabaseAdmin
+  const { db } = await import("@/db/client.server");
+  const { data } = await db
     .from("user_roles")
     .select("role, company_id")
     .eq("user_id", userId);
@@ -15,12 +15,12 @@ async function assertCompanyAdmin(userId: string, companyId: string) {
 }
 
 export const listLocations = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     await assertCompanyAdmin(context.userId, data.companyId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: rows } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { data: rows } = await db
       .from("locations")
       .select("id, name, address, created_at")
       .eq("company_id", data.companyId)
@@ -29,7 +29,7 @@ export const listLocations = createServerFn({ method: "POST" })
   });
 
 export const createLocation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z.object({
       companyId: z.string().uuid(),
@@ -39,8 +39,8 @@ export const createLocation = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertCompanyAdmin(context.userId, data.companyId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.from("locations").insert({
+    const { db } = await import("@/db/client.server");
+    const { error } = await db.from("locations").insert({
       company_id: data.companyId,
       name: data.name,
       address: data.address ?? null,
@@ -50,20 +50,20 @@ export const createLocation = createServerFn({ method: "POST" })
   });
 
 export const deleteLocation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) => z.object({ locationId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: loc } = await supabaseAdmin.from("locations").select("company_id").eq("id", data.locationId).maybeSingle();
+    const { db } = await import("@/db/client.server");
+    const { data: loc } = await db.from("locations").select("company_id").eq("id", data.locationId).maybeSingle();
     if (!loc) throw new Error("Not found");
     await assertCompanyAdmin(context.userId, loc.company_id);
-    const { error } = await supabaseAdmin.from("locations").delete().eq("id", data.locationId);
+    const { error } = await db.from("locations").delete().eq("id", data.locationId);
     if (error) throw error;
     return { ok: true };
   });
 
 export const setDriverLocation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z.object({
       driverId: z.string().uuid(),
@@ -71,11 +71,11 @@ export const setDriverLocation = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: drv } = await supabaseAdmin.from("drivers").select("company_id").eq("id", data.driverId).maybeSingle();
+    const { db } = await import("@/db/client.server");
+    const { data: drv } = await db.from("drivers").select("company_id").eq("id", data.driverId).maybeSingle();
     if (!drv) throw new Error("Not found");
     await assertCompanyAdmin(context.userId, drv.company_id);
-    const { error } = await supabaseAdmin
+    const { error } = await db
       .from("drivers")
       .update({ location_id: data.locationId })
       .eq("id", data.driverId);
@@ -84,7 +84,7 @@ export const setDriverLocation = createServerFn({ method: "POST" })
   });
 
 export const updateReviewLinks = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z.object({
       companyId: z.string().uuid(),
@@ -95,8 +95,8 @@ export const updateReviewLinks = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertCompanyAdmin(context.userId, data.companyId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { error } = await db
       .from("companies")
       .update({
         google_review_url: data.googleUrl ?? null,

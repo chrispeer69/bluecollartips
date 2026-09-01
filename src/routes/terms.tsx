@@ -12,10 +12,10 @@ export const Route = createFileRoute("/terms")({
       { property: "og:title", content: "Terms of Service — Blue Collar Tips" },
       { property: "og:description", content: "The terms governing use of the Blue Collar Tips platform." },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://roadsidetips.lovable.app/terms" },
+      { property: "og:url", content: "https://bluecollartips.app/terms" },
       { name: "twitter:card", content: "summary" },
     ],
-    links: [{ rel: "canonical", href: "https://roadsidetips.lovable.app/terms" }],
+    links: [{ rel: "canonical", href: "https://bluecollartips.app/terms" }],
   }),
   component: TermsPage,
 });

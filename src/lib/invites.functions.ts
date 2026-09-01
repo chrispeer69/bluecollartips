@@ -1,10 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuth } from "@/auth/middleware";
 import { z } from "zod";
 import { randomBytes } from "crypto";
+import { sendSms } from "./sms/send.server";
 
 const APP_BASE_URL =
-  process.env.APP_BASE_URL ?? "https://roadsidetips.lovable.app";
+  process.env.APP_BASE_URL ?? "https://bluecollartips.app";
 
 function normalizeE164(phone: string): string | null {
   const cleaned = phone.replace(/[^\d+]/g, "");
@@ -16,11 +17,11 @@ function normalizeE164(phone: string): string | null {
 }
 
 export const listInvites = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: roles } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { data: roles } = await db
       .from("user_roles")
       .select("role, company_id")
       .eq("user_id", context.userId);
@@ -28,7 +29,7 @@ export const listInvites = createServerFn({ method: "POST" })
       (r) => r.role === "super_admin" || (r.role === "company_admin" && r.company_id === data.companyId),
     );
     if (!ok) throw new Error("Forbidden");
-    const { data: items } = await supabaseAdmin
+    const { data: items } = await db
       .from("invites")
       .select("id, code, role, email, expires_at, used_at, created_at")
       .eq("company_id", data.companyId)
@@ -38,7 +39,7 @@ export const listInvites = createServerFn({ method: "POST" })
   });
 
 export const createInvite = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z
       .object({
@@ -51,8 +52,8 @@ export const createInvite = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: roles } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { data: roles } = await db
       .from("user_roles")
       .select("role, company_id")
       .eq("user_id", context.userId);
@@ -61,7 +62,7 @@ export const createInvite = createServerFn({ method: "POST" })
     );
     if (!ok) throw new Error("Forbidden");
     const code = randomBytes(6).toString("hex").toUpperCase();
-    const { data: inviteRow } = await supabaseAdmin.from("invites").insert({
+    const { data: inviteRow } = await db.from("invites").insert({
       company_id: data.companyId,
       code,
       role: data.role,
@@ -75,7 +76,7 @@ export const createInvite = createServerFn({ method: "POST" })
     let texted = false;
     let deliveryError: string | null = null;
 
-    const { data: company } = await supabaseAdmin
+    const { data: company } = await db
       .from("companies")
       .select("name")
       .eq("id", data.companyId)
@@ -113,38 +114,12 @@ export const createInvite = createServerFn({ method: "POST" })
           data.role === "driver"
             ? `${companyName} added you as a driver on Blue Collar Tips. Activate your account: ${inviteUrl}`
             : `You're invited to manage ${companyName} on Blue Collar Tips. Activate: ${inviteUrl}`;
-        const lovableKey = process.env.LOVABLE_API_KEY;
-        const twilioKey = process.env.TWILIO_API_KEY;
-        const fromNumber = process.env.TWILIO_FROM_NUMBER;
-        let status: string = "skipped";
-        let providerSid: string | null = null;
-        let sendErr: string | null = null;
-        if (!lovableKey || !twilioKey || !fromNumber) {
-          sendErr = "Twilio not connected — SMS not sent.";
-        } else {
-          const resp = await fetch(
-            "https://connector-gateway.lovable.dev/twilio/Messages.json",
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${lovableKey}`,
-                "X-Connection-Api-Key": twilioKey,
-                "Content-Type": "application/x-www-form-urlencoded",
-              },
-              body: new URLSearchParams({ To: to, From: fromNumber, Body: body }),
-            },
-          );
-          const json = (await resp.json()) as { sid?: string; message?: string };
-          if (!resp.ok) {
-            status = "failed";
-            sendErr = json.message ?? `Twilio ${resp.status}`;
-          } else {
-            status = "sent";
-            providerSid = json.sid ?? null;
-            texted = true;
-          }
-        }
-        await supabaseAdmin.from("sms_deliveries").insert({
+        const result = await sendSms(to, body);
+        const status = result.status;
+        const providerSid = result.sid;
+        const sendErr = result.error;
+        texted = status === "sent";
+        await db.from("sms_deliveries").insert({
           company_id: data.companyId,
           driver_id: null,
           to_phone: to,
@@ -165,18 +140,18 @@ export const createInvite = createServerFn({ method: "POST" })
   });
 
 export const revokeInvite = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) => z.object({ inviteId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: inv } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { data: inv } = await db
       .from("invites")
       .select("company_id, used_at")
       .eq("id", data.inviteId)
       .maybeSingle();
     if (!inv) throw new Error("Not found");
     if (inv.used_at) throw new Error("Already used");
-    const { data: roles } = await supabaseAdmin
+    const { data: roles } = await db
       .from("user_roles")
       .select("role, company_id")
       .eq("user_id", context.userId);
@@ -184,7 +159,7 @@ export const revokeInvite = createServerFn({ method: "POST" })
       (r) => r.role === "super_admin" || (r.role === "company_admin" && r.company_id === inv.company_id),
     );
     if (!ok) throw new Error("Forbidden");
-    await supabaseAdmin
+    await db
       .from("invites")
       .update({ expires_at: new Date(Date.now() - 1000).toISOString() })
       .eq("id", data.inviteId);
@@ -195,8 +170,8 @@ export const revokeInvite = createServerFn({ method: "POST" })
 export const peekInvite = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ code: z.string().trim().min(1).max(64) }).parse(d))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: inv } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { data: inv } = await db
       .from("invites")
       .select("role, email, expires_at, used_at, company_id, companies(name, slug, logo_url, primary_color)")
       .eq("code", data.code)

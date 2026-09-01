@@ -1,6 +1,8 @@
 # Blue Collar Tips
 
-Lovable.ai Build Prompt — Blue Collar AI Tip Platform
+For a plain-language explanation of the product, user roles, workflows, integrations, and launch plan, see [Product Purpose and User Workflows](docs/PRODUCT_AND_WORKFLOW.md).
+
+Product Specification — Blue Collar AI Tip Platform
 
 Project Overview
 
@@ -150,7 +152,7 @@ Company Admin can also trigger from the company dashboard: same capability, usef
 
 Default SMS copy (editable per company in Company Admin branding settings): "Thanks for choosing [Company Name]! Please rate your experience and let us know how we did: [link]"
 
-Use an SMS provider — Twilio is the standard recommendation for this (reliable, well-documented, pay-per-message, easy Stripe-adjacent stack fit) — but Lovable should confirm/propose based on what's easiest to wire up in their environment.
+Use an SMS provider — Twilio is the standard recommendation for this (reliable, well-documented, pay-per-message, easy Stripe-adjacent stack fit) — but the implementation team should confirm/propose based on what's easiest to wire up in their environment.
 
 Future phase (do not build now, but design for it): TowBook integration will auto-trigger this SMS at the moment a job is marked complete in TowBook, with no manual step required. Build the manual trigger (driver app button + admin dashboard button) as a clean function/service that a future TowBook webhook can call directly — i.e., the "send tip/review SMS for job X to phone Y" action should be one reusable backend function, not duplicated logic, so wiring in an automatic trigger later is a small change.
 
@@ -208,13 +210,13 @@ Low-rating alerts: optionally notify Company Admin in-app when a driver receives
 
 App name: Blue Collar AI (platform brand, shown subtly in footer/admin areas)
 
-Tenant #1 branding: Roadside Towing — use a clean, rugged, professional service-industry look (dark blues/oranges or similar tow-truck-industry palette; Lovable should propose a logo concept and color scheme if none is supplied, with the understanding that branding is editable per company in Company Admin settings).
+Tenant #1 branding: Roadside Towing — use a clean, rugged, professional service-industry look (dark blues/oranges or similar tow-truck-industry palette; the implementation team should propose a logo concept and color scheme if none is supplied, with the understanding that branding is editable per company in Company Admin settings).
 
-14. Technical Notes for Lovable
+14. Technical Notes
 
 Use Stripe Connect (Express) for all real payment processing — do not attempt to build custom payment rails for Venmo/CashApp/Zelle, since they have no public merchant API. These remain manual-confirmation deep-links only.
 
-Use Twilio (or Lovable's recommended equivalent) for SMS delivery of the tip/review link. Build the "send link via SMS" action as a single reusable backend function callable from both the driver app and Company Admin dashboard, so a future TowBook auto-trigger integration can call the same function without rework.
+Use Twilio (or the implementation team's recommended equivalent) for SMS delivery of the tip/review link. Build the "send link via SMS" action as a single reusable backend function callable from both the driver app and Company Admin dashboard, so a future TowBook auto-trigger integration can call the same function without rework.
 
 Design the data model multi-tenant from day one: Company → Drivers → Tips, with a platform-level (Blue Collar AI) layer above all companies.
 
@@ -224,7 +226,7 @@ Weekly payout automation (Wednesday mornings) should be a scheduled job against 
 
 Please ask me clarifying questions about anything ambiguous in this spec before or during the build — especially around: exact Stripe Connect charge-type implementation, SMS/email provider for invites, and any state-specific tip/labor law considerations I should be aware of (I am not a lawyer and this hasn't been legally reviewed).
 
-Open Questions for Lovable to Ask the User (anticipated)
+Open Questions (anticipated)
 
 Which states will this operate in (relevant to wage/tip law and Stripe Connect availability)?
 
@@ -240,25 +242,16 @@ What happens if a driver is deactivated mid-week with an unpaid balance — manu
 
 For the future TowBook auto-trigger: does TowBook offer webhooks/API access on job-completion status, or will this require polling/manual export integration?
 
-This project was built with [Lovable](https://lovable.dev).
-
-**Live app**: https://bluecollartips.lovable.app
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/05701b3e-3a66-4d5a-a379-571a0cb002f8).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
 ## Development
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+You need Node.js 22.12+, npm, and PostgreSQL.
 
 ```sh
 git clone <this-repository-url>
 cd <repository-name>
 npm i
+npm run db:migrate
 npm run dev
 ```
+
+Copy `.env.example` to `.env` and configure PostgreSQL, Stripe, Twilio, and Resend first.

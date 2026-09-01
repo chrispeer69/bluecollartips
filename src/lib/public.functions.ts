@@ -14,10 +14,10 @@ function currentIpHash(): string {
 }
 
 async function enforceRateLimit(driverId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { db } = await import("@/db/client.server");
   const ip_hash = currentIpHash();
   const bucket = new Date(Math.floor(Date.now() / RATE_WINDOW_MS) * RATE_WINDOW_MS).toISOString();
-  const { data: existing } = await supabaseAdmin
+  const { data: existing } = await db
     .from("rating_rate_limits")
     .select("count")
     .eq("ip_hash", ip_hash)
@@ -28,7 +28,7 @@ async function enforceRateLimit(driverId: string) {
   if (next > RATE_MAX) {
     throw new Error("Too many submissions from your network. Please try again later.");
   }
-  await supabaseAdmin
+  await db
     .from("rating_rate_limits")
     .upsert(
       { ip_hash, driver_id: driverId, window_start: bucket, count: next },
@@ -41,14 +41,14 @@ export const getPublicDriver = createServerFn({ method: "GET" })
     z.object({ companySlug: z.string().min(1), driverSlug: z.string().min(1) }).parse(data),
   )
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: company } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { data: company } = await db
       .from("companies")
       .select("id, name, slug, logo_url, primary_color, secondary_color, support_email, google_review_url, yelp_review_url, facebook_review_url")
       .eq("slug", data.companySlug)
       .maybeSingle();
     if (!company) return { company: null, driver: null };
-    const { data: driver } = await supabaseAdmin
+    const { data: driver } = await db
       .from("drivers")
       .select("id, display_name, slug, photo_url, status, venmo_handle, cashapp_handle, zelle_handle, paypal_handle")
       .eq("company_id", company.id)
@@ -85,14 +85,14 @@ export const submitRating = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     // Privileged insert path (no auth required on public page)
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: company } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { data: company } = await db
       .from("companies")
       .select("id")
       .eq("slug", data.companySlug)
       .maybeSingle();
     if (!company) throw new Error("Company not found");
-    const { data: driver } = await supabaseAdmin
+    const { data: driver } = await db
       .from("drivers")
       .select("id, status")
       .eq("company_id", company.id)
@@ -103,7 +103,7 @@ export const submitRating = createServerFn({ method: "POST" })
     // Rate limit: max 5 submissions / IP / hour for this driver
     await enforceRateLimit(driver.id);
 
-    const { data: rating, error: rErr } = await supabaseAdmin
+    const { data: rating, error: rErr } = await db
       .from("ratings")
       .insert({
         company_id: company.id,
@@ -123,7 +123,7 @@ export const submitRating = createServerFn({ method: "POST" })
     // indicated a P2P/cash tip, we log it as an unverified manual tip so the
     // driver's books reflect it; the driver and admin will reconcile.
     if (data.tipCents && data.tipSource && data.tipSource !== "stripe") {
-      const { error: tErr } = await supabaseAdmin.from("tips").insert({
+      const { error: tErr } = await db.from("tips").insert({
         company_id: company.id,
         driver_id: driver.id,
         rating_id: rating.id,
@@ -142,7 +142,7 @@ export const submitRating = createServerFn({ method: "POST" })
     // Fire-and-await thank-you notifications (per-company templates).
     try {
       const { sendThankYou } = await import("@/lib/thankyou.server");
-      await sendThankYou(supabaseAdmin, {
+      await sendThankYou(db, {
         companyId: company.id,
         driverId: driver.id,
         ratingId: rating.id,
@@ -159,7 +159,7 @@ export const submitRating = createServerFn({ method: "POST" })
     // Notify the employee (SMS) about the new rating/tip.
     try {
       const { notifyEmployee } = await import("@/lib/notify.server");
-      await notifyEmployee(supabaseAdmin, {
+      await notifyEmployee(db, {
         companyId: company.id,
         driverId: driver.id,
         kind: data.tipCents && data.tipCents > 0 ? "tip" : "rating",

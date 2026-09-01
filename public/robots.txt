@@ -3,4 +3,4 @@ Allow: /
 Disallow: /dashboard
 Disallow: /join/
 
-Sitemap: https://roadsidetips.lovable.app/sitemap.xml
+Sitemap: https://bluecollartips.app/sitemap.xml

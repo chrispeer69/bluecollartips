@@ -13,9 +13,9 @@ export const Route = createFileRoute("/$companySlug/d/$driverSlug")({
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { property: "og:title", content: "Rate your service — Blue Collar Tips" },
       { property: "og:description", content: "Rate your service, leave feedback, and tip securely by card or P2P." },
-      { property: "og:url", content: `https://roadsidetips.lovable.app/${params.companySlug}/d/${params.driverSlug}` },
+      { property: "og:url", content: `https://bluecollartips.app/${params.companySlug}/d/${params.driverSlug}` },
     ],
-    links: [{ rel: "canonical", href: `https://roadsidetips.lovable.app/${params.companySlug}/d/${params.driverSlug}` }],
+    links: [{ rel: "canonical", href: `https://bluecollartips.app/${params.companySlug}/d/${params.driverSlug}` }],
   }),
   component: TipPage,
 });

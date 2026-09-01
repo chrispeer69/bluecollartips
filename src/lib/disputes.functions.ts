@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuth } from "@/auth/middleware";
 import { z } from "zod";
 
-type AdminClient = Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"];
+type AdminClient = Awaited<typeof import("@/db/client.server")>["db"];
 
 async function requireCompanyAdmin(admin: AdminClient, userId: string, companyId: string) {
   const { data: roles } = await admin
@@ -42,12 +42,12 @@ async function customerContact(admin: AdminClient, ratingId: string | null) {
 
 /** Admin: list flagged / refunded tips for a company with their open flags. */
 export const listTipDisputes = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await requireCompanyAdmin(supabaseAdmin, context.userId, data.companyId);
-    const { data: rows } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    await requireCompanyAdmin(db, context.userId, data.companyId);
+    const { data: rows } = await db
       .from("tips")
       .select(
         "id, driver_id, amount_cents, source, customer_name, created_at, disputed, disputed_at, dispute_reason, refunded_at, refund_amount_cents, refund_reason, verified, stripe_payment_intent_id",
@@ -61,16 +61,16 @@ export const listTipDisputes = createServerFn({ method: "POST" })
 
 /** Admin: flag a problematic tip. Opens a discrepancy flag and notifies the employee. */
 export const flagTipDispute = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z.object({ tipId: z.string().uuid(), reason: z.string().trim().min(3).max(500) }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const tip = await loadTip(supabaseAdmin, data.tipId);
-    await requireCompanyAdmin(supabaseAdmin, context.userId, tip.company_id);
+    const { db } = await import("@/db/client.server");
+    const tip = await loadTip(db, data.tipId);
+    await requireCompanyAdmin(db, context.userId, tip.company_id);
 
-    await supabaseAdmin
+    await db
       .from("tips")
       .update({
         disputed: true,
@@ -80,7 +80,7 @@ export const flagTipDispute = createServerFn({ method: "POST" })
       })
       .eq("id", tip.id);
 
-    await supabaseAdmin.from("discrepancy_flags").insert({
+    await db.from("discrepancy_flags").insert({
       company_id: tip.company_id,
       driver_id: tip.driver_id,
       tip_id: tip.id,
@@ -92,7 +92,7 @@ export const flagTipDispute = createServerFn({ method: "POST" })
 
     try {
       const { notifyTipDisputed } = await import("@/lib/notify.server");
-      await notifyTipDisputed(supabaseAdmin, {
+      await notifyTipDisputed(db, {
         companyId: tip.company_id,
         driverId: tip.driver_id,
         amountCents: tip.amount_cents,
@@ -106,16 +106,16 @@ export const flagTipDispute = createServerFn({ method: "POST" })
 
 /** Admin: clear a dispute without refunding. Resolves open flags on the tip. */
 export const clearTipDispute = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z.object({ tipId: z.string().uuid(), notes: z.string().trim().max(500).optional() }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const tip = await loadTip(supabaseAdmin, data.tipId);
-    await requireCompanyAdmin(supabaseAdmin, context.userId, tip.company_id);
+    const { db } = await import("@/db/client.server");
+    const tip = await loadTip(db, data.tipId);
+    await requireCompanyAdmin(db, context.userId, tip.company_id);
 
-    await supabaseAdmin
+    await db
       .from("tips")
       .update({
         disputed: false,
@@ -126,7 +126,7 @@ export const clearTipDispute = createServerFn({ method: "POST" })
       })
       .eq("id", tip.id);
 
-    await supabaseAdmin
+    await db
       .from("discrepancy_flags")
       .update({
         status: "resolved",
@@ -144,7 +144,7 @@ export const clearTipDispute = createServerFn({ method: "POST" })
  * manual tips are reversed in-app. Notifies the employee and the customer.
  */
 export const refundTip = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z
       .object({
@@ -155,9 +155,9 @@ export const refundTip = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const tip = await loadTip(supabaseAdmin, data.tipId);
-    await requireCompanyAdmin(supabaseAdmin, context.userId, tip.company_id);
+    const { db } = await import("@/db/client.server");
+    const tip = await loadTip(db, data.tipId);
+    await requireCompanyAdmin(db, context.userId, tip.company_id);
     if (tip.refunded_at) throw new Error("This tip was already refunded");
 
     const amount = Math.min(data.amountCents ?? tip.amount_cents, tip.amount_cents);
@@ -179,7 +179,7 @@ export const refundTip = createServerFn({ method: "POST" })
       refundId = refund.id;
     }
 
-    await supabaseAdmin
+    await db
       .from("tips")
       .update({
         refunded_at: new Date().toISOString(),
@@ -194,7 +194,7 @@ export const refundTip = createServerFn({ method: "POST" })
       })
       .eq("id", tip.id);
 
-    await supabaseAdmin
+    await db
       .from("discrepancy_flags")
       .update({
         status: "resolved",
@@ -205,9 +205,9 @@ export const refundTip = createServerFn({ method: "POST" })
       .eq("status", "open");
 
     try {
-      const contact = await customerContact(supabaseAdmin, tip.rating_id);
+      const contact = await customerContact(db, tip.rating_id);
       const { notifyTipRefunded } = await import("@/lib/notify.server");
-      await notifyTipRefunded(supabaseAdmin, {
+      await notifyTipRefunded(db, {
         companyId: tip.company_id,
         driverId: tip.driver_id,
         amountCents: amount,

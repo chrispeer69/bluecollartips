@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 
-const BASE_URL = "https://roadsidetips.lovable.app";
+const BASE_URL = "https://bluecollartips.app";
 
 interface SitemapEntry {
   path: string;
@@ -25,8 +25,8 @@ export const Route = createFileRoute("/sitemap.xml")({
         // Private routes (/dashboard/*, /join/:code) are intentionally excluded —
         // they're noindex and disallowed in robots.txt.
         try {
-          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-          const { data: drivers } = await supabaseAdmin
+          const { db } = await import("@/db/client.server");
+          const { data: drivers } = await db
             .from("drivers")
             .select("slug, created_at, companies!inner(slug, status)")
             .eq("status", "active");

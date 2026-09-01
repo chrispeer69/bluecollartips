@@ -11,9 +11,9 @@ export const Route = createFileRoute("/join/$code")({
       { name: "robots", content: "noindex" },
       { property: "og:title", content: "Join your team on Blue Collar Tips" },
       { property: "og:description", content: "Accept your invite to start collecting ratings and tips from customers." },
-      { property: "og:url", content: `https://roadsidetips.lovable.app/join/${params.code}` },
+      { property: "og:url", content: `https://bluecollartips.app/join/${params.code}` },
     ],
-    links: [{ rel: "canonical", href: `https://roadsidetips.lovable.app/join/${params.code}` }],
+    links: [{ rel: "canonical", href: `https://bluecollartips.app/join/${params.code}` }],
   }),
   component: JoinPage,
 });

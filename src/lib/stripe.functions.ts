@@ -1,11 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuth } from "@/auth/middleware";
 import { z } from "zod";
 import { TIP_MAX_CENTS, TIP_MIN_CENTS } from "./constants";
 
 async function resolveStripeDriver(userId: string, driverId?: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  let query = supabaseAdmin
+  const { db } = await import("@/db/client.server");
+  let query = db
     .from("drivers")
     .select("id, email, display_name, stripe_account_id, company_id, user_id")
     .limit(1);
@@ -14,7 +14,7 @@ async function resolveStripeDriver(userId: string, driverId?: string) {
   if (!driver) throw new Error("No driver profile");
   if (driver.user_id === userId) return driver;
 
-  const { data: roles } = await supabaseAdmin
+  const { data: roles } = await db
     .from("user_roles")
     .select("role, company_id")
     .eq("user_id", userId);
@@ -27,13 +27,13 @@ async function resolveStripeDriver(userId: string, driverId?: string) {
 
 /** Driver-initiated Stripe Express onboarding. Returns a one-time AccountLink URL. */
 export const createDriverOnboardingLink = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) => z.object({ returnUrl: z.string().url(), driverId: z.string().uuid().optional() }).parse(d))
   .handler(async ({ data, context }) => {
     const { getStripe } = await import("./stripe.server");
     const stripe = getStripe();
     if (!stripe) throw new Error("Stripe is not configured yet. Ask the platform admin to add STRIPE_SECRET_KEY.");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { db } = await import("@/db/client.server");
     const driver = await resolveStripeDriver(context.userId, data.driverId);
 
     let accountId = driver.stripe_account_id;
@@ -45,7 +45,7 @@ export const createDriverOnboardingLink = createServerFn({ method: "POST" })
         metadata: { driver_id: driver.id },
       });
       accountId = account.id;
-      await supabaseAdmin.from("drivers").update({ stripe_account_id: accountId }).eq("id", driver.id);
+      await db.from("drivers").update({ stripe_account_id: accountId }).eq("id", driver.id);
     }
     const link = await stripe.accountLinks.create({
       account: accountId,
@@ -58,17 +58,17 @@ export const createDriverOnboardingLink = createServerFn({ method: "POST" })
 
 /** Refresh Stripe status flags for the signed-in driver. */
 export const refreshStripeStatus = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) => z.object({ driverId: z.string().uuid().optional() }).optional().parse(d))
   .handler(async ({ data, context }) => {
     const { getStripe } = await import("./stripe.server");
     const stripe = getStripe();
     if (!stripe) return { enabled: false };
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { db } = await import("@/db/client.server");
     const driver = await resolveStripeDriver(context.userId, data?.driverId);
     if (!driver?.stripe_account_id) return { enabled: false };
     const acct = await stripe.accounts.retrieve(driver.stripe_account_id);
-    await supabaseAdmin
+    await db
       .from("drivers")
       .update({
         stripe_charges_enabled: !!acct.charges_enabled,
@@ -97,14 +97,14 @@ export const createTipPaymentIntent = createServerFn({ method: "POST" })
     const { getStripe } = await import("./stripe.server");
     const stripe = getStripe();
     if (!stripe) throw new Error("Card payments are not configured yet.");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: company } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { data: company } = await db
       .from("companies")
       .select("id")
       .eq("slug", data.companySlug)
       .maybeSingle();
     if (!company) throw new Error("Company not found");
-    const { data: driver } = await supabaseAdmin
+    const { data: driver } = await db
       .from("drivers")
       .select("id, stripe_account_id, stripe_charges_enabled, status, display_name")
       .eq("company_id", company.id)

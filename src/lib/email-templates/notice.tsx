@@ -70,7 +70,7 @@ export const template = {
     subject: 'You just got a tip',
     heading: 'You just got a $20.00 tip',
     lines: ['A customer rated you 5 stars and left a tip.', 'Nice work out there.'],
-    ctaUrl: 'https://roadsidetips.lovable.app/dashboard/driver',
+    ctaUrl: 'https://bluecollartips.app/dashboard/driver',
     ctaLabel: 'View my earnings',
   },
 } satisfies TemplateEntry

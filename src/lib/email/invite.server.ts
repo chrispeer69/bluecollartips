@@ -1,7 +1,8 @@
 import * as React from 'react'
 import { render } from '@react-email/render'
 import { TEMPLATES } from '@/lib/email-templates/registry'
-import { supabaseAdmin } from '@/integrations/supabase/client.server'
+import { db } from '@/db/client.server'
+import { sendEmail } from './send.server'
 
 const SITE_NAME = 'Blue Collar Tips'
 const SENDER_DOMAIN = 'notify.bluecollarai.online'
@@ -17,17 +18,17 @@ function generateToken(): string {
 
 async function getOrCreateUnsubscribeToken(email: string): Promise<string> {
   const normalized = email.toLowerCase()
-  const { data: existing } = await supabaseAdmin
+  const { data: existing } = await db
     .from('email_unsubscribe_tokens')
     .select('token, used_at')
     .eq('email', normalized)
     .maybeSingle()
   if (existing && !existing.used_at) return existing.token
   const token = generateToken()
-  await supabaseAdmin
+  await db
     .from('email_unsubscribe_tokens')
     .upsert({ token, email: normalized }, { onConflict: 'email', ignoreDuplicates: true })
-  const { data: stored } = await supabaseAdmin
+  const { data: stored } = await db
     .from('email_unsubscribe_tokens')
     .select('token')
     .eq('email', normalized)
@@ -57,13 +58,13 @@ export async function enqueueTransactionalEmail(args: SendInviteEmailArgs) {
   const messageId = crypto.randomUUID()
 
   // Suppression check
-  const { data: suppressed } = await supabaseAdmin
+  const { data: suppressed } = await db
     .from('suppressed_emails')
     .select('id')
     .eq('email', normalized)
     .maybeSingle()
   if (suppressed) {
-    await supabaseAdmin.from('email_send_log').insert({
+    await db.from('email_send_log').insert({
       message_id: messageId,
       template_name: templateName,
       recipient_email: to,
@@ -82,39 +83,28 @@ export async function enqueueTransactionalEmail(args: SendInviteEmailArgs) {
       ? template.subject(args.templateData)
       : template.subject
 
-  await supabaseAdmin.from('email_send_log').insert({
+  await db.from('email_send_log').insert({
     message_id: messageId,
     template_name: templateName,
     recipient_email: to,
     status: 'pending',
   })
 
-  const { error } = await supabaseAdmin.rpc('enqueue_email', {
-    queue_name: 'transactional_emails',
-    payload: {
-      message_id: messageId,
-      to,
-      from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
-      sender_domain: SENDER_DOMAIN,
-      subject,
-      html,
-      text,
-      purpose: 'transactional',
-      label: templateName,
-      idempotency_key: args.idempotencyKey,
-      unsubscribe_token: unsubscribeToken,
-      queued_at: new Date().toISOString(),
-    },
-  })
-  if (error) {
-    await supabaseAdmin.from('email_send_log').insert({
+  try {
+    const result = await sendEmail({ to, subject, html, text })
+    await db.from('email_send_log').insert({
+      message_id: messageId, template_name: templateName, recipient_email: to,
+      status: result.sent ? 'sent' : 'skipped', metadata: { provider_id: result.id, unsubscribe_token: unsubscribeToken },
+    })
+  } catch (error) {
+    await db.from('email_send_log').insert({
       message_id: messageId,
       template_name: templateName,
       recipient_email: to,
       status: 'failed',
-      error_message: error.message,
+      error_message: error instanceof Error ? error.message : String(error),
     })
-    throw new Error(`Failed to enqueue email: ${error.message}`)
+    throw error
   }
-  return { queued: true, messageId }
+  return { queued: false, sent: true, messageId }
 }

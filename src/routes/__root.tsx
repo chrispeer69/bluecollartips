@@ -10,7 +10,6 @@ import {
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 
 function NotFoundComponent() {
   return (
@@ -38,7 +37,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
   useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    console.error("Root error boundary", error);
   }, [error]);
 
   return (
@@ -86,8 +85,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "An Automated fast and quick on line tip tool for blue collar workers." },
       { property: "og:description", content: "An Automated fast and quick on line tip tool for blue collar workers." },
       { name: "twitter:description", content: "An Automated fast and quick on line tip tool for blue collar workers." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5e003514-1310-4fe5-9c73-eda5bbd58b18/id-preview-2af7b19a--05701b3e-3a66-4d5a-a379-571a0cb002f8.lovable.app-1782859328342.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5e003514-1310-4fe5-9c73-eda5bbd58b18/id-preview-2af7b19a--05701b3e-3a66-4d5a-a379-571a0cb002f8.lovable.app-1782859328342.png" },
     ],
     links: [
       {

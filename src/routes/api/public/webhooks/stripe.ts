@@ -20,7 +20,7 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
           return new Response(`Invalid signature: ${e instanceof Error ? e.message : ""}`, { status: 400 });
         }
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { db } = await import("@/db/client.server");
 
         if (event.type === "payment_intent.succeeded") {
           const pi = event.data.object as {
@@ -32,7 +32,7 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
           const driverId = pi.metadata?.driver_id;
           const companyId = pi.metadata?.company_id;
           if (driverId && companyId) {
-            await supabaseAdmin.from("tips").upsert(
+            await db.from("tips").upsert(
               {
                 company_id: companyId,
                 driver_id: driverId,
@@ -51,7 +51,7 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
             );
             try {
               const { sendThankYou } = await import("@/lib/thankyou.server");
-              await sendThankYou(supabaseAdmin, {
+              await sendThankYou(db, {
                 companyId,
                 driverId,
                 stars: Number(pi.metadata?.stars ?? 5),
@@ -66,7 +66,7 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
             // Notify the employee and send the customer a receipt.
             try {
               const { notifyEmployee, sendCustomerReceipt } = await import("@/lib/notify.server");
-              await notifyEmployee(supabaseAdmin, {
+              await notifyEmployee(db, {
                 companyId,
                 driverId,
                 kind: "tip",
@@ -74,7 +74,7 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
                 stars: pi.metadata?.stars ? Number(pi.metadata.stars) : null,
                 customerName: pi.metadata?.customer_name || null,
               });
-              await sendCustomerReceipt(supabaseAdmin, {
+              await sendCustomerReceipt(db, {
                 companyId,
                 driverId,
                 customerPhone: pi.metadata?.customer_phone || null,
@@ -91,7 +91,7 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
             charges_enabled?: boolean;
             payouts_enabled?: boolean;
           };
-          await supabaseAdmin
+          await db
             .from("drivers")
             .update({
               stripe_charges_enabled: !!acct.charges_enabled,

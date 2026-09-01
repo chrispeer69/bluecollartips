@@ -68,16 +68,16 @@ export const Route = createFileRoute("/api/public/webhooks/ghl")({
         if (!parsed.success) return json(400, { error: "Invalid payload", details: parsed.error.flatten() });
         const { companySlug, driver: driverKey, contact } = parsed.data;
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { db } = await import("@/db/client.server");
 
-        const { data: company } = await supabaseAdmin
+        const { data: company } = await db
           .from("companies")
           .select("id, name, slug")
           .eq("slug", companySlug)
           .maybeSingle();
         if (!company) return json(404, { error: `Company not found: ${companySlug}` });
 
-        let query = supabaseAdmin
+        let query = db
           .from("drivers")
           .select("id, slug, display_name, email, phone, status")
           .eq("company_id", company.id)

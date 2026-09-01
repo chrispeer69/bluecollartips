@@ -46,7 +46,7 @@ export const createInvite = createServerFn({ method: "POST" })
       .object({
         companyId: z.string().uuid(),
         role: z.enum(["company_admin", "driver"]),
-        email: z.string().email().optional().nullable(),
+        email: z.string().email(),
         phone: z.string().trim().max(40).optional().nullable(),
         recipientName: z.string().trim().max(120).optional().nullable(),
       })
@@ -62,9 +62,6 @@ export const createInvite = createServerFn({ method: "POST" })
       (r) => r.role === "super_admin" || (r.role === "company_admin" && r.company_id === data.companyId),
     );
     if (!ok) throw new Error("Forbidden");
-    if (data.role === "company_admin" && !data.email) {
-      throw new Error("Company admin invitations require a recipient email address");
-    }
     if (data.role === "driver" && data.email) {
       const { data: existingDriver } = await db
         .from("drivers")
@@ -89,7 +86,7 @@ export const createInvite = createServerFn({ method: "POST" })
       company_id: data.companyId,
       code,
       role: data.role,
-      email: data.email ?? null,
+      email: data.email,
       created_by: context.userId,
       expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
     }).select("id").single();
@@ -214,9 +211,9 @@ export const reviewJoinRequest = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { db, sql } = await import("@/db/client.server");
     const requests = await sql()`
-      select jr.*, i.role, u.email, u.full_name
+      select jr.*, coalesce(i.role, 'driver'::app_role) as role, u.email, u.full_name
       from join_requests jr
-      join invites i on i.id = jr.invite_id
+      left join invites i on i.id = jr.invite_id
       join users u on u.id = jr.user_id
       where jr.id = ${data.requestId}
       limit 1
@@ -265,7 +262,15 @@ export const peekInvite = createServerFn({ method: "POST" })
       .select("role, email, expires_at, used_at, company_id, companies(name, slug, logo_url, primary_color)")
       .eq("code", data.code)
       .maybeSingle();
-    if (!inv) return { valid: false as const };
+    if (!inv) {
+      const { data: company } = await db
+        .from("companies")
+        .select("name, slug, logo_url, primary_color")
+        .eq("join_code", data.code)
+        .maybeSingle();
+      if (!company) return { valid: false as const };
+      return { valid: true as const, used: false, expired: false, role: "driver", email: null, company };
+    }
     const expired = inv.expires_at && new Date(inv.expires_at) < new Date();
     return {
       valid: !inv.used_at && !expired,

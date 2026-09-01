@@ -55,7 +55,9 @@ function JoinPage() {
           {company?.logo_url && <img src={company.logo_url} alt={company.name} className="mx-auto h-14" />}
           <h1 className="display mt-4 text-3xl font-bold">Welcome to {company?.name}</h1>
           <p className="mt-2 opacity-90">
-            You've been invited to join as a <span className="font-semibold uppercase">{state.role === "driver" ? "employee" : state.role.replace("_", " ")}</span>.
+            {state.email
+              ? <>You've been invited to join as an <span className="font-semibold uppercase">{state.role === "driver" ? "employee" : state.role.replace("_", " ")}</span>.</>
+              : <>Use this company code to request access as an <span className="font-semibold uppercase">employee</span>.</>}
           </p>
         </div>
       </div>
@@ -64,10 +66,12 @@ function JoinPage() {
           href={`/auth?invite=${encodeURIComponent(code)}${state.email ? `&email=${encodeURIComponent(state.email)}` : ""}`}
           className="block w-full rounded-md bg-primary px-4 py-3 text-center text-base font-semibold text-primary-foreground"
         >
-          Create your account
+          {state.email ? "Accept invitation" : "Sign in or create account to request access"}
         </a>
         <p className="mt-3 text-center text-xs text-muted-foreground">
-          Already signed up? Sign in, open Settings, and enter invite code <span className="font-mono">{code}</span> under “Join another workspace.”
+          {state.email
+            ? <>This invitation only works for <span className="font-medium">{state.email}</span> and is accepted automatically after sign-in.</>
+            : <>After using code <span className="font-mono">{code}</span>, your dashboard will show “waiting for approval” until a company admin approves you.</>}
         </p>
       </div>
     </div>

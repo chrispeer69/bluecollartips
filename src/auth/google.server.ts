@@ -53,7 +53,19 @@ async function applyOnboarding(userId: string, email: string, intent: Intent) {
   if (intent.intent === "employee" && intent.inviteCode) {
     const invites = await sql()`select * from invites where upper(code) = upper(${intent.inviteCode}) and used_at is null and (expires_at is null or expires_at > now()) limit 1`;
     const invite = invites[0];
-    if (!invite) throw new Error("The employee invite is invalid or expired");
+    if (!invite) {
+      const companies = await sql()`select id from companies where join_code = ${intent.inviteCode} limit 1`;
+      const company = companies[0];
+      if (!company) throw new Error("The company or employee invite code is invalid");
+      await sql()`
+        insert into join_requests (invite_id, company_id, user_id, status)
+        values (null, ${company.id}, ${userId}, 'pending')
+        on conflict (company_id, user_id) do update
+          set status = case when join_requests.status = 'rejected' then 'pending' else join_requests.status end,
+              reviewed_by = null, reviewed_at = null
+      `;
+      return;
+    }
     if (invite.email && String(invite.email).toLowerCase() !== email.toLowerCase()) {
       throw new Error(`This invitation was sent to ${invite.email}. Choose that Google account to accept it.`);
     }

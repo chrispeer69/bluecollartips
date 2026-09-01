@@ -260,6 +260,16 @@ function AdminDashboard() {
         </div>}
 
         {page === "employees" && <Section title="Employees">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+            <div>
+              <div className="text-sm font-semibold">Company employee code</div>
+              <p className="mt-1 text-xs text-muted-foreground">Share this permanent code. New employees remain pending until an admin approves them below.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-md border border-border bg-background px-4 py-2 font-mono text-xl font-bold tracking-[0.3em]">{data.company.join_code}</span>
+              <button type="button" onClick={() => navigator.clipboard.writeText(data.company.join_code)} className="rounded-md border border-border bg-card px-3 py-2 text-sm">Copy</button>
+            </div>
+          </div>
           <DriverRoster
             drivers={data.drivers}
             ratingsByDriver={ratingStats.byDriver}
@@ -903,7 +913,7 @@ function InvitesPanel({ companyId }: { companyId: string }) {
   return (
     <>
       <p className="mb-4 text-sm text-muted-foreground">
-        Leave email empty to create a reusable employee join code. Anyone using that code requires your approval. Enter an email to send a one-person invitation that auto-accepts only when that exact email signs in.
+        Email invitations are for a specific person and auto-accept only when that exact email signs in. Use the 5-digit company code above for employees who should request approval.
       </p>
       <form
         className="mb-3 flex flex-wrap items-end gap-2"
@@ -915,7 +925,7 @@ function InvitesPanel({ companyId }: { companyId: string }) {
               data: {
                 companyId,
                 role,
-                email: email || null,
+                email,
                 phone: phone || null,
                 recipientName: name || null,
               },
@@ -950,10 +960,10 @@ function InvitesPanel({ companyId }: { companyId: string }) {
           </Select>
         </label>
         <Input label="Name (optional)" value={name} onChange={setName} />
-        <Input label="Email (optional)" value={email} onChange={setEmail} type="email" />
+        <Input label="Email" value={email} onChange={setEmail} type="email" required />
         <Input label="Phone (optional)" value={phone} onChange={setPhone} type="tel" placeholder="+1 555 555 5555" />
         <button disabled={busy} className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-60">
-          {busy ? "Creating…" : email ? "Send invite" : "Create shared code"}
+          {busy ? "Sending…" : "Send email invite"}
         </button>
       </form>
       {items.length === 0 ? (

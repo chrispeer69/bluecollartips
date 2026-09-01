@@ -188,7 +188,7 @@ function AuthPage() {
             ? "Welcome back."
             : signupType === "company"
               ? "Register your company to start collecting tips and ratings."
-              : "Joining a team? Enter the invite code your employer sent you."}
+            : "Joining a team? Enter the 5-digit company code or the invitation code emailed to you."}
         </p>
 
         {mode === "signup" && (
@@ -288,17 +288,17 @@ function AuthPage() {
           </div>
           {mode === "signup" && signupType === "employee" && (
             <div>
-              <label className="block text-sm font-medium">Invite code</label>
+              <label className="block text-sm font-medium">Company or invitation code</label>
               <input
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm uppercase"
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                 maxLength={32}
-                placeholder="ABCD1234"
+                placeholder="12345"
                 required
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Ask your company admin for this code, or use the invite link they emailed you.
+                A company code requires admin approval. An invitation sent to this exact email is accepted automatically.
               </p>
             </div>
           )}

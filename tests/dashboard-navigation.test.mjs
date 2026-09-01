@@ -9,6 +9,7 @@ const joinWorkspace = await readFile(new URL("../src/components/JoinWorkspacePan
 const auth = await readFile(new URL("../src/routes/auth.tsx", import.meta.url), "utf8");
 const dashboardRouter = await readFile(new URL("../src/routes/dashboard/index.tsx", import.meta.url), "utf8");
 const platformFunctions = await readFile(new URL("../src/lib/platform.functions.ts", import.meta.url), "utf8");
+const companyCodesMigration = await readFile(new URL("../migrations/006_company_join_codes.sql", import.meta.url), "utf8");
 
 test("admin dashboard exposes task-based sidebar pages", () => {
   for (const label of ["Overview", "Employees", "Ratings & feedback", "Tips & reconciliation", "Company settings"]) {
@@ -56,8 +57,12 @@ test("shared codes require approval while email invitations are restricted", () 
   assert.match(admin, /Pending join requests/);
   assert.match(admin, /Approve/);
   assert.match(admin, /Reject/);
-  assert.match(admin, /Leave email empty to create a reusable employee join code/);
+  assert.match(admin, /5-digit company code/);
+  assert.match(admin, /Company employee code/);
+  assert.match(admin, /Send email invite/);
   assert.match(joinWorkspace, /Request sent\. A company admin must approve you/);
+  assert.match(companyCodesMigration, /companies_join_code_unique/);
+  assert.match(companyCodesMigration, /join_requests_company_user_unique/);
 });
 
 test("platform user administration exposes memberships and filters", () => {

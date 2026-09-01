@@ -13,7 +13,7 @@ export function JoinWorkspacePanel() {
     <div className="rounded-xl border border-border bg-card p-5">
       <h2 className="text-base font-semibold">Join another workspace</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Already have an account? Enter an invite code from a company admin to add that employee or admin workspace to this account.
+        Enter the company's 5-digit employee code. Your request will remain pending until a company admin approves it.
       </p>
       <form
         className="mt-4 flex max-w-xl flex-col gap-2 sm:flex-row"
@@ -40,12 +40,12 @@ export function JoinWorkspacePanel() {
         }}
       >
         <label className="flex-1 text-sm">
-          Invite code
+          Company code
           <input
             value={inviteCode}
             onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
             className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm uppercase"
-            placeholder="ABCD1234"
+            placeholder="12345"
             maxLength={64}
             autoComplete="off"
             required
@@ -61,7 +61,7 @@ export function JoinWorkspacePanel() {
       {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
       {message && <p className="mt-2 text-sm text-emerald-700">{message}</p>}
       <p className="mt-3 text-xs text-muted-foreground">
-        Your email remains your login. The invite adds a separate company role and employee profile; it does not create another account.
+        Your email remains your login. A targeted invitation sent directly to your email is accepted automatically instead.
       </p>
     </div>
   );

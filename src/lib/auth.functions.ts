@@ -116,7 +116,21 @@ export const claimRole = createServerFn({ method: "POST" })
           limit 1 for update
         `;
         const invite = invites[0];
-        if (!invite) throw new Error("Invalid invite code");
+        if (!invite) {
+          const companies = await tx`select id from companies where join_code = ${inviteCode} limit 1`;
+          const company = companies[0];
+          if (!company) throw new Error("Invalid company or invite code");
+          const existing = await tx`select id from user_roles where user_id = ${userId} and company_id = ${company.id} limit 1`;
+          if (existing.length) throw new Error("Your account already belongs to this company");
+          await tx`
+            insert into join_requests (invite_id, company_id, user_id, status)
+            values (null, ${company.id}, ${userId}, 'pending')
+            on conflict (company_id, user_id) do update
+              set status = case when join_requests.status = 'rejected' then 'pending' else join_requests.status end,
+                  reviewed_by = null, reviewed_at = null
+          `;
+          return { role: "driver", companyId: company.id, status: "pending" as const };
+        }
         if (invite.used_at) throw new Error("Invite already used");
         if (invite.expires_at && new Date(invite.expires_at) < new Date())
           throw new Error("Invite expired");

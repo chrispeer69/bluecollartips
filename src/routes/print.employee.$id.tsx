@@ -1,7 +1,7 @@
 import { createFileRoute, useParams, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { QRCodeCanvas } from "qrcode.react";
+import { BrandedQRCode } from "@/components/DashboardShell";
 import { z } from "zod";
 import { getPayoutStatement } from "@/lib/payouts.functions";
 import { getDriverDashboard } from "@/lib/driver.functions";
@@ -67,7 +67,7 @@ function PrintPage() {
           <h1 className="mt-6 text-5xl font-black" style={{ color: brand }}>Rate & tip your service pro</h1>
           <p className="mt-3 text-lg text-gray-700">Scan the code to leave a rating and tip {driver.display_name}.</p>
           <div className="mx-auto mt-8 inline-block rounded-lg border-2 border-gray-200 p-4">
-            <QRCodeCanvas value={tipUrl} size={340} includeMargin />
+            <BrandedQRCode value={tipUrl} size={340} logoUrl={co?.logo_url} />
           </div>
           <div className="mt-4 text-lg font-semibold">{driver.display_name}</div>
           <div className="mt-1 break-all text-sm text-gray-600">{tipUrl}</div>

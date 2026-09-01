@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { LogOut, Menu, X, type LucideIcon } from "lucide-react";
 import * as Select from "@radix-ui/react-select";
 import { Check, ChevronsUpDown } from "lucide-react";
+import { QRCodeCanvas } from "qrcode.react";
 
 export type DashboardNavItem<T extends string> = {
   id: T;
@@ -61,6 +62,37 @@ export function WorkspaceSelect({
         </Select.Content>
       </Select.Portal>
     </Select.Root>
+  );
+}
+
+export function BrandedQRCode({
+  value,
+  size,
+  logoUrl,
+  id,
+  includeMargin = true,
+}: {
+  value: string;
+  size: number;
+  logoUrl?: string | null;
+  id?: string;
+  includeMargin?: boolean;
+}) {
+  return (
+    <QRCodeCanvas
+      id={id}
+      value={value}
+      size={size}
+      includeMargin={includeMargin}
+      level={logoUrl ? "H" : "M"}
+      imageSettings={logoUrl ? {
+        src: logoUrl,
+        height: Math.round(size * 0.2),
+        width: Math.round(size * 0.2),
+        excavate: true,
+        crossOrigin: "anonymous",
+      } : undefined}
+    />
   );
 }
 

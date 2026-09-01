@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { QRCodeCanvas } from "qrcode.react";
 import { auth } from "@/auth/client";
 import { getDriverDashboard, logManualTip, updateDriverProfile, updateNotifyPrefs } from "@/lib/driver.functions";
 import { getPayoutStatement } from "@/lib/payouts.functions";
@@ -9,7 +8,7 @@ import { PRESET_TIPS, SPLIT, TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib
 import { createDriverOnboardingLink, refreshStripeStatus } from "@/lib/stripe.functions";
 import { sendTipLinkSms } from "@/lib/sms.functions";
 import { confirmCashTip, disputeCashTip, listUnverifiedTips } from "@/lib/reconciliation.functions";
-import { DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
+import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
 import { Banknote, Building2, LayoutDashboard, QrCode, Settings, WalletCards } from "lucide-react";
 
 type DriverPage = "overview" | "share" | "tips" | "earnings" | "settings";
@@ -141,7 +140,7 @@ function DriverDashboard() {
         {page === "share" && <Section title="My QR code & link">
           <div className="flex flex-col items-center gap-4 sm:flex-row">
             <div className="rounded-lg bg-white p-4">
-              <QRCodeCanvas value={tipUrl} size={180} includeMargin />
+              <BrandedQRCode value={tipUrl} size={180} logoUrl={data.driver.companies?.logo_url} />
             </div>
             <div className="flex-1">
               <div className="break-all rounded-md bg-muted px-3 py-2 text-sm">{tipUrl}</div>
@@ -178,7 +177,7 @@ function DriverDashboard() {
           </div>
         </Section>}
 
-        {showQR && <FullscreenQR url={tipUrl} onClose={() => setShowQR(false)} />}
+        {showQR && <FullscreenQR url={tipUrl} logoUrl={data.driver.companies?.logo_url} onClose={() => setShowQR(false)} />}
 
         {page === "tips" && <LogTipPanel driverId={data.driver.id} onLogged={() => load(data.driver.id)} />}
 
@@ -231,7 +230,7 @@ function downloadQR() {
   a.click();
 }
 
-function FullscreenQR({ url, onClose }: { url: string; onClose: () => void }) {
+function FullscreenQR({ url, logoUrl, onClose }: { url: string; logoUrl?: string | null; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -247,7 +246,7 @@ function FullscreenQR({ url, onClose }: { url: string; onClose: () => void }) {
       className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-white p-6"
     >
       <div className="rounded-xl bg-white p-4 shadow-2xl">
-        <QRCodeCanvas value={url} size={Math.min(420, typeof window !== "undefined" ? window.innerWidth - 64 : 320)} includeMargin />
+        <BrandedQRCode value={url} size={Math.min(420, typeof window !== "undefined" ? window.innerWidth - 64 : 320)} logoUrl={logoUrl} />
       </div>
       <div className="max-w-[90vw] break-all text-center text-sm text-neutral-700">{url}</div>
       <button

@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { QRCodeCanvas } from "qrcode.react";
 import { auth } from "@/auth/client";
 import {
   createCompany,
@@ -21,7 +20,7 @@ import { platformOverview, suspendTenant } from "@/lib/platform.functions";
 import { sendTipLinkSms } from "@/lib/sms.functions";
 import { listTipDisputes, flagTipDispute, clearTipDispute, refundTip } from "@/lib/disputes.functions";
 import { listLocations, createLocation, deleteLocation, setDriverLocation, updateReviewLinks } from "@/lib/locations.functions";
-import { DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
+import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
 import { Building2, CreditCard, LayoutDashboard, MessageSquareText, Settings, ShieldCheck, Users } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/admin")({
@@ -268,6 +267,7 @@ function AdminDashboard() {
               await load(companyId);
             }}
             companySlug={data.company.slug}
+            companyLogo={data.company.logo_url}
             companyId={data.company.id}
             onLocationChanged={() => load(companyId)}
           />
@@ -390,6 +390,7 @@ function DriverRoster({
   onCreate,
   onStatus,
   companySlug,
+  companyLogo,
   companyId,
   onLocationChanged,
 }: {
@@ -399,6 +400,7 @@ function DriverRoster({
   onCreate: (v: { displayName: string; email?: string | null; phone?: string | null; employeeId?: string | null }) => Promise<void>;
   onStatus: (id: string, s: "pending" | "active" | "deactivated") => Promise<void>;
   companySlug: string;
+  companyLogo?: string | null;
   companyId: string;
   onLocationChanged: () => void;
 }) {
@@ -475,7 +477,7 @@ function DriverRoster({
                   aria-label={`Open QR code for ${d.display_name}`}
                 >
                   <span className="shrink-0 rounded-md bg-white p-1.5">
-                    <QRCodeCanvas value={url} size={76} includeMargin={false} />
+                    <BrandedQRCode value={url} size={76} logoUrl={companyLogo} includeMargin={false} />
                   </span>
                   <span className="min-w-0">
                     <span className="block font-medium">{d.display_name}</span>
@@ -573,6 +575,7 @@ function DriverRoster({
           driverId={qrDriverId}
           driverName={qrFor.name}
           url={qrFor.url}
+          logoUrl={companyLogo}
           onClose={() => { setQrFor(null); setQrDriverId(null); }}
         />
       )}
@@ -580,7 +583,7 @@ function DriverRoster({
   );
 }
 
-function DriverQRModal({ driverId, driverName, url, onClose }: { driverId: string; driverName: string; url: string; onClose: () => void }) {
+function DriverQRModal({ driverId, driverName, url, logoUrl, onClose }: { driverId: string; driverName: string; url: string; logoUrl?: string | null; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   const download = () => {
     const canvas = document.getElementById("admin-driver-qr") as HTMLCanvasElement | null;
@@ -605,7 +608,7 @@ function DriverQRModal({ driverId, driverName, url, onClose }: { driverId: strin
         </div>
         <div className="flex flex-col items-center gap-4">
           <div className="rounded-lg bg-white p-4">
-            <QRCodeCanvas id="admin-driver-qr" value={url} size={240} includeMargin />
+            <BrandedQRCode id="admin-driver-qr" value={url} size={240} logoUrl={logoUrl} />
           </div>
           <div className="w-full break-all rounded-md bg-muted px-3 py-2 text-xs">{url}</div>
           <div className="flex flex-wrap justify-center gap-2">

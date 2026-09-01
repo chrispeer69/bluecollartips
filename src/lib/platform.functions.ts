@@ -18,7 +18,7 @@ export const platformOverview = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertSuper(context.userId);
     const { db } = await import("@/db/client.server");
-    const [{ data: tenants }, { data: tips }, { data: drivers }, { data: users }] = await Promise.all([
+    const [{ data: tenants }, { data: tips }, { data: drivers }, { data: users }, { data: roles }] = await Promise.all([
       db
         .from("companies")
         .select("id, name, slug, status, created_at, primary_color")
@@ -28,7 +28,20 @@ export const platformOverview = createServerFn({ method: "GET" })
         .select("amount_cents, company_amount_cents, platform_amount_cents, company_id, source, verified, created_at"),
       db.from("drivers").select("*", { count: "exact", head: true }),
       db.from("users").select("id, email, full_name, created_at").order("created_at", { ascending: false }),
+      db.from("user_roles").select("user_id, role, company_id, companies(name)"),
     ]);
+
+    const rolesByUser = new Map<string, Array<{ role: string; companyId: string | null; companyName: string }>>();
+    for (const membership of roles ?? []) {
+      const company = Array.isArray(membership.companies) ? membership.companies[0] : membership.companies;
+      const list = rolesByUser.get(membership.user_id) ?? [];
+      list.push({
+        role: membership.role,
+        companyId: membership.company_id,
+        companyName: company?.name ?? (membership.role === "super_admin" ? "Platform" : "Unassigned"),
+      });
+      rolesByUser.set(membership.user_id, list);
+    }
 
     const byCompany = new Map<string, { gross: number; companyShare: number; platformShare: number; count: number; pendingCompany: number }>();
     let platformTotal = 0;
@@ -58,7 +71,7 @@ export const platformOverview = createServerFn({ method: "GET" })
       grossTotal,
       driverCount: drivers ?? 0,
       userCount: users?.length ?? 0,
-      users: users ?? [],
+      users: (users ?? []).map((user) => ({ ...user, memberships: rolesByUser.get(user.id) ?? [] })),
       employees: (await db.from("drivers").select("id, display_name, email, company_id, status, companies(name)")).data?.map((employee) => ({
         ...employee,
         ...(byEmployee.get(employee.id) ?? { gross: 0, platformShare: 0, count: 0 }),

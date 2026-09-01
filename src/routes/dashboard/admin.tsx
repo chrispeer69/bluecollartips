@@ -22,6 +22,7 @@ import { listTipDisputes, flagTipDispute, clearTipDispute, refundTip } from "@/l
 import { listLocations, createLocation, deleteLocation, setDriverLocation, updateReviewLinks } from "@/lib/locations.functions";
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
 import { JoinWorkspacePanel } from "@/components/JoinWorkspacePanel";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, CreditCard, LayoutDashboard, MessageSquareText, Settings, ShieldCheck, Users } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/admin")({
@@ -1059,12 +1060,23 @@ function PlatformPanel({ view }: { view: PlatformPage }) {
   const get = useServerFn(platformOverview);
   const suspend = useServerFn(suspendTenant);
   const [data, setData] = useState<Awaited<ReturnType<typeof platformOverview>> | null>(null);
+  const [userSearch, setUserSearch] = useState("");
+  const [userCompany, setUserCompany] = useState("all");
+  const [userRole, setUserRole] = useState("all");
   const reload = async () => setData(await get());
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   if (!data) return <div className="text-sm text-muted-foreground">Loading…</div>;
+  const normalizedSearch = userSearch.trim().toLowerCase();
+  const filteredUsers = data.users.filter((user) => {
+    const matchesSearch = !normalizedSearch || [user.full_name, user.email, ...user.memberships.map((item) => item.companyName)]
+      .some((value) => value?.toLowerCase().includes(normalizedSearch));
+    const matchesCompany = userCompany === "all" || user.memberships.some((item) => item.companyId === userCompany || (userCompany === "platform" && item.role === "super_admin"));
+    const matchesRole = userRole === "all" || user.memberships.some((item) => item.role === userRole);
+    return matchesSearch && matchesCompany && matchesRole;
+  });
   return (
     <div className="space-y-4">
       {view === "platformOverview" && <div className="grid gap-3 sm:grid-cols-5">
@@ -1084,7 +1096,28 @@ function PlatformPanel({ view }: { view: PlatformPage }) {
       </div>}
       {view === "platformUsers" && <div className="rounded-lg border border-border p-4">
         <h3 className="font-semibold">Registered users</h3>
-        <div className="mt-3 overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Name</th><th>Email</th><th>Created</th></tr></thead><tbody className="divide-y divide-border">{data.users.map((user) => <tr key={user.id}><td className="py-2">{user.full_name}</td><td>{user.email}</td><td>{new Date(user.created_at).toLocaleDateString()}</td></tr>)}</tbody></table></div>
+        <div className="mt-3 grid gap-2 md:grid-cols-3">
+          <input value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder="Search name, email or organization" className="rounded-md border border-input bg-background px-3 py-2 text-sm" />
+          <Select value={userCompany} onValueChange={setUserCompany}>
+            <SelectTrigger><SelectValue placeholder="All organizations" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All organizations</SelectItem>
+              <SelectItem value="platform">Platform</SelectItem>
+              {data.tenants.map((tenant) => <SelectItem key={tenant.id} value={tenant.id}>{tenant.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={userRole} onValueChange={setUserRole}>
+            <SelectTrigger><SelectValue placeholder="All roles" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All roles</SelectItem>
+              <SelectItem value="super_admin">Super admin</SelectItem>
+              <SelectItem value="company_admin">Company admin</SelectItem>
+              <SelectItem value="driver">Employee</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="mt-3 overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Name</th><th>Email</th><th>Organization</th><th>Role</th><th>Created</th></tr></thead><tbody className="divide-y divide-border">{filteredUsers.map((user) => <tr key={user.id}><td className="py-2">{user.full_name || "—"}</td><td>{user.email}</td><td>{user.memberships.length ? user.memberships.map((item) => item.companyName).join(", ") : "Unassigned"}</td><td>{user.memberships.length ? user.memberships.map((item) => item.role.replace("driver", "employee").replaceAll("_", " ")).join(", ") : "—"}</td><td>{new Date(user.created_at).toLocaleDateString()}</td></tr>)}</tbody></table></div>
+        <p className="mt-3 text-xs text-muted-foreground">Showing {filteredUsers.length} of {data.users.length} users.</p>
       </div>}
       {view === "platformOverview" && <div className="text-xs text-muted-foreground">
         Integrations · Stripe: <span className={data.integrations.stripe ? "text-emerald-600" : ""}>{data.integrations.stripe ? "connected" : "not connected"}</span>{" "}

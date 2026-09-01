@@ -8,6 +8,7 @@ const shell = await readFile(new URL("../src/components/DashboardShell.tsx", imp
 const joinWorkspace = await readFile(new URL("../src/components/JoinWorkspacePanel.tsx", import.meta.url), "utf8");
 const auth = await readFile(new URL("../src/routes/auth.tsx", import.meta.url), "utf8");
 const dashboardRouter = await readFile(new URL("../src/routes/dashboard/index.tsx", import.meta.url), "utf8");
+const platformFunctions = await readFile(new URL("../src/lib/platform.functions.ts", import.meta.url), "utf8");
 
 test("admin dashboard exposes task-based sidebar pages", () => {
   for (const label of ["Overview", "Employees", "Ratings & feedback", "Tips & reconciliation", "Company settings"]) {
@@ -49,4 +50,13 @@ test("Google signup and invite redemption cover new and existing accounts", () =
   assert.match(driver, /<JoinWorkspacePanel/);
   assert.match(dashboardRouter, /<JoinWorkspacePanel/);
   assert.match(admin, /Employee & admin invite codes/);
+});
+
+test("platform user administration exposes memberships and filters", () => {
+  assert.match(platformFunctions, /user_roles/);
+  assert.match(platformFunctions, /memberships: rolesByUser/);
+  assert.match(admin, /Search name, email or organization/);
+  assert.match(admin, /All organizations/);
+  assert.match(admin, /All roles/);
+  assert.match(admin, /Showing \{filteredUsers\.length\} of \{data\.users\.length\} users/);
 });

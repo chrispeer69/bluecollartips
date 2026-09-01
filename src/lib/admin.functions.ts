@@ -37,6 +37,7 @@ export const getAdminDashboard = createServerFn({ method: "POST" })
       .select("role, company_id")
       .eq("user_id", userId);
     const isSuper = roles?.some((r) => r.role === "super_admin") ?? false;
+    const adminCompanyIds = roles?.filter((r) => r.role === "company_admin" && r.company_id).map((r) => r.company_id) ?? [];
     let companyId = data.companyId ?? roles?.find((r) => r.role === "company_admin")?.company_id;
     if (!companyId) {
       // Super admin without a selection: default to first company
@@ -70,7 +71,7 @@ export const getAdminDashboard = createServerFn({ method: "POST" })
         .select("*")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false }),
-      isSuper ? db.from("companies").select("id, name, slug") : Promise.resolve({ data: null }),
+      isSuper && adminCompanyIds.length ? db.from("companies").select("id, name, slug").in("id", adminCompanyIds) : Promise.resolve({ data: null }),
     ]);
     return { isSuper, company, drivers: drivers ?? [], ratings: ratings ?? [], tips: tips ?? [], flags: flags ?? [], companies: companies ?? null };
   });

@@ -3,6 +3,7 @@ import { requireAuth } from "@/auth/middleware";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import { sendSms } from "./sms/send.server";
+import { slugify } from "./constants";
 
 const APP_BASE_URL =
   process.env.APP_BASE_URL ?? "https://bluecollartips.app";
@@ -61,6 +62,28 @@ export const createInvite = createServerFn({ method: "POST" })
       (r) => r.role === "super_admin" || (r.role === "company_admin" && r.company_id === data.companyId),
     );
     if (!ok) throw new Error("Forbidden");
+    if (data.role === "company_admin" && !data.email) {
+      throw new Error("Company admin invitations require a recipient email address");
+    }
+    if (data.role === "driver" && data.email) {
+      const { data: existingDriver } = await db
+        .from("drivers")
+        .select("id")
+        .eq("company_id", data.companyId)
+        .ilike("email", data.email)
+        .maybeSingle();
+      if (!existingDriver) {
+        const base = slugify(data.recipientName || data.email.split("@")[0]) || "employee";
+        await db.from("drivers").insert({
+          company_id: data.companyId,
+          display_name: data.recipientName || data.email.split("@")[0],
+          slug: `${base}-${randomBytes(2).toString("hex")}`,
+          email: data.email,
+          phone: data.phone ?? null,
+          status: "pending",
+        });
+      }
+    }
     const code = randomBytes(6).toString("hex").toUpperCase();
     const { data: inviteRow } = await db.from("invites").insert({
       company_id: data.companyId,
@@ -112,7 +135,9 @@ export const createInvite = createServerFn({ method: "POST" })
         if (!to) throw new Error("Invalid phone number");
         const body =
           data.role === "driver"
-            ? `${companyName} added you as a driver on Blue Collar Tips. Activate your account: ${inviteUrl}`
+            ? data.email
+              ? `${companyName} invited you as an employee on Blue Collar Tips. Accept: ${inviteUrl}`
+              : `${companyName} shared an employee join code. Sign in to request admin approval: ${inviteUrl}`
             : `You're invited to manage ${companyName} on Blue Collar Tips. Activate: ${inviteUrl}`;
         const result = await sendSms(to, body);
         const status = result.status;
@@ -163,6 +188,70 @@ export const revokeInvite = createServerFn({ method: "POST" })
       .from("invites")
       .update({ expires_at: new Date(Date.now() - 1000).toISOString() })
       .eq("id", data.inviteId);
+    return { ok: true };
+  });
+
+export const listJoinRequests = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { db } = await import("@/db/client.server");
+    const { data: roles } = await db.from("user_roles").select("role, company_id").eq("user_id", context.userId);
+    const ok = roles?.some((role) => role.role === "super_admin" || (role.role === "company_admin" && role.company_id === data.companyId));
+    if (!ok) throw new Error("Forbidden");
+    const { data: items } = await db
+      .from("join_requests")
+      .select("id, status, created_at, users(email, full_name), invites(code, role)")
+      .eq("company_id", data.companyId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    return { items: items ?? [] };
+  });
+
+export const reviewJoinRequest = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({ requestId: z.string().uuid(), decision: z.enum(["approved", "rejected"]) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { db, sql } = await import("@/db/client.server");
+    const requests = await sql()`
+      select jr.*, i.role, u.email, u.full_name
+      from join_requests jr
+      join invites i on i.id = jr.invite_id
+      join users u on u.id = jr.user_id
+      where jr.id = ${data.requestId}
+      limit 1
+    `;
+    const request = requests[0];
+    if (!request) throw new Error("Join request not found");
+    const { data: roles } = await db.from("user_roles").select("role, company_id").eq("user_id", context.userId);
+    const ok = roles?.some((role) => role.role === "super_admin" || (role.role === "company_admin" && role.company_id === request.company_id));
+    if (!ok) throw new Error("Forbidden");
+    if (request.status !== "pending") throw new Error("This request has already been reviewed");
+
+    await sql().begin(async (tx) => {
+      if (data.decision === "approved") {
+        if (request.role !== "driver") throw new Error("Shared codes can only request employee access");
+        const existing = await tx`select id from drivers where company_id = ${request.company_id} and user_id = ${request.user_id} limit 1`;
+        if (!existing.length) {
+          const base = slugify(request.full_name || request.email.split("@")[0]) || "employee";
+          const slug = `${base}-${randomBytes(2).toString("hex")}`;
+          await tx`
+            insert into drivers (company_id, user_id, display_name, slug, email, status)
+            values (${request.company_id}, ${request.user_id}, ${request.full_name || request.email}, ${slug}, ${request.email}, 'active')
+          `;
+        }
+        await tx`
+          insert into user_roles (user_id, company_id, role)
+          values (${request.user_id}, ${request.company_id}, 'driver')
+          on conflict do nothing
+        `;
+      }
+      await tx`
+        update join_requests
+        set status = ${data.decision}, reviewed_by = ${context.userId}, reviewed_at = now()
+        where id = ${request.id}
+      `;
+    });
     return { ok: true };
   });
 

@@ -14,14 +14,13 @@ import {
 } from "@/lib/admin.functions";
 import { dollars } from "@/lib/constants";
 import { Section, Stat, TopBar } from "./driver";
-import { createInvite, listInvites, revokeInvite } from "@/lib/invites.functions";
+import { createInvite, listInvites, revokeInvite, listJoinRequests, reviewJoinRequest } from "@/lib/invites.functions";
 import { reconciliationOverview } from "@/lib/reconciliation.functions";
 import { platformOverview, suspendTenant } from "@/lib/platform.functions";
 import { sendTipLinkSms } from "@/lib/sms.functions";
 import { listTipDisputes, flagTipDispute, clearTipDispute, refundTip } from "@/lib/disputes.functions";
 import { listLocations, createLocation, deleteLocation, setDriverLocation, updateReviewLinks } from "@/lib/locations.functions";
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
-import { JoinWorkspacePanel } from "@/components/JoinWorkspacePanel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, CreditCard, LayoutDashboard, MessageSquareText, Settings, ShieldCheck, Users } from "lucide-react";
 
@@ -311,8 +310,6 @@ function AdminDashboard() {
           <ThankYouTemplatesPanel companyId={data.company.id} />
         </Section>}
 
-        {page === "settings" && <JoinWorkspacePanel />}
-
         {(page === "overview" || page === "feedback") && <Section title="Recent ratings & feedback">
           <FeedbackList ratings={data.ratings} drivers={data.drivers} />
         </Section>}
@@ -330,6 +327,10 @@ function AdminDashboard() {
 
         {page === "employees" && <Section title="Employee & admin invite codes">
           <InvitesPanel companyId={data.company.id} />
+        </Section>}
+
+        {page === "employees" && <Section title="Pending join requests">
+          <JoinRequestsPanel companyId={data.company.id} onApproved={() => load(companyId)} />
         </Section>}
 
         {page === "payments" && <Section title="Tip disputes & refunds">
@@ -459,7 +460,7 @@ function DriverRoster({
           }}
         >
           <Input label="Name" value={name} onChange={setName} required />
-          <Input label="Email" value={email} onChange={setEmail} type="email" />
+          <Input label="Email" value={email} onChange={setEmail} type="email" required />
           <Input label="Phone" value={phone} onChange={setPhone} />
           <Input label="Employee ID" value={empId} onChange={setEmpId} />
           <div className="sm:col-span-2">
@@ -902,7 +903,7 @@ function InvitesPanel({ companyId }: { companyId: string }) {
   return (
     <>
       <p className="mb-4 text-sm text-muted-foreground">
-        Create an invite, then copy its link or share the code shown below. Existing users can enter the code under Settings → Join another workspace.
+        Leave email empty to create a reusable employee join code. Anyone using that code requires your approval. Enter an email to send a one-person invitation that auto-accepts only when that exact email signs in.
       </p>
       <form
         className="mb-3 flex flex-wrap items-end gap-2"
@@ -940,16 +941,19 @@ function InvitesPanel({ companyId }: { companyId: string }) {
       >
         <label className="text-sm">
           Role
-          <select value={role} onChange={(e) => setRole(e.target.value as typeof role)} className="mt-1 block rounded-md border border-input bg-background px-3 py-2 text-sm">
-            <option value="driver">Employee</option>
-            <option value="company_admin">Company admin</option>
-          </select>
+          <Select value={role} onValueChange={(value) => setRole(value as typeof role)}>
+            <SelectTrigger className="mt-1 min-w-40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="driver">Employee</SelectItem>
+              <SelectItem value="company_admin">Company admin</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
         <Input label="Name (optional)" value={name} onChange={setName} />
         <Input label="Email (optional)" value={email} onChange={setEmail} type="email" />
         <Input label="Phone (optional)" value={phone} onChange={setPhone} type="tel" placeholder="+1 555 555 5555" />
         <button disabled={busy} className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-60">
-          {busy ? "Sending…" : "Send invite"}
+          {busy ? "Creating…" : email ? "Send invite" : "Create shared code"}
         </button>
       </form>
       {items.length === 0 ? (
@@ -986,6 +990,39 @@ function InvitesPanel({ companyId }: { companyId: string }) {
         </div>
       )}
     </>
+  );
+}
+
+function JoinRequestsPanel({ companyId, onApproved }: { companyId: string; onApproved: () => void }) {
+  const list = useServerFn(listJoinRequests);
+  const review = useServerFn(reviewJoinRequest);
+  const [items, setItems] = useState<any[]>([]);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const reload = async () => setItems((await list({ data: { companyId } })).items);
+  useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [companyId]);
+  const pending = items.filter((item) => item.status === "pending");
+  if (!pending.length) return <div className="text-sm text-muted-foreground">No pending requests from shared employee codes.</div>;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Name</th><th>Email</th><th>Code</th><th>Requested</th><th></th></tr></thead>
+        <tbody className="divide-y divide-border">
+          {pending.map((item) => {
+            const user = Array.isArray(item.users) ? item.users[0] : item.users;
+            const invite = Array.isArray(item.invites) ? item.invites[0] : item.invites;
+            const decide = async (decision: "approved" | "rejected") => {
+              setBusyId(item.id);
+              try {
+                await review({ data: { requestId: item.id, decision } });
+                await reload();
+                if (decision === "approved") onApproved();
+              } finally { setBusyId(null); }
+            };
+            return <tr key={item.id}><td className="py-2 font-medium">{user?.full_name || "—"}</td><td>{user?.email || "—"}</td><td className="font-mono text-xs">{invite?.code}</td><td>{new Date(item.created_at).toLocaleDateString()}</td><td className="text-right"><button disabled={busyId === item.id} onClick={() => decide("approved")} className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50">Approve</button><button disabled={busyId === item.id} onClick={() => decide("rejected")} className="ml-2 rounded-md border border-border px-3 py-1.5 text-xs disabled:opacity-50">Reject</button></td></tr>;
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

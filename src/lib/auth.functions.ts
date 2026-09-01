@@ -91,7 +91,12 @@ export const getMyRoleContext = createServerFn({ method: "GET" })
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
-    return { roles: roles ?? [], driver };
+    const { count: pendingJoinCount } = await db
+      .from("join_requests")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("status", "pending");
+    return { roles: roles ?? [], driver, pendingJoinCount: pendingJoinCount ?? 0 };
   });
 
 // Redeem an employee/company invite. Super-admin access is provisioned separately.
@@ -115,6 +120,35 @@ export const claimRole = createServerFn({ method: "POST" })
         if (invite.used_at) throw new Error("Invite already used");
         if (invite.expires_at && new Date(invite.expires_at) < new Date())
           throw new Error("Invite expired");
+
+        const users = await tx`select email from users where id = ${userId} limit 1`;
+        const accountEmail = users[0]?.email as string | undefined;
+        if (invite.email && accountEmail?.toLowerCase() !== String(invite.email).toLowerCase()) {
+          throw new Error(`This invitation was sent to ${invite.email}. Sign in with that email to accept it.`);
+        }
+
+        const companyMembership = await tx`
+          select id from user_roles
+          where user_id = ${userId} and company_id = ${invite.company_id}
+          limit 1
+        `;
+        if (!invite.email && companyMembership.length) {
+          throw new Error("Your account already belongs to this company");
+        }
+
+        // A code created without a recipient email is a reusable company join
+        // code. It requests access; a company admin must approve it.
+        if (!invite.email) {
+          if (invite.role !== "driver") throw new Error("Company admin invitations must be sent to a specific email address");
+          await tx`
+            insert into join_requests (invite_id, company_id, user_id)
+            values (${invite.id}, ${invite.company_id}, ${userId})
+            on conflict (invite_id, user_id) do update
+              set status = case when join_requests.status = 'rejected' then 'pending' else join_requests.status end,
+                  reviewed_by = null, reviewed_at = null
+          `;
+          return { role: invite.role, companyId: invite.company_id, status: "pending" as const };
+        }
 
         const existing = await tx`
           select id from user_roles
@@ -146,7 +180,7 @@ export const claimRole = createServerFn({ method: "POST" })
           update invites set used_at = now(), used_by = ${userId}
           where id = ${invite.id}
         `;
-        return { role: invite.role, companyId: invite.company_id };
+        return { role: invite.role, companyId: invite.company_id, status: "approved" as const };
       });
       return result;
     }

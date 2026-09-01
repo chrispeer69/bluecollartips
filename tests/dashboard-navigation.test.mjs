@@ -46,10 +46,18 @@ test("Google signup and invite redemption cover new and existing accounts", () =
   assert.match(auth, /params\.set\("intent", "company"\)/);
   assert.match(auth, /params\.set\("intent", "employee"\)/);
   assert.match(joinWorkspace, /claim\(\{ data: \{ inviteCode: code \} \}\)/);
-  assert.match(admin, /<JoinWorkspacePanel/);
+  assert.doesNotMatch(admin, /<JoinWorkspacePanel/);
   assert.match(driver, /<JoinWorkspacePanel/);
   assert.match(dashboardRouter, /<JoinWorkspacePanel/);
   assert.match(admin, /Employee & admin invite codes/);
+});
+
+test("shared codes require approval while email invitations are restricted", () => {
+  assert.match(admin, /Pending join requests/);
+  assert.match(admin, /Approve/);
+  assert.match(admin, /Reject/);
+  assert.match(admin, /Leave email empty to create a reusable employee join code/);
+  assert.match(joinWorkspace, /Request sent\. A company admin must approve you/);
 });
 
 test("platform user administration exposes memberships and filters", () => {

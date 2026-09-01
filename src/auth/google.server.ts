@@ -50,17 +50,29 @@ function readIntent(request: Request): Intent | null {
 
 async function applyOnboarding(userId: string, email: string, intent: Intent) {
   const roles = await sql()`select 1 from user_roles where user_id = ${userId} limit 1`;
-  if (roles.length) return;
   if (intent.intent === "employee" && intent.inviteCode) {
-    const invites = await sql()`select * from invites where code = ${intent.inviteCode} and used_at is null and (expires_at is null or expires_at > now()) limit 1`;
+    const invites = await sql()`select * from invites where upper(code) = upper(${intent.inviteCode}) and used_at is null and (expires_at is null or expires_at > now()) limit 1`;
     const invite = invites[0];
     if (!invite) throw new Error("The employee invite is invalid or expired");
+    if (invite.email && String(invite.email).toLowerCase() !== email.toLowerCase()) {
+      throw new Error(`This invitation was sent to ${invite.email}. Choose that Google account to accept it.`);
+    }
     await sql().begin(async (tx) => {
+      if (!invite.email) {
+        if (invite.role !== "driver") throw new Error("Company admin invitations must be sent to a specific email address");
+        await tx`
+          insert into join_requests (invite_id, company_id, user_id)
+          values (${invite.id}, ${invite.company_id}, ${userId})
+          on conflict (invite_id, user_id) do nothing
+        `;
+        return;
+      }
       await tx`insert into user_roles (user_id, company_id, role) values (${userId}, ${invite.company_id}, ${invite.role}) on conflict do nothing`;
       await tx`update invites set used_at = now(), used_by = ${userId} where id = ${invite.id} and used_at is null`;
-      if (invite.role === "driver") await tx`update drivers set user_id = ${userId}, status = 'active' where company_id = ${invite.company_id} and lower(email) = lower(${invite.email ?? email}) and user_id is null`;
+      if (invite.role === "driver") await tx`update drivers set user_id = ${userId}, status = 'active' where company_id = ${invite.company_id} and lower(email) = lower(${invite.email}) and user_id is null`;
     });
   } else if (intent.intent === "company" && intent.companyName) {
+    if (roles.length) return;
     const companyName = intent.companyName;
     const slug = `${slugify(companyName)}-${randomBytes(2).toString("hex").slice(0, 3)}`;
     await sql().begin(async (tx) => {

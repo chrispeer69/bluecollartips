@@ -41,7 +41,9 @@ function DashboardRouter() {
           navigate({ to: "/dashboard/driver" });
         } else {
           setStatus(
-            "Your account isn't linked to a company yet. Enter the invite code from your company admin below.",
+            ctx.pendingJoinCount
+              ? "Your request was sent and is waiting for a company admin to approve it."
+              : "Your account isn't linked to a company yet. Enter the invite code from your company admin below.",
           );
         }
       } catch (e: unknown) {
@@ -54,7 +56,7 @@ function DashboardRouter() {
     <div className="grid min-h-screen place-items-center bg-background px-6 text-center">
       <div className="w-full max-w-xl">
         <p className="text-sm text-muted-foreground">{status}</p>
-        {!status.startsWith("Checking") && <div className="mt-5 text-left"><JoinWorkspacePanel /></div>}
+        {!status.startsWith("Checking") && !status.includes("waiting for") && <div className="mt-5 text-left"><JoinWorkspacePanel /></div>}
         <div className="mt-6 flex justify-center gap-3">
           <button
             onClick={async () => {

@@ -83,7 +83,7 @@ export const createDriver = createServerFn({ method: "POST" })
       .object({
         companyId: z.string().uuid(),
         displayName: z.string().trim().min(1).max(80),
-        email: z.string().trim().email().optional().nullable(),
+        email: z.string().trim().email(),
         phone: z.string().trim().max(40).optional().nullable(),
         employeeId: z.string().trim().max(60).optional().nullable(),
       })
@@ -100,7 +100,7 @@ export const createDriver = createServerFn({ method: "POST" })
         company_id: data.companyId,
         display_name: data.displayName,
         slug,
-        email: data.email ?? null,
+        email: data.email,
         phone: data.phone ?? null,
         employee_id: data.employeeId ?? null,
         status: "pending",
@@ -114,7 +114,7 @@ export const createDriver = createServerFn({ method: "POST" })
       company_id: data.companyId,
       code,
       role: "driver",
-      email: data.email ?? null,
+      email: data.email,
       created_by: context.userId,
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });

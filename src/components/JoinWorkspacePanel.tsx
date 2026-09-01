@@ -7,6 +7,7 @@ export function JoinWorkspacePanel() {
   const [inviteCode, setInviteCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   return (
     <div className="rounded-xl border border-border bg-card p-5">
@@ -22,9 +23,16 @@ export function JoinWorkspacePanel() {
           if (!code) return;
           setBusy(true);
           setError(null);
+          setMessage(null);
           try {
-            await claim({ data: { inviteCode: code } });
-            window.location.assign("/dashboard");
+            const result = await claim({ data: { inviteCode: code } });
+            if (result.status === "pending") {
+              setInviteCode("");
+              setMessage("Request sent. A company admin must approve you before this workspace appears.");
+              setBusy(false);
+            } else {
+              window.location.assign("/dashboard");
+            }
           } catch (err) {
             setError(err instanceof Error ? err.message : "Could not join this workspace");
             setBusy(false);
@@ -51,6 +59,7 @@ export function JoinWorkspacePanel() {
         </button>
       </form>
       {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+      {message && <p className="mt-2 text-sm text-emerald-700">{message}</p>}
       <p className="mt-3 text-xs text-muted-foreground">
         Your email remains your login. The invite adds a separate company role and employee profile; it does not create another account.
       </p>

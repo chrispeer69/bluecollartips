@@ -21,6 +21,7 @@ import { sendTipLinkSms } from "@/lib/sms.functions";
 import { listTipDisputes, flagTipDispute, clearTipDispute, refundTip } from "@/lib/disputes.functions";
 import { listLocations, createLocation, deleteLocation, setDriverLocation, updateReviewLinks } from "@/lib/locations.functions";
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
+import { JoinWorkspacePanel } from "@/components/JoinWorkspacePanel";
 import { Building2, CreditCard, LayoutDashboard, MessageSquareText, Settings, ShieldCheck, Users } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/admin")({
@@ -301,6 +302,8 @@ function AdminDashboard() {
           <ThankYouTemplatesPanel companyId={data.company.id} />
         </Section>}
 
+        {page === "settings" && <JoinWorkspacePanel />}
+
         {(page === "overview" || page === "feedback") && <Section title="Recent ratings & feedback">
           <FeedbackList ratings={data.ratings} drivers={data.drivers} />
         </Section>}
@@ -316,7 +319,7 @@ function AdminDashboard() {
           />
         </Section>}
 
-        {page === "employees" && <Section title="Invites">
+        {page === "employees" && <Section title="Employee & admin invite codes">
           <InvitesPanel companyId={data.company.id} />
         </Section>}
 
@@ -887,6 +890,9 @@ function InvitesPanel({ companyId }: { companyId: string }) {
   }, [companyId]);
   return (
     <>
+      <p className="mb-4 text-sm text-muted-foreground">
+        Create an invite, then copy its link or share the code shown below. Existing users can enter the code under Settings → Join another workspace.
+      </p>
       <form
         className="mb-3 flex flex-wrap items-end gap-2"
         onSubmit={async (e) => {

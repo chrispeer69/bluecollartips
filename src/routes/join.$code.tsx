@@ -67,7 +67,7 @@ function JoinPage() {
           Create your account
         </a>
         <p className="mt-3 text-center text-xs text-muted-foreground">
-          Already signed up? You can also sign in and enter invite code <span className="font-mono">{code}</span> from the dashboard.
+          Already signed up? Sign in, open Settings, and enter invite code <span className="font-mono">{code}</span> under “Join another workspace.”
         </p>
       </div>
     </div>

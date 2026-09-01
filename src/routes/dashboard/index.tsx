@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { auth } from "@/auth/client";
 import { getMyRoleContext } from "@/lib/auth.functions";
+import { JoinWorkspacePanel } from "@/components/JoinWorkspacePanel";
 
 export const Route = createFileRoute("/dashboard/")({
   head: () => ({
@@ -40,7 +41,7 @@ function DashboardRouter() {
           navigate({ to: "/dashboard/driver" });
         } else {
           setStatus(
-            "Your account isn't linked to a company yet. Ask your company admin to send you an invite code, then sign out and sign up with it.",
+            "Your account isn't linked to a company yet. Enter the invite code from your company admin below.",
           );
         }
       } catch (e: unknown) {
@@ -51,8 +52,9 @@ function DashboardRouter() {
 
   return (
     <div className="grid min-h-screen place-items-center bg-background px-6 text-center">
-      <div className="max-w-md">
+      <div className="w-full max-w-xl">
         <p className="text-sm text-muted-foreground">{status}</p>
+        {!status.startsWith("Checking") && <div className="mt-5 text-left"><JoinWorkspacePanel /></div>}
         <div className="mt-6 flex justify-center gap-3">
           <button
             onClick={async () => {

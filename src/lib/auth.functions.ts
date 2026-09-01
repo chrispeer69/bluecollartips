@@ -88,6 +88,8 @@ export const getMyRoleContext = createServerFn({ method: "GET" })
       .from("drivers")
       .select("id, slug, status, company_id, display_name, photo_url, companies(slug, name, primary_color, secondary_color, logo_url)")
       .eq("user_id", userId)
+      .order("created_at", { ascending: true })
+      .limit(1)
       .maybeSingle();
     return { roles: roles ?? [], driver };
   });

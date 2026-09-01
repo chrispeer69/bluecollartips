@@ -9,6 +9,7 @@ import { createDriverOnboardingLink, refreshStripeStatus } from "@/lib/stripe.fu
 import { sendTipLinkSms } from "@/lib/sms.functions";
 import { confirmCashTip, disputeCashTip, listUnverifiedTips } from "@/lib/reconciliation.functions";
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
+import { JoinWorkspacePanel } from "@/components/JoinWorkspacePanel";
 import { Banknote, Building2, LayoutDashboard, QrCode, Settings, WalletCards } from "lucide-react";
 
 type DriverPage = "overview" | "share" | "tips" | "earnings" | "settings";
@@ -186,6 +187,8 @@ function DriverDashboard() {
         {page === "settings" && <ProfileSettingsPanel driver={data.driver} accountEmail={data.accountEmail} onSaved={() => load(data.driver.id)} />}
 
         {page === "settings" && <NotifyPrefsPanel driverId={data.driver.id} initial={!!data.driver.notify_sms} phone={data.driver.phone ?? null} />}
+
+        {page === "settings" && <JoinWorkspacePanel />}
 
         {page === "earnings" && <StripePanel driverId={data.driver.id} stripeEnabled={!!data.driver.stripe_charges_enabled} />}
 

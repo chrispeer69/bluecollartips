@@ -25,7 +25,8 @@ export const platformOverview = createServerFn({ method: "GET" })
         .order("created_at", { ascending: false }),
       db
         .from("tips")
-        .select("amount_cents, company_amount_cents, platform_amount_cents, company_id, source, verified, created_at"),
+        .select("id, driver_id, amount_cents, company_amount_cents, platform_amount_cents, company_id, source, verified, created_at")
+        .order("created_at", { ascending: false }),
       db.from("drivers").select("*", { count: "exact", head: true }),
       db.from("users").select("id, email, full_name, created_at").order("created_at", { ascending: false }),
       db.from("user_roles").select("user_id, role, company_id, companies(name)"),
@@ -69,6 +70,7 @@ export const platformOverview = createServerFn({ method: "GET" })
       tenants: (tenants ?? []).map((c) => ({ ...c, ...(byCompany.get(c.id) ?? { gross: 0, companyShare: 0, platformShare: 0, count: 0, pendingCompany: 0 }) })),
       platformTotal,
       grossTotal,
+      tips: tips ?? [],
       driverCount: drivers ?? 0,
       userCount: users?.length ?? 0,
       users: (users ?? []).map((user) => ({ ...user, memberships: rolesByUser.get(user.id) ?? [] })),

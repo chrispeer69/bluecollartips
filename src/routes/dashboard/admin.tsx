@@ -505,6 +505,7 @@ function DriverRoster({
             <thead className="text-left text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="py-2">Name</th>
+                <th className="hidden lg:table-cell">Email</th>
                 <th>Status</th>
                 <th className="hidden sm:table-cell">Location</th>
                 <th className="hidden md:table-cell">Tip link</th>
@@ -520,6 +521,7 @@ function DriverRoster({
                 return (
                   <tr key={d.id}>
                     <td className="py-2 font-medium">{d.display_name}</td>
+                    <td className="hidden lg:table-cell text-muted-foreground">{d.email || "—"}</td>
                     <td>
                       <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize">{d.status}</span>
                     </td>
@@ -1086,11 +1088,24 @@ function PlatformPanel({ view }: { view: PlatformPage }) {
         <Stat label="Employees" value={String(data.driverCount)} />
         <Stat label="Registered users" value={String(data.userCount)} />
       </div>}
+      {view === "platformPayments" && <div className="grid gap-3 sm:grid-cols-3">
+        <Stat label="Gross tips" value={dollars(data.grossTotal)} />
+        <Stat label="Platform fees earned" value={dollars(data.platformTotal)} />
+        <Stat label="Tips processed" value={String(data.tips.length)} />
+      </div>}
+      {view === "platformPayments" && <div className="rounded-lg border border-border p-4">
+        <h3 className="font-semibold">Organization fee breakdown</h3>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Organization</th><th>Tips</th><th>Gross</th><th>Company share</th><th>Platform fees</th></tr></thead><tbody className="divide-y divide-border">
+            {data.tenants.map((tenant) => <tr key={tenant.id}><td className="py-2 font-medium">{tenant.name}</td><td>{tenant.count}</td><td>{dollars(tenant.gross)}</td><td>{dollars(tenant.companyShare)}</td><td>{dollars(tenant.platformShare)}</td></tr>)}
+          </tbody></table>
+        </div>
+      </div>}
       {view === "platformPayments" && <div className="rounded-lg border border-border p-4">
         <h3 className="font-semibold">Employee earnings breakdown</h3>
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Employee</th><th>Company</th><th>Tips</th><th>Gross</th><th>Platform share</th></tr></thead><tbody className="divide-y divide-border">
-            {data.employees.map((employee) => <tr key={employee.id}><td className="py-2 font-medium">{employee.display_name}</td><td>{Array.isArray(employee.companies) ? employee.companies[0]?.name : employee.companies?.name}</td><td>{employee.count}</td><td>{dollars(employee.gross)}</td><td>{dollars(employee.platformShare)}</td></tr>)}
+          <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Employee</th><th>Email</th><th>Company</th><th>Tips</th><th>Gross</th><th>Platform share</th></tr></thead><tbody className="divide-y divide-border">
+            {data.employees.map((employee) => <tr key={employee.id}><td className="py-2 font-medium">{employee.display_name}</td><td>{employee.email || "—"}</td><td>{Array.isArray(employee.companies) ? employee.companies[0]?.name : employee.companies?.name}</td><td>{employee.count}</td><td>{dollars(employee.gross)}</td><td>{dollars(employee.platformShare)}</td></tr>)}
           </tbody></table>
         </div>
       </div>}

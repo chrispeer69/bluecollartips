@@ -59,4 +59,8 @@ test("platform user administration exposes memberships and filters", () => {
   assert.match(admin, /All organizations/);
   assert.match(admin, /All roles/);
   assert.match(admin, /Showing \{filteredUsers\.length\} of \{data\.users\.length\} users/);
+  assert.match(platformFunctions, /id, driver_id, amount_cents/);
+  assert.match(admin, /Platform fees earned/);
+  assert.match(admin, /Organization fee breakdown/);
+  assert.match(admin, /\{d\.email \|\| "—"\}/);
 });

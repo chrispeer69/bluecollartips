@@ -162,7 +162,7 @@ function AdminDashboard() {
   const totals = sumTips(data.tips);
   const ratingStats = ratingAgg(data.ratings, data.drivers);
 
-  const visibleNav = data.isSuper ? adminNav : adminNav.filter((item) => item.id !== "platform");
+  const visibleNav = adminNav.filter((item) => item.id !== "platform");
   const pageTitle = visibleNav.find((item) => item.id === page)?.label ?? "Overview";
   const platformWorkspace = "__platform__";
   return (
@@ -230,23 +230,8 @@ function AdminDashboard() {
         )}
 
         {page === "platform" && data.isSuper && data.companies && data.companies.length > 0 && (
-          <Section title="Tenant">
+          <Section title="Organizations">
             <div className="flex flex-wrap items-center gap-3">
-              <select
-                value={companyId}
-                onChange={(e) => {
-                  setCompanyId(e.target.value);
-                  setLoading(true);
-                  load(e.target.value);
-                }}
-                className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                {data.companies.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
               <NewCompanyInline
                 onCreate={async (v) => {
                   const r = await newCo({ data: v });

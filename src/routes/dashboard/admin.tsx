@@ -39,14 +39,21 @@ export const Route = createFileRoute("/dashboard/admin")({
 });
 
 type Data = any;
-type AdminPage = "overview" | "employees" | "feedback" | "payments" | "settings" | "platform";
+type CompanyPage = "overview" | "employees" | "feedback" | "payments" | "settings";
+type PlatformPage = "platformOverview" | "platformOrganizations" | "platformUsers" | "platformPayments";
+type AdminPage = CompanyPage | PlatformPage;
 const adminNav: DashboardNavItem<AdminPage>[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, group: "Workspace" },
   { id: "employees", label: "Employees", icon: Users, group: "Manage" },
   { id: "feedback", label: "Ratings & feedback", icon: MessageSquareText },
   { id: "payments", label: "Tips & reconciliation", icon: CreditCard, group: "Money" },
   { id: "settings", label: "Company settings", icon: Settings, group: "Configure" },
-  { id: "platform", label: "Platform", icon: ShieldCheck, group: "Blue Collar Tips" },
+];
+const platformNav: DashboardNavItem<AdminPage>[] = [
+  { id: "platformOverview", label: "Platform overview", icon: ShieldCheck, group: "Administration" },
+  { id: "platformOrganizations", label: "Organizations", icon: Building2 },
+  { id: "platformUsers", label: "Registered users", icon: Users, group: "Access" },
+  { id: "platformPayments", label: "Platform earnings", icon: CreditCard, group: "Money" },
 ];
 
 function AdminDashboard() {
@@ -163,13 +170,14 @@ function AdminDashboard() {
   const totals = sumTips(data.tips);
   const ratingStats = ratingAgg(data.ratings, data.drivers);
 
-  const visibleNav = adminNav.filter((item) => item.id !== "platform");
+  const isPlatform = page.startsWith("platform");
+  const visibleNav = isPlatform ? platformNav : adminNav;
   const pageTitle = visibleNav.find((item) => item.id === page)?.label ?? "Overview";
   const platformWorkspace = "__platform__";
   return (
     <DashboardShell
-      title={page === "platform" ? "Blue Collar Tips" : data.company.name}
-      subtitle={page === "platform" ? "Platform workspace" : data.isSuper ? "Super admin" : "Company admin"}
+      title={isPlatform ? "Blue Collar Tips" : data.company.name}
+      subtitle={isPlatform ? "Platform administration" : data.isSuper ? "Super admin" : "Company admin"}
       pageTitle={pageTitle}
       active={page}
       items={visibleNav}
@@ -180,10 +188,10 @@ function AdminDashboard() {
           <span className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground"><Building2 size={14} /> Workspace</span>
           {data.isSuper && data.companies?.length ? (
             <WorkspaceSelect
-              value={page === "platform" ? platformWorkspace : companyId ?? data.company.id}
+              value={isPlatform ? platformWorkspace : companyId ?? data.company.id}
               onChange={(value) => {
                 if (value === platformWorkspace) {
-                  setPage("platform");
+                  setPage("platformOverview");
                   return;
                 }
                 setPage("overview");
@@ -230,7 +238,7 @@ function AdminDashboard() {
           </div>
         )}
 
-        {page === "platform" && data.isSuper && data.companies && data.companies.length > 0 && (
+        {page === "platformOrganizations" && data.isSuper && data.companies && data.companies.length > 0 && (
           <Section title="Organizations">
             <div className="flex flex-wrap items-center gap-3">
               <NewCompanyInline
@@ -340,9 +348,9 @@ function AdminDashboard() {
           <AdminSmsPanel drivers={data.drivers} />
         </Section>}
 
-        {page === "platform" && data.isSuper && (
-          <Section title="Platform overview (super admin)">
-            <PlatformPanel />
+        {isPlatform && data.isSuper && (
+          <Section title={pageTitle}>
+            <PlatformPanel view={page as PlatformPage} />
           </Section>
         )}
     </DashboardShell>
@@ -1047,7 +1055,7 @@ function AdminSmsPanel({ drivers }: { drivers: Data["drivers"] }) {
   );
 }
 
-function PlatformPanel() {
+function PlatformPanel({ view }: { view: PlatformPage }) {
   const get = useServerFn(platformOverview);
   const suspend = useServerFn(suspendTenant);
   const [data, setData] = useState<Awaited<ReturnType<typeof platformOverview>> | null>(null);
@@ -1059,30 +1067,30 @@ function PlatformPanel() {
   if (!data) return <div className="text-sm text-muted-foreground">Loading…</div>;
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-5">
+      {view === "platformOverview" && <div className="grid gap-3 sm:grid-cols-5">
         <Stat label="Gross tips" value={dollars(data.grossTotal)} />
         <Stat label="Platform 10%" value={dollars(data.platformTotal)} />
         <Stat label="Tenants" value={String(data.tenants.length)} />
         <Stat label="Employees" value={String(data.driverCount)} />
         <Stat label="Registered users" value={String(data.userCount)} />
-      </div>
-      <div className="rounded-lg border border-border p-4">
+      </div>}
+      {view === "platformPayments" && <div className="rounded-lg border border-border p-4">
         <h3 className="font-semibold">Employee earnings breakdown</h3>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Employee</th><th>Company</th><th>Tips</th><th>Gross</th><th>Platform share</th></tr></thead><tbody className="divide-y divide-border">
             {data.employees.map((employee) => <tr key={employee.id}><td className="py-2 font-medium">{employee.display_name}</td><td>{Array.isArray(employee.companies) ? employee.companies[0]?.name : employee.companies?.name}</td><td>{employee.count}</td><td>{dollars(employee.gross)}</td><td>{dollars(employee.platformShare)}</td></tr>)}
           </tbody></table>
         </div>
-      </div>
-      <div className="rounded-lg border border-border p-4">
+      </div>}
+      {view === "platformUsers" && <div className="rounded-lg border border-border p-4">
         <h3 className="font-semibold">Registered users</h3>
         <div className="mt-3 overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Name</th><th>Email</th><th>Created</th></tr></thead><tbody className="divide-y divide-border">{data.users.map((user) => <tr key={user.id}><td className="py-2">{user.full_name}</td><td>{user.email}</td><td>{new Date(user.created_at).toLocaleDateString()}</td></tr>)}</tbody></table></div>
-      </div>
-      <div className="text-xs text-muted-foreground">
+      </div>}
+      {view === "platformOverview" && <div className="text-xs text-muted-foreground">
         Integrations · Stripe: <span className={data.integrations.stripe ? "text-emerald-600" : ""}>{data.integrations.stripe ? "connected" : "not connected"}</span>{" "}
         · Twilio: <span className={data.integrations.twilio ? "text-emerald-600" : ""}>{data.integrations.twilio ? "connected" : "not connected"}</span>
-      </div>
-      <div className="overflow-x-auto">
+      </div>}
+      {view === "platformOrganizations" && <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="text-left text-xs uppercase text-muted-foreground">
             <tr><th className="py-2">Tenant</th><th>Status</th><th className="hidden sm:table-cell">Tips</th><th>Gross</th><th className="hidden md:table-cell">Co share</th><th className="hidden md:table-cell">Platform 10%</th><th className="hidden lg:table-cell">Pending co payout</th><th></th></tr>
@@ -1112,7 +1120,7 @@ function PlatformPanel() {
             ))}
           </tbody>
         </table>
-      </div>
+      </div>}
     </div>
   );
 }

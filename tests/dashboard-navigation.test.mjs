@@ -10,9 +10,13 @@ const auth = await readFile(new URL("../src/routes/auth.tsx", import.meta.url), 
 const dashboardRouter = await readFile(new URL("../src/routes/dashboard/index.tsx", import.meta.url), "utf8");
 
 test("admin dashboard exposes task-based sidebar pages", () => {
-  for (const label of ["Overview", "Employees", "Ratings & feedback", "Tips & reconciliation", "Company settings", "Platform"]) {
+  for (const label of ["Overview", "Employees", "Ratings & feedback", "Tips & reconciliation", "Company settings"]) {
     assert.match(admin, new RegExp(`label: "${label.replace(/[&]/g, "\\&")}"`));
   }
+  for (const label of ["Platform overview", "Organizations", "Registered users", "Platform earnings"]) {
+    assert.match(admin, new RegExp(`label: "${label.replace(/[&]/g, "\\&")}"`));
+  }
+  assert.match(admin, /const visibleNav = isPlatform \? platformNav : adminNav/);
   assert.match(admin, /workspace=\{/);
   assert.match(admin, /<DashboardShell/);
 });

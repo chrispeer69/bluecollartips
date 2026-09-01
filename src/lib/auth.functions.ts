@@ -28,9 +28,6 @@ export const signUp = createServerFn({ method: "POST" })
     const passwordHash = await hashPassword(data.password);
     try {
       const rows = await sql()`insert into users (email, password_hash, full_name) values (${data.email.toLowerCase().trim()}, ${passwordHash}, ${data.fullName}) returning id`;
-      if (process.env.BOOTSTRAP_ADMIN_EMAIL?.toLowerCase() === data.email.toLowerCase().trim()) {
-        await sql()`insert into user_roles (user_id, company_id, role) values (${rows[0].id}, null, 'super_admin') on conflict do nothing`;
-      }
       await createSession(rows[0].id);
       return { ok: true };
     } catch (error: any) {
@@ -92,7 +89,7 @@ export const getMyRoleContext = createServerFn({ method: "GET" })
     return { roles: roles ?? [], driver };
   });
 
-// Bootstrap: redeem an invite code OR (if none + no super_admin exists) become super_admin.
+// Redeem an employee/company invite. Super-admin access is provisioned separately.
 export const claimRole = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator((d) => z.object({ inviteCode: z.string().trim().max(64).optional() }).parse(d))

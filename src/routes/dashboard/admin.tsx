@@ -164,10 +164,11 @@ function AdminDashboard() {
 
   const visibleNav = data.isSuper ? adminNav : adminNav.filter((item) => item.id !== "platform");
   const pageTitle = visibleNav.find((item) => item.id === page)?.label ?? "Overview";
+  const platformWorkspace = "__platform__";
   return (
     <DashboardShell
-      title={data.company.name}
-      subtitle={data.isSuper ? "Super admin" : "Company admin"}
+      title={page === "platform" ? "Blue Collar Tips" : data.company.name}
+      subtitle={page === "platform" ? "Platform workspace" : data.isSuper ? "Super admin" : "Company admin"}
       pageTitle={pageTitle}
       active={page}
       items={visibleNav}
@@ -178,9 +179,21 @@ function AdminDashboard() {
           <span className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground"><Building2 size={14} /> Workspace</span>
           {data.isSuper && data.companies?.length ? (
             <WorkspaceSelect
-              value={companyId ?? data.company.id}
-              onChange={(value) => { setCompanyId(value); setLoading(true); load(value); }}
-              options={data.companies.map((c) => ({ value: c.id, label: c.name, detail: "Company workspace" }))}
+              value={page === "platform" ? platformWorkspace : companyId ?? data.company.id}
+              onChange={(value) => {
+                if (value === platformWorkspace) {
+                  setPage("platform");
+                  return;
+                }
+                setPage("overview");
+                setCompanyId(value);
+                setLoading(true);
+                load(value);
+              }}
+              options={[
+                { value: platformWorkspace, label: "Platform administration", detail: "All organizations" },
+                ...data.companies.map((c) => ({ value: c.id, label: c.name, detail: "Company workspace" })),
+              ]}
             />
           ) : <span className="mt-1 block truncate text-sm font-semibold">{data.company.name}</span>}
         </label>

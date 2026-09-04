@@ -307,10 +307,18 @@ function AdminDashboard() {
         {page === "settings" && <Section title="Review syndication links (Google / Yelp / Facebook)">
           <ReviewLinksPanel
             companyId={data.company.id}
+            companySlug={data.company.slug}
+            companyLogo={data.company.logo_url}
             initial={{
               google: data.company.google_review_url ?? "",
               yelp: data.company.yelp_review_url ?? "",
               facebook: data.company.facebook_review_url ?? "",
+              threshold: data.company.positive_rating_threshold ?? 4,
+              action: data.company.positive_submit_action ?? "success_page",
+              redirectUrl: data.company.positive_redirect_url ?? "",
+              webhookEnabled: data.company.review_webhook_enabled ?? false,
+              webhookUrl: data.company.review_webhook_url ?? "",
+              hasWebhookSecret: data.company.has_review_webhook_secret ?? false,
             }}
             onSaved={() => load(companyId)}
           />
@@ -756,7 +764,7 @@ function FeedbackList({ ratings, drivers }: { ratings: Data["ratings"]; drivers:
             <div>
               <span className="text-secondary">{"★".repeat(r.stars)}</span>
               <span className="text-muted-foreground">{"★".repeat(5 - r.stars)}</span>
-              <span className="ml-2 text-xs text-muted-foreground">{String(byId.get(r.driver_id) ?? "")}</span>
+              <span className="ml-2 text-xs text-muted-foreground">{String(byId.get(r.driver_id) ?? "Company")}</span>
               {r.flagged && (
                 <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-xs text-destructive">low rating</span>
               )}
@@ -1369,19 +1377,38 @@ function LocationsPanel({ companyId }: { companyId: string }) {
 
 function ReviewLinksPanel({
   companyId,
+  companySlug,
+  companyLogo,
   initial,
   onSaved,
 }: {
   companyId: string;
-  initial: { google: string; yelp: string; facebook: string };
+  companySlug: string;
+  companyLogo?: string | null;
+  initial: { google: string; yelp: string; facebook: string; threshold: number; action: "success_page" | "redirect"; redirectUrl: string; webhookEnabled: boolean; webhookUrl: string; hasWebhookSecret: boolean };
   onSaved: () => void;
 }) {
   const save = useServerFn(updateReviewLinks);
   const [google, setGoogle] = useState(initial.google);
   const [yelp, setYelp] = useState(initial.yelp);
   const [facebook, setFacebook] = useState(initial.facebook);
+  const [threshold, setThreshold] = useState(initial.threshold);
+  const [action, setAction] = useState(initial.action);
+  const [redirectUrl, setRedirectUrl] = useState(initial.redirectUrl);
+  const [webhookEnabled, setWebhookEnabled] = useState(initial.webhookEnabled);
+  const [webhookUrl, setWebhookUrl] = useState(initial.webhookUrl);
+  const [webhookSecret, setWebhookSecret] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const companyUrl = typeof window !== "undefined" ? `${window.location.origin}/${companySlug}` : `/${companySlug}`;
+  const downloadCompanyQr = () => {
+    const canvas = document.getElementById("admin-company-qr") as HTMLCanvasElement | null;
+    if (!canvas) return;
+    const anchor = document.createElement("a");
+    anchor.href = canvas.toDataURL("image/png");
+    anchor.download = `${companySlug}-review-qr.png`;
+    anchor.click();
+  };
   return (
     <form
       className="grid gap-3 sm:grid-cols-2"
@@ -1395,6 +1422,12 @@ function ReviewLinksPanel({
               googleUrl: google.trim() || null,
               yelpUrl: yelp.trim() || null,
               facebookUrl: facebook.trim() || null,
+              positiveRatingThreshold: threshold,
+              positiveSubmitAction: action,
+              positiveRedirectUrl: redirectUrl.trim() || null,
+              reviewWebhookEnabled: webhookEnabled,
+              reviewWebhookUrl: webhookUrl.trim() || null,
+              reviewWebhookSecret: webhookSecret.trim() || null,
             },
           });
           setMsg("Saved ✓");
@@ -1407,12 +1440,48 @@ function ReviewLinksPanel({
       <Input label="Google review URL" value={google} onChange={setGoogle} placeholder="https://g.page/r/…/review" />
       <Input label="Yelp review URL" value={yelp} onChange={setYelp} placeholder="https://www.yelp.com/writeareview/biz/…" />
       <Input label="Facebook review URL" value={facebook} onChange={setFacebook} placeholder="https://www.facebook.com/…/reviews" />
+      <label className="text-sm">Positive rating threshold
+        <select value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2">
+          <option value={4}>4 stars and above</option><option value={5}>5 stars only</option>
+        </select>
+      </label>
+      <label className="text-sm">After a positive submission
+        <select value={action} onChange={(e) => setAction(e.target.value as "success_page" | "redirect")} className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2">
+          <option value="success_page">Show success page</option><option value="redirect">Redirect to a link</option>
+        </select>
+      </label>
+      {action === "redirect" && <div className="sm:col-span-2"><Input label="Redirect URL" value={redirectUrl} onChange={setRedirectUrl} placeholder="https://g.page/r/…/review" required /></div>}
+      <div className="sm:col-span-2 rounded-lg border border-border p-4">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={webhookEnabled} onChange={(e) => setWebhookEnabled(e.target.checked)} />
+          Send submitted ratings to this company’s webhook
+        </label>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Input label="Submission webhook URL" value={webhookUrl} onChange={setWebhookUrl} placeholder="https://services.leadconnectorhq.com/hooks/…" required={webhookEnabled} />
+          <Input label={`Signing secret${initial.hasWebhookSecret ? " (leave blank to keep current)" : ""}`} value={webhookSecret} onChange={setWebhookSecret} type="password" placeholder={initial.hasWebhookSecret ? "Secret already saved" : "At least 16 characters"} required={webhookEnabled && !initial.hasWebhookSecret} />
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">Requests include X-BlueCollarTips-Signature using HMAC-SHA256. Webhooks remain off until enabled.</p>
+      </div>
+      <div className="sm:col-span-2 rounded-lg border border-border p-4">
+        <div className="font-medium">Default company QR and feedback link</div>
+        <p className="mt-1 text-xs text-muted-foreground">Use this when no employee can be matched.</p>
+        <div className="mt-3 flex flex-wrap items-center gap-4">
+          <span className="rounded-md bg-white p-2"><BrandedQRCode id="admin-company-qr" value={companyUrl} size={112} logoUrl={companyLogo} /></span>
+          <div>
+            <div className="break-all text-xs">{companyUrl}</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button type="button" onClick={() => navigator.clipboard.writeText(companyUrl)} className="rounded-md border border-border px-3 py-2 text-sm">Copy company link</button>
+              <button type="button" onClick={downloadCompanyQr} className="rounded-md border border-border px-3 py-2 text-sm">Download QR (PNG)</button>
+            </div>
+          </div>
+        </div>
+      </div>
       <div className="sm:col-span-2 flex items-center gap-3">
         <button disabled={busy} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">
           {busy ? "Saving…" : "Save review links"}
         </button>
         {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
-        <span className="text-xs text-muted-foreground">Shown to happy customers (5★) after they submit a rating.</span>
+        <span className="text-xs text-muted-foreground">Positive customers follow the action configured above.</span>
       </div>
     </form>
   );

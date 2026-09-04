@@ -6,6 +6,7 @@ import { PRESET_TIPS, TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib/consta
 import { StripeCardPanel } from "@/components/StripeCardPanel";
 
 export const Route = createFileRoute("/$companySlug/d/$driverSlug")({
+  validateSearch: (search: Record<string, unknown>) => ({ t: typeof search.t === "string" ? search.t : undefined }),
   head: ({ params }) => ({
     meta: [
       { title: "Rate your service — Blue Collar Tips" },
@@ -24,6 +25,7 @@ type TipSource = "stripe" | "venmo" | "cashapp" | "zelle" | "paypal" | "cash" | 
 
 function TipPage() {
   const { companySlug, driverSlug } = useParams({ from: "/$companySlug/d/$driverSlug" });
+  const { t: reviewToken } = Route.useSearch();
   const getDriver = useServerFn(getPublicDriver);
   const submit = useServerFn(submitRating);
 
@@ -89,7 +91,7 @@ function TipPage() {
             Your feedback helps {driver.display_name} and the {company.name} team keep raising the
             bar.
           </p>
-          {stars >= 5 && (company.google_review_url || company.yelp_review_url || company.facebook_review_url) && (
+          {stars >= company.positive_rating_threshold && (company.google_review_url || company.yelp_review_url || company.facebook_review_url) && (
             <div className="mt-8 rounded-lg bg-white/10 p-4 text-left">
               <div className="text-center text-sm opacity-90">
                 Loved us? Share a review — it takes 30 seconds and means the world:
@@ -167,7 +169,7 @@ function TipPage() {
     }
     setSubmitting(true);
     try {
-      await submit({
+      const result = await submit({
         data: {
           companySlug,
           driverSlug,
@@ -178,8 +180,13 @@ function TipPage() {
           customerEmail: customerEmail.trim() || null,
           tipCents: finalTipCents > 0 ? finalTipCents : null,
           tipSource: finalTipCents > 0 ? tipSource : null,
+          reviewToken,
         },
       });
+      if (result.redirectUrl) {
+        window.location.assign(result.redirectUrl);
+        return;
+      }
       // If they chose a P2P deep link, open it now.
       if (finalTipCents > 0 && tipSource && tipSource !== "stripe" && tipSource !== "cash") {
         const url = p2pLink(tipSource, driver, finalTipCents);

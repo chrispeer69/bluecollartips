@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { timingSafeEqual } from "crypto";
+import { hashReviewToken, newReviewToken } from "@/lib/review-webhooks.server";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -10,12 +11,15 @@ const CORS = {
 
 const Body = z.object({
   companySlug: z.string().min(1),
+  jobId: z.string().trim().min(1).max(200),
+  ghlContactId: z.string().trim().max(200).optional(),
+  expiresInDays: z.number().int().min(1).max(30).optional(),
   driver: z.object({
     // At least one of these must be provided to match a driver.
     slug: z.string().trim().min(1).optional(),
     email: z.string().trim().email().optional(),
     phone: z.string().trim().min(5).optional(),
-  }),
+  }).optional(),
   contact: z
     .object({
       name: z.string().trim().max(200).optional(),
@@ -66,7 +70,7 @@ export const Route = createFileRoute("/api/public/webhooks/ghl")({
         }
         const parsed = Body.safeParse(payload);
         if (!parsed.success) return json(400, { error: "Invalid payload", details: parsed.error.flatten() });
-        const { companySlug, driver: driverKey, contact } = parsed.data;
+        const { companySlug, jobId, ghlContactId, expiresInDays, driver: driverKey, contact } = parsed.data;
 
         const { db } = await import("@/db/client.server");
 
@@ -77,37 +81,38 @@ export const Route = createFileRoute("/api/public/webhooks/ghl")({
           .maybeSingle();
         if (!company) return json(404, { error: `Company not found: ${companySlug}` });
 
-        let query = db
-          .from("drivers")
-          .select("id, slug, display_name, email, phone, status")
-          .eq("company_id", company.id)
-          .eq("status", "active")
-          .limit(1);
-
-        if (driverKey.slug) {
-          query = query.eq("slug", driverKey.slug);
-        } else if (driverKey.email) {
-          query = query.ilike("email", driverKey.email);
-        } else if (driverKey.phone) {
-          const digits = normalizePhone(driverKey.phone);
-          query = query.ilike("phone", `%${digits}%`);
-        } else {
-          return json(400, { error: "driver.slug, driver.email, or driver.phone required" });
+        let driver = null;
+        if (driverKey) {
+          let query = db.from("drivers").select("id, slug, display_name, email, phone, status")
+            .eq("company_id", company.id).eq("status", "active").limit(1);
+          if (driverKey.slug) query = query.eq("slug", driverKey.slug);
+          else if (driverKey.email) query = query.ilike("email", driverKey.email);
+          else if (driverKey.phone) query = query.ilike("phone", `%${normalizePhone(driverKey.phone)}%`);
+          else return json(400, { error: "driver.slug, driver.email, or driver.phone required" });
+          ({ data: driver } = await query.maybeSingle());
         }
-
-        const { data: driver } = await query.maybeSingle();
-        if (!driver) return json(404, { error: "No matching active driver for company" });
 
         const url = new URL(request.url);
         const origin = `${url.protocol}//${url.host}`;
-        const tipUrl = `${origin}/${company.slug}/d/${driver.slug}`;
+        const token = newReviewToken();
+        const expiresAt = new Date(Date.now() + (expiresInDays ?? 7) * 86_400_000).toISOString();
+        const { error: contextError } = await db.from("review_contexts").upsert({
+          company_id: company.id, driver_id: driver?.id ?? null, token_hash: hashReviewToken(token),
+          external_job_id: jobId, external_contact_id: ghlContactId ?? null, expires_at: expiresAt,
+        }, { onConflict: "company_id,external_job_id" });
+        if (contextError) return json(500, { error: "Could not create review link" });
+        const path = driver ? `/${company.slug}/d/${driver.slug}` : `/${company.slug}`;
+        const tipUrl = `${origin}${path}?t=${encodeURIComponent(token)}`;
 
         return json(200, {
           ok: true,
           tipUrl,
           shortUrl: tipUrl,
           company: { id: company.id, name: company.name, slug: company.slug },
-          driver: { id: driver.id, name: driver.display_name, slug: driver.slug },
+          driver: driver ? { id: driver.id, name: driver.display_name, slug: driver.slug } : null,
+          matchedDriver: Boolean(driver),
+          jobId,
+          expiresAt,
           contact: contact ?? null,
         });
       },

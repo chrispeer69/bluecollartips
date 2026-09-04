@@ -16,6 +16,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
+import { Route as CompanySlugIndexRouteImport } from './routes/$companySlug/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as DashboardAdminRouteImport } from './routes/dashboard/admin'
 import { Route as DashboardDriverRouteImport } from './routes/dashboard/driver'
@@ -63,6 +64,11 @@ const TermsRoute = TermsRouteImport.update({
 const UnsubscribeRoute = UnsubscribeRouteImport.update({
   id: '/unsubscribe',
   path: '/unsubscribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompanySlugIndexRoute = CompanySlugIndexRouteImport.update({
+  id: '/$companySlug/',
+  path: '/$companySlug/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardIndexRoute = DashboardIndexRouteImport.update({
@@ -145,6 +151,7 @@ export interface FileRoutesByFullPath {
   '/guides/fica-tip-credit': typeof GuidesFicaTipCreditRoute
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
+  '/$companySlug/': typeof CompanySlugIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
@@ -167,6 +174,7 @@ export interface FileRoutesByTo {
   '/guides/fica-tip-credit': typeof GuidesFicaTipCreditRoute
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
+  '/$companySlug': typeof CompanySlugIndexRoute
   '/dashboard': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
@@ -190,6 +198,7 @@ export interface FileRoutesById {
   '/guides/fica-tip-credit': typeof GuidesFicaTipCreditRoute
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
+  '/$companySlug/': typeof CompanySlugIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
@@ -214,6 +223,7 @@ export interface FileRouteTypes {
     | '/guides/fica-tip-credit'
     | '/guides/tip-pooling'
     | '/join/$code'
+    | '/$companySlug/'
     | '/dashboard/'
     | '/$companySlug/d/$driverSlug'
     | '/api/auth/google'
@@ -236,6 +246,7 @@ export interface FileRouteTypes {
     | '/guides/fica-tip-credit'
     | '/guides/tip-pooling'
     | '/join/$code'
+    | '/$companySlug'
     | '/dashboard'
     | '/$companySlug/d/$driverSlug'
     | '/api/auth/google'
@@ -258,6 +269,7 @@ export interface FileRouteTypes {
     | '/guides/fica-tip-credit'
     | '/guides/tip-pooling'
     | '/join/$code'
+    | '/$companySlug/'
     | '/dashboard/'
     | '/$companySlug/d/$driverSlug'
     | '/api/auth/google'
@@ -281,6 +293,7 @@ export interface RootRouteChildren {
   GuidesFicaTipCreditRoute: typeof GuidesFicaTipCreditRoute
   GuidesTipPoolingRoute: typeof GuidesTipPoolingRoute
   JoinCodeRoute: typeof JoinCodeRoute
+  CompanySlugIndexRoute: typeof CompanySlugIndexRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   CompanySlugDDriverSlugRoute: typeof CompanySlugDDriverSlugRoute
   ApiAuthGoogleRoute: typeof ApiAuthGoogleRouteWithChildren
@@ -338,6 +351,13 @@ declare module '@tanstack/react-router' {
       path: '/unsubscribe'
       fullPath: '/unsubscribe'
       preLoaderRoute: typeof UnsubscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/$companySlug/': {
+      id: '/$companySlug/'
+      path: '/$companySlug'
+      fullPath: '/$companySlug/'
+      preLoaderRoute: typeof CompanySlugIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard/': {
@@ -460,6 +480,7 @@ const rootRouteChildren: RootRouteChildren = {
   GuidesFicaTipCreditRoute: GuidesFicaTipCreditRoute,
   GuidesTipPoolingRoute: GuidesTipPoolingRoute,
   JoinCodeRoute: JoinCodeRoute,
+  CompanySlugIndexRoute: CompanySlugIndexRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   CompanySlugDDriverSlugRoute: CompanySlugDDriverSlugRoute,
   ApiAuthGoogleRoute: ApiAuthGoogleRouteWithChildren,

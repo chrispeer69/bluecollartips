@@ -1,6 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireAuth } from "@/auth/middleware";
 import { z } from "zod";
+import { encryptWebhookSecret } from "./review-webhooks.server";
+
+const httpUrl = (max: number) => z.string().trim().url().max(max).refine((value) => {
+  const protocol = new URL(value).protocol;
+  return protocol === "https:" || protocol === "http:";
+}, "URL must start with http:// or https://");
 
 async function assertCompanyAdmin(userId: string, companyId: string) {
   const { db } = await import("@/db/client.server");
@@ -20,6 +26,11 @@ export const listLocations = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertCompanyAdmin(context.userId, data.companyId);
     const { db } = await import("@/db/client.server");
+    if (data.reviewWebhookEnabled && !data.reviewWebhookSecret) {
+      const { data: existing } = await db.from("companies")
+        .select("review_webhook_secret_encrypted").eq("id", data.companyId).maybeSingle();
+      if (!existing?.review_webhook_secret_encrypted) throw new Error("Webhook signing secret is required");
+    }
     const { data: rows } = await db
       .from("locations")
       .select("id, name, address, created_at")
@@ -88,21 +99,41 @@ export const updateReviewLinks = createServerFn({ method: "POST" })
   .inputValidator((d) =>
     z.object({
       companyId: z.string().uuid(),
-      googleUrl: z.string().trim().url().max(500).optional().nullable(),
-      yelpUrl: z.string().trim().url().max(500).optional().nullable(),
-      facebookUrl: z.string().trim().url().max(500).optional().nullable(),
+      googleUrl: httpUrl(500).optional().nullable(),
+      yelpUrl: httpUrl(500).optional().nullable(),
+      facebookUrl: httpUrl(500).optional().nullable(),
+      positiveRatingThreshold: z.number().int().min(1).max(5),
+      positiveSubmitAction: z.enum(["success_page", "redirect"]),
+      positiveRedirectUrl: httpUrl(1000).optional().nullable(),
+      reviewWebhookEnabled: z.boolean(),
+      reviewWebhookUrl: httpUrl(1000).optional().nullable(),
+      reviewWebhookSecret: z.string().trim().min(16).max(500).optional().nullable(),
+    }).superRefine((value, ctx) => {
+      if (value.positiveSubmitAction === "redirect" && !value.positiveRedirectUrl) {
+        ctx.addIssue({ code: "custom", path: ["positiveRedirectUrl"], message: "Redirect URL is required" });
+      }
+      if (value.reviewWebhookEnabled && !value.reviewWebhookUrl) {
+        ctx.addIssue({ code: "custom", path: ["reviewWebhookUrl"], message: "Webhook URL is required" });
+      }
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
     await assertCompanyAdmin(context.userId, data.companyId);
     const { db } = await import("@/db/client.server");
+    const update: Record<string, unknown> = {
+      google_review_url: data.googleUrl ?? null,
+      yelp_review_url: data.yelpUrl ?? null,
+      facebook_review_url: data.facebookUrl ?? null,
+      positive_rating_threshold: data.positiveRatingThreshold,
+      positive_submit_action: data.positiveSubmitAction,
+      positive_redirect_url: data.positiveRedirectUrl ?? null,
+      review_webhook_enabled: data.reviewWebhookEnabled,
+      review_webhook_url: data.reviewWebhookUrl ?? null,
+    };
+    if (data.reviewWebhookSecret) update.review_webhook_secret_encrypted = encryptWebhookSecret(data.reviewWebhookSecret);
     const { error } = await db
       .from("companies")
-      .update({
-        google_review_url: data.googleUrl ?? null,
-        yelp_review_url: data.yelpUrl ?? null,
-        facebook_review_url: data.facebookUrl ?? null,
-      })
+      .update(update)
       .eq("id", data.companyId);
     if (error) throw error;
     return { ok: true };

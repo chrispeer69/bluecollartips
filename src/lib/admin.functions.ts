@@ -73,7 +73,12 @@ export const getAdminDashboard = createServerFn({ method: "POST" })
         .order("created_at", { ascending: false }),
       isSuper && adminCompanyIds.length ? db.from("companies").select("id, name, slug").in("id", adminCompanyIds) : Promise.resolve({ data: null }),
     ]);
-    return { isSuper, company, drivers: drivers ?? [], ratings: ratings ?? [], tips: tips ?? [], flags: flags ?? [], companies: companies ?? null };
+    const safeCompany = company ? {
+      ...company,
+      has_review_webhook_secret: Boolean(company.review_webhook_secret_encrypted),
+      review_webhook_secret_encrypted: undefined,
+    } : null;
+    return { isSuper, company: safeCompany, drivers: drivers ?? [], ratings: ratings ?? [], tips: tips ?? [], flags: flags ?? [], companies: companies ?? null };
   });
 
 export const createDriver = createServerFn({ method: "POST" })

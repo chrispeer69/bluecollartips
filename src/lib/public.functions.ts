@@ -5,8 +5,8 @@ import { createHash } from "crypto";
 import { getRequestHeader } from "@tanstack/react-start/server";
 import { deliverReviewWebhook, hashReviewToken } from "./review-webhooks.server";
 
-const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const RATE_MAX = 5;
+const RATE_WINDOW_MS = 5 * 60 * 1000;
+const RATE_MAX = 3;
 
 function currentIpHash(): string {
   const fwd = getRequestHeader("x-forwarded-for") || getRequestHeader("cf-connecting-ip") || "unknown";
@@ -140,7 +140,7 @@ export const submitRating = createServerFn({ method: "POST" })
     if (!driver || driver.status !== "active") throw new Error("Driver not available");
     const reviewContext = await resolveReviewContext(db, data.reviewToken, company.id, driver.id);
 
-    // Rate limit: max 5 submissions / IP / hour for this driver
+    // Rate limit: max 3 submissions / IP / 5 minutes for this driver page.
     await enforceRateLimit(driver.id);
 
     const { data: rating, error: rErr } = await db

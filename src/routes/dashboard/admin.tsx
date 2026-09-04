@@ -318,7 +318,6 @@ function AdminDashboard() {
               redirectUrl: data.company.positive_redirect_url ?? "",
               webhookEnabled: data.company.review_webhook_enabled ?? false,
               webhookUrl: data.company.review_webhook_url ?? "",
-              hasWebhookSecret: data.company.has_review_webhook_secret ?? false,
             }}
             onSaved={() => load(companyId)}
           />
@@ -1385,7 +1384,7 @@ function ReviewLinksPanel({
   companyId: string;
   companySlug: string;
   companyLogo?: string | null;
-  initial: { google: string; yelp: string; facebook: string; threshold: number; action: "success_page" | "redirect"; redirectUrl: string; webhookEnabled: boolean; webhookUrl: string; hasWebhookSecret: boolean };
+  initial: { google: string; yelp: string; facebook: string; threshold: number; action: "success_page" | "redirect"; redirectUrl: string; webhookEnabled: boolean; webhookUrl: string };
   onSaved: () => void;
 }) {
   const save = useServerFn(updateReviewLinks);
@@ -1397,7 +1396,6 @@ function ReviewLinksPanel({
   const [redirectUrl, setRedirectUrl] = useState(initial.redirectUrl);
   const [webhookEnabled, setWebhookEnabled] = useState(initial.webhookEnabled);
   const [webhookUrl, setWebhookUrl] = useState(initial.webhookUrl);
-  const [webhookSecret, setWebhookSecret] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const companyUrl = typeof window !== "undefined" ? `${window.location.origin}/${companySlug}` : `/${companySlug}`;
@@ -1427,7 +1425,6 @@ function ReviewLinksPanel({
               positiveRedirectUrl: redirectUrl.trim() || null,
               reviewWebhookEnabled: webhookEnabled,
               reviewWebhookUrl: webhookUrl.trim() || null,
-              reviewWebhookSecret: webhookSecret.trim() || null,
             },
           });
           setMsg("Saved ✓");
@@ -1458,9 +1455,8 @@ function ReviewLinksPanel({
         </label>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Input label="Submission webhook URL" value={webhookUrl} onChange={setWebhookUrl} placeholder="https://services.leadconnectorhq.com/hooks/…" required={webhookEnabled} />
-          <Input label={`Signing secret${initial.hasWebhookSecret ? " (leave blank to keep current)" : ""}`} value={webhookSecret} onChange={setWebhookSecret} type="password" placeholder={initial.hasWebhookSecret ? "Secret already saved" : "At least 16 characters"} required={webhookEnabled && !initial.hasWebhookSecret} />
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">Requests include X-BlueCollarTips-Signature using HMAC-SHA256. Webhooks remain off until enabled.</p>
+        <p className="mt-2 text-xs text-muted-foreground">Requests include an HMAC-SHA256 signature managed by the server environment. Webhooks remain off until enabled.</p>
       </div>
       <div className="sm:col-span-2 rounded-lg border border-border p-4">
         <div className="font-medium">Default company QR and feedback link</div>

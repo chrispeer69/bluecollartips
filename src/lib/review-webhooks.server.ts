@@ -1,24 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from "node:crypto";
-
-function encryptionKey() {
-  const raw = process.env.ENCRYPTION_KEY;
-  if (!raw) throw new Error("ENCRYPTION_KEY is required");
-  return createHash("sha256").update(raw).digest();
-}
-
-export function encryptWebhookSecret(value: string) {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", encryptionKey(), iv);
-  const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
-  return [iv, cipher.getAuthTag(), encrypted].map((part) => part.toString("base64url")).join(".");
-}
-
-export function decryptWebhookSecret(value: string) {
-  const [iv, tag, encrypted] = value.split(".").map((part) => Buffer.from(part, "base64url"));
-  const decipher = createDecipheriv("aes-256-gcm", encryptionKey(), iv);
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
-}
+import { createHash, createHmac, randomBytes } from "node:crypto";
 
 export function hashReviewToken(value: string) {
   return createHash("sha256").update(value).digest("hex");
@@ -29,11 +9,12 @@ export function newReviewToken() {
 }
 
 export async function deliverReviewWebhook(db: any, company: any, payload: Record<string, unknown>) {
-  if (!company.review_webhook_enabled || !company.review_webhook_url || !company.review_webhook_secret_encrypted) return;
+  const signingSecret = process.env.GHL_WEBHOOK_SECRET;
+  if (!company.review_webhook_enabled || !company.review_webhook_url || !signingSecret) return;
   let deliveryId: string | null = null;
   try {
     const body = JSON.stringify(payload);
-    const signature = createHmac("sha256", decryptWebhookSecret(company.review_webhook_secret_encrypted)).update(body).digest("hex");
+    const signature = createHmac("sha256", signingSecret).update(body).digest("hex");
     const { data: delivery, error: deliveryError } = await db.from("review_webhook_deliveries").insert({
       company_id: company.id, rating_id: payload.ratingId, destination_url: company.review_webhook_url,
     }).select("id").single();

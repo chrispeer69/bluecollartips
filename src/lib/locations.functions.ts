@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireAuth } from "@/auth/middleware";
 import { z } from "zod";
-import { encryptWebhookSecret } from "./review-webhooks.server";
 
 const httpUrl = (max: number) => z.string().trim().url().max(max).refine((value) => {
   const protocol = new URL(value).protocol;
@@ -26,11 +25,6 @@ export const listLocations = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertCompanyAdmin(context.userId, data.companyId);
     const { db } = await import("@/db/client.server");
-    if (data.reviewWebhookEnabled && !data.reviewWebhookSecret) {
-      const { data: existing } = await db.from("companies")
-        .select("review_webhook_secret_encrypted").eq("id", data.companyId).maybeSingle();
-      if (!existing?.review_webhook_secret_encrypted) throw new Error("Webhook signing secret is required");
-    }
     const { data: rows } = await db
       .from("locations")
       .select("id, name, address, created_at")
@@ -107,7 +101,6 @@ export const updateReviewLinks = createServerFn({ method: "POST" })
       positiveRedirectUrl: httpUrl(1000).optional().nullable(),
       reviewWebhookEnabled: z.boolean(),
       reviewWebhookUrl: httpUrl(1000).optional().nullable(),
-      reviewWebhookSecret: z.string().trim().min(16).max(500).optional().nullable(),
     }).superRefine((value, ctx) => {
       if (value.positiveSubmitAction === "redirect" && !value.positiveRedirectUrl) {
         ctx.addIssue({ code: "custom", path: ["positiveRedirectUrl"], message: "Redirect URL is required" });
@@ -130,7 +123,6 @@ export const updateReviewLinks = createServerFn({ method: "POST" })
       review_webhook_enabled: data.reviewWebhookEnabled,
       review_webhook_url: data.reviewWebhookUrl ?? null,
     };
-    if (data.reviewWebhookSecret) update.review_webhook_secret_encrypted = encryptWebhookSecret(data.reviewWebhookSecret);
     const { error } = await db
       .from("companies")
       .update(update)

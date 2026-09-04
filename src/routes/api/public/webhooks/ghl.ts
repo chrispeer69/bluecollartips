@@ -17,6 +17,7 @@ const Body = z.object({
   driver: z.object({
     // At least one of these must be provided to match a driver.
     slug: z.string().trim().min(1).optional(),
+    name: z.string().trim().min(1).max(120).optional(),
     email: z.string().trim().email().optional(),
     phone: z.string().trim().min(5).optional(),
   }).optional(),
@@ -86,9 +87,10 @@ export const Route = createFileRoute("/api/public/webhooks/ghl")({
           let query = db.from("drivers").select("id, slug, display_name, email, phone, status")
             .eq("company_id", company.id).eq("status", "active").limit(1);
           if (driverKey.slug) query = query.eq("slug", driverKey.slug);
+          else if (driverKey.name) query = query.ilike("display_name", driverKey.name);
           else if (driverKey.email) query = query.ilike("email", driverKey.email);
           else if (driverKey.phone) query = query.ilike("phone", `%${normalizePhone(driverKey.phone)}%`);
-          else return json(400, { error: "driver.slug, driver.email, or driver.phone required" });
+          else return json(400, { error: "driver.slug, driver.name, driver.email, or driver.phone required" });
           ({ data: driver } = await query.maybeSingle());
         }
 

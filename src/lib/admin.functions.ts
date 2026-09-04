@@ -11,6 +11,12 @@ function generateInviteCode() {
   return randomBytes(6).toString("hex").toUpperCase();
 }
 
+async function uniqueDriverSlug(db: any, companyId: string, displayName: string) {
+  const base = slugify(displayName) || "employee";
+  const { data: existing } = await db.from("drivers").select("id").eq("company_id", companyId).eq("slug", base).maybeSingle();
+  return existing ? `${base}-${randomBytes(2).toString("hex")}` : base;
+}
+
 async function assertCompanyAdmin(userId: string, companyId: string) {
   const { db } = await import("@/db/client.server");
   const { data } = await db
@@ -97,8 +103,7 @@ export const createDriver = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertCompanyAdmin(context.userId, data.companyId);
     const { db } = await import("@/db/client.server");
-    const baseSlug = slugify(data.displayName);
-    const slug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
+    const slug = await uniqueDriverSlug(db, data.companyId, data.displayName);
     const { data: driver, error } = await db
       .from("drivers")
       .insert({

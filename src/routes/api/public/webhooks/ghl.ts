@@ -97,7 +97,7 @@ export const Route = createFileRoute("/api/public/webhooks/ghl")({
         const url = new URL(request.url);
         const origin = `${url.protocol}//${url.host}`;
         const token = newReviewToken();
-        const expiresAt = new Date(Date.now() + (expiresInDays ?? 7) * 86_400_000).toISOString();
+        const expiresAt = new Date(Date.now() + (expiresInDays ?? 10) * 86_400_000).toISOString();
         const { error: contextError } = await db.from("review_contexts").upsert({
           company_id: company.id, driver_id: driver?.id ?? null, token_hash: hashReviewToken(token),
           external_job_id: jobId, external_contact_id: ghlContactId ?? null, expires_at: expiresAt,

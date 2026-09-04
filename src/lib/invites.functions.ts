@@ -71,10 +71,15 @@ export const createInvite = createServerFn({ method: "POST" })
         .maybeSingle();
       if (!existingDriver) {
         const base = slugify(data.recipientName || data.email.split("@")[0]) || "employee";
+        const { data: slugOwner } = await db.from("drivers")
+          .select("id")
+          .eq("company_id", data.companyId)
+          .eq("slug", base)
+          .maybeSingle();
         await db.from("drivers").insert({
           company_id: data.companyId,
           display_name: data.recipientName || data.email.split("@")[0],
-          slug: `${base}-${randomBytes(2).toString("hex")}`,
+          slug: slugOwner ? `${base}-${randomBytes(2).toString("hex")}` : base,
           email: data.email,
           phone: data.phone ?? null,
           status: "pending",
@@ -231,7 +236,8 @@ export const reviewJoinRequest = createServerFn({ method: "POST" })
         const existing = await tx`select id from drivers where company_id = ${request.company_id} and user_id = ${request.user_id} limit 1`;
         if (!existing.length) {
           const base = slugify(request.full_name || request.email.split("@")[0]) || "employee";
-          const slug = `${base}-${randomBytes(2).toString("hex")}`;
+          const slugOwner = await tx`select id from drivers where company_id = ${request.company_id} and slug = ${base} limit 1`;
+          const slug = slugOwner.length ? `${base}-${randomBytes(2).toString("hex")}` : base;
           await tx`
             insert into drivers (company_id, user_id, display_name, slug, email, status)
             values (${request.company_id}, ${request.user_id}, ${request.full_name || request.email}, ${slug}, ${request.email}, 'active')

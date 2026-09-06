@@ -56,6 +56,11 @@ function AuthPage() {
   }
 
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("sso") === "roadside") void signInWithRoadside();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const inv = params.get("invite");
@@ -91,6 +96,16 @@ function AuthPage() {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Sign in succeeded but routing failed");
     }
+  }
+
+  // Roadside SSO: Supabase's Keycloak connector pointed at the Roadside issuer.
+  async function signInWithRoadside() {
+    setError(null);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "keycloak",
+      options: { scopes: "openid email profile", redirectTo: `${window.location.origin}/auth` },
+    });
+    if (error) setError(error.message);
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -170,6 +185,15 @@ function AuthPage() {
             </button>
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={signInWithRoadside}
+          className="mt-6 w-full rounded-md border px-4 py-2 text-sm font-semibold"
+          style={{ background: "#dfeaf8", color: "#0f2f5f", borderColor: "#b9cfec" }}
+        >
+          Sign in with Roadside SSO
+        </button>
 
         <form className="mt-6 space-y-4" onSubmit={onSubmit}>
           {mode === "signup" && (

@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuth } from "@/auth/middleware";
 import { z } from "zod";
 
 /**
@@ -8,7 +8,7 @@ import { z } from "zod";
  * Access: driver themself, super_admin, or company_admin of the driver's company.
  */
 export const getPayoutStatement = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z.object({
       driverId: z.string().uuid(),
@@ -17,8 +17,8 @@ export const getPayoutStatement = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: driver } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { data: driver } = await db
       .from("drivers")
       .select("id, display_name, user_id, company_id, companies(name, slug)")
       .eq("id", data.driverId)
@@ -26,7 +26,7 @@ export const getPayoutStatement = createServerFn({ method: "POST" })
     if (!driver) throw new Error("Not found");
     // Authorization
     if (driver.user_id !== context.userId) {
-      const { data: roles } = await supabaseAdmin
+      const { data: roles } = await db
         .from("user_roles")
         .select("role, company_id")
         .eq("user_id", context.userId);
@@ -35,7 +35,7 @@ export const getPayoutStatement = createServerFn({ method: "POST" })
       if (!isSuper && !isAdmin) throw new Error("Forbidden");
     }
 
-    let q = supabaseAdmin
+    let q = db
       .from("tips")
       .select("id, amount_cents, driver_amount_cents, company_amount_cents, platform_amount_cents, source, verified, customer_name, note, created_at")
       .eq("driver_id", data.driverId)

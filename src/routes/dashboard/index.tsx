@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
+import { auth } from "@/auth/client";
 import { getMyRoleContext } from "@/lib/auth.functions";
+import { JoinWorkspacePanel } from "@/components/JoinWorkspacePanel";
 
 export const Route = createFileRoute("/dashboard/")({
   head: () => ({
@@ -25,7 +26,7 @@ function DashboardRouter() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.auth.getSession();
+      const { data } = await auth.getSession();
       if (!data.session) {
         navigate({ to: "/auth" });
         return;
@@ -40,7 +41,9 @@ function DashboardRouter() {
           navigate({ to: "/dashboard/driver" });
         } else {
           setStatus(
-            "Your account isn't linked to a company yet. Ask your company admin to send you an invite code, then sign out and sign up with it.",
+            ctx.pendingJoinCount
+              ? "Your request was sent and is waiting for a company admin to approve it."
+              : "Your account isn't linked to a company yet. Enter the invite code from your company admin below.",
           );
         }
       } catch (e: unknown) {
@@ -51,12 +54,13 @@ function DashboardRouter() {
 
   return (
     <div className="grid min-h-screen place-items-center bg-background px-6 text-center">
-      <div className="max-w-md">
+      <div className="w-full max-w-xl">
         <p className="text-sm text-muted-foreground">{status}</p>
+        {!status.startsWith("Checking") && !status.includes("waiting for") && <div className="mt-5 text-left"><JoinWorkspacePanel /></div>}
         <div className="mt-6 flex justify-center gap-3">
           <button
             onClick={async () => {
-              await supabase.auth.signOut();
+              await auth.signOut();
               navigate({ to: "/auth" });
             }}
             className="rounded-md border border-border px-4 py-2 text-sm"

@@ -1,11 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuth } from "@/auth/middleware";
 import { z } from "zod";
 
 async function canAccessDriver(userId: string, driver: { user_id: string | null; company_id: string }) {
   if (driver.user_id === userId) return true;
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: roles } = await supabaseAdmin
+  const { db } = await import("@/db/client.server");
+  const { data: roles } = await db
     .from("user_roles")
     .select("role, company_id")
     .eq("user_id", userId);
@@ -15,11 +15,11 @@ async function canAccessDriver(userId: string, driver: { user_id: string | null;
 }
 
 export const listUnverifiedTips = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) => z.object({ driverId: z.string().uuid().optional() }).optional().parse(d))
   .handler(async ({ data: input, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    let query = supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    let query = db
       .from("drivers")
       .select("id, user_id, company_id")
       .limit(1);
@@ -27,7 +27,7 @@ export const listUnverifiedTips = createServerFn({ method: "GET" })
     const { data: driver } = await query.maybeSingle();
     if (!driver) return { items: [] };
     if (!(await canAccessDriver(context.userId, driver))) return { items: [] };
-    const { data } = await supabaseAdmin
+    const { data } = await db
       .from("tips")
       .select("id, amount_cents, source, customer_name, created_at, note")
       .eq("driver_id", driver.id)
@@ -40,27 +40,27 @@ export const listUnverifiedTips = createServerFn({ method: "GET" })
   });
 
 export const confirmCashTip = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) => z.object({ tipId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: tip } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { data: tip } = await db
       .from("tips")
       .select("id, driver_id, amount_cents, company_id")
       .eq("id", data.tipId)
       .maybeSingle();
     if (!tip) throw new Error("Not found");
-    const { data: driver } = await supabaseAdmin
+    const { data: driver } = await db
       .from("drivers")
       .select("user_id, company_id")
       .eq("id", tip.driver_id)
       .maybeSingle();
     if (!driver || !(await canAccessDriver(context.userId, driver))) throw new Error("Forbidden");
-    await supabaseAdmin
+    await db
       .from("tips")
       .update({ verified: true, verified_at: new Date().toISOString() })
       .eq("id", tip.id);
-    await supabaseAdmin.from("cash_tip_verifications").insert({
+    await db.from("cash_tip_verifications").insert({
       company_id: tip.company_id,
       tip_id: tip.id,
       driver_id: tip.driver_id,
@@ -72,29 +72,29 @@ export const confirmCashTip = createServerFn({ method: "POST" })
   });
 
 export const disputeCashTip = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) =>
     z.object({ tipId: z.string().uuid(), reason: z.string().trim().max(500).optional() }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: tip } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { data: tip } = await db
       .from("tips")
       .select("id, driver_id, company_id")
       .eq("id", data.tipId)
       .maybeSingle();
     if (!tip) throw new Error("Not found");
-    const { data: driver } = await supabaseAdmin
+    const { data: driver } = await db
       .from("drivers")
       .select("user_id, company_id")
       .eq("id", tip.driver_id)
       .maybeSingle();
     if (!driver || !(await canAccessDriver(context.userId, driver))) throw new Error("Forbidden");
-    await supabaseAdmin
+    await db
       .from("tips")
       .update({ disputed: true, disputed_at: new Date().toISOString() })
       .eq("id", tip.id);
-    await supabaseAdmin.from("discrepancy_flags").insert({
+    await db.from("discrepancy_flags").insert({
       company_id: tip.company_id,
       driver_id: tip.driver_id,
       tip_id: tip.id,
@@ -107,11 +107,11 @@ export const disputeCashTip = createServerFn({ method: "POST" })
 
 /** Admin view: drivers with > 20% unverified share in last 30 days, plus per-driver counts. */
 export const reconciliationOverview = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: roles } = await supabaseAdmin
+    const { db } = await import("@/db/client.server");
+    const { data: roles } = await db
       .from("user_roles")
       .select("role, company_id")
       .eq("user_id", context.userId);
@@ -121,7 +121,7 @@ export const reconciliationOverview = createServerFn({ method: "POST" })
     if (!ok) throw new Error("Forbidden");
 
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: tips } = await supabaseAdmin
+    const { data: tips } = await db
       .from("tips")
       .select("driver_id, source, verified, amount_cents, created_at")
       .eq("company_id", data.companyId)

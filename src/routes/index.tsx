@@ -14,9 +14,9 @@ export const Route = createFileRoute("/")({
         property: "og:description",
         content: "The feedback loop that turns good work into more tips — for any field service crew.",
       },
-      { property: "og:url", content: "https://roadsidetips.lovable.app/" },
+      { property: "og:url", content: "https://bluecollartips.app/" },
     ],
-    links: [{ rel: "canonical", href: "https://roadsidetips.lovable.app/" }],
+    links: [{ rel: "canonical", href: "https://bluecollartips.app/" }],
   }),
   component: Index,
 });

@@ -16,10 +16,10 @@ export const Route = createFileRoute("/guides/tip-pooling")({
           "A practical guide to automated tip pooling and the 80/10/10 split for towing and field service companies.",
       },
       { property: "og:type", content: "article" },
-      { property: "og:url", content: "https://roadsidetips.lovable.app/guides/tip-pooling" },
+      { property: "og:url", content: "https://bluecollartips.app/guides/tip-pooling" },
     ],
     links: [
-      { rel: "canonical", href: "https://roadsidetips.lovable.app/guides/tip-pooling" },
+      { rel: "canonical", href: "https://bluecollartips.app/guides/tip-pooling" },
     ],
     scripts: [
       {
@@ -32,7 +32,7 @@ export const Route = createFileRoute("/guides/tip-pooling")({
             "How automated tip pooling and the 80/10/10 split work for towing and field service companies.",
           author: { "@type": "Organization", name: "Blue Collar Tips" },
           publisher: { "@type": "Organization", name: "Blue Collar Tips" },
-          mainEntityOfPage: "https://roadsidetips.lovable.app/guides/tip-pooling",
+          mainEntityOfPage: "https://bluecollartips.app/guides/tip-pooling",
         }),
       },
     ],

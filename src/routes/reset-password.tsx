@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { resetPassword } from "@/lib/auth.functions";
 
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
@@ -22,22 +23,14 @@ export const Route = createFileRoute("/reset-password")({
 
 function ResetPasswordPage() {
   const navigate = useNavigate();
-  const [ready, setReady] = useState(false);
+  const reset = useServerFn(resetPassword);
+  const token = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("token") : null;
+  const ready = Boolean(token);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
-
-  useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") setReady(true);
-    });
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -52,10 +45,10 @@ function ResetPasswordPage() {
     }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw error;
+      if (!token) throw new Error("Missing password reset token");
+      await reset({ data: { token, password } });
       setDone(true);
-      setTimeout(() => navigate({ to: "/dashboard" }), 1500);
+      setTimeout(() => navigate({ to: "/auth" }), 1500);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not update password");
     } finally {

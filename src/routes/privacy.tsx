@@ -12,10 +12,10 @@ export const Route = createFileRoute("/privacy")({
       { property: "og:title", content: "Privacy Policy — Blue Collar Tips" },
       { property: "og:description", content: "How we handle customer, employee, and company data." },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://roadsidetips.lovable.app/privacy" },
+      { property: "og:url", content: "https://bluecollartips.app/privacy" },
       { name: "twitter:card", content: "summary" },
     ],
-    links: [{ rel: "canonical", href: "https://roadsidetips.lovable.app/privacy" }],
+    links: [{ rel: "canonical", href: "https://bluecollartips.app/privacy" }],
   }),
   component: PrivacyPage,
 });

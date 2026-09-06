@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
+import { auth } from "@/auth/client";
 import { claimRole, getMyRoleContext, registerCompany } from "@/lib/auth.functions";
 
 export const Route = createFileRoute("/auth")({
@@ -11,9 +11,9 @@ export const Route = createFileRoute("/auth")({
       { name: "description", content: "Sign in to Blue Collar Tips to manage employee tips, customer ratings, team invites, and company reputation tools." },
       { property: "og:title", content: "Sign in — Blue Collar Tips" },
       { property: "og:description", content: "Sign in or create your Blue Collar Tips account to manage tips, ratings, and your team." },
-      { property: "og:url", content: "https://roadsidetips.lovable.app/auth" },
+      { property: "og:url", content: "https://bluecollartips.app/auth" },
     ],
-    links: [{ rel: "canonical", href: "https://roadsidetips.lovable.app/auth" }],
+    links: [{ rel: "canonical", href: "https://bluecollartips.app/auth" }],
   }),
   component: AuthPage,
 });
@@ -43,7 +43,7 @@ function AuthPage() {
     }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      const { error } = await auth.resetPasswordForEmail(email.trim(), {
         redirectTo: `${window.location.origin}/reset-password`,
       });
       if (error) throw error;
@@ -56,26 +56,48 @@ function AuthPage() {
   }
 
   useEffect(() => {
+    let inviteFromUrl: string | null = null;
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const inv = params.get("invite");
+      inviteFromUrl = inv;
       const em = params.get("email");
+      const oauthError = params.get("oauthError");
       if (inv) {
         setInviteCode(inv.toUpperCase());
         setMode("signup");
         setSignupType("employee");
       }
       if (em) setEmail(em);
+      if (oauthError) setError(oauthError);
     }
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/dashboard" });
+    auth.getSession().then(async ({ data }) => {
+      if (!data.session) return;
+      if (inviteFromUrl) {
+        try {
+          await claim({ data: { inviteCode: inviteFromUrl } });
+        } catch (e: unknown) {
+          setError(e instanceof Error ? e.message : "Could not accept invite");
+          return;
+        }
+      }
+      navigate({ to: "/dashboard" });
     });
-  }, [navigate]);
+  }, [claim, navigate]);
 
   async function routeAfterAuth() {
     try {
       const ctx = await getRole();
-      if (!ctx.roles.length && !ctx.driver) {
+      // An existing account may redeem another company's invite to gain a
+      // second, separately scoped employee workspace.
+      if (inviteCode.trim()) {
+        try {
+          await claim({ data: { inviteCode: inviteCode.trim() } });
+        } catch (e: unknown) {
+          setError(e instanceof Error ? e.message : "Could not accept invite");
+          return;
+        }
+      } else if (!ctx.roles.length && !ctx.driver) {
         try {
           if (mode === "signup" && signupType === "company") {
             await register({ data: { companyName: companyName.trim() } });
@@ -106,7 +128,7 @@ function AuthPage() {
         if (signupType === "employee" && !inviteCode.trim()) {
           throw new Error("Enter the invite code your employer sent you.");
         }
-        const { error } = await supabase.auth.signUp({
+        const { error } = await auth.signUp({
           email,
           password,
           options: {
@@ -116,7 +138,7 @@ function AuthPage() {
         });
         if (error) throw error;
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
       await routeAfterAuth();
@@ -125,6 +147,31 @@ function AuthPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function continueWithGoogle() {
+    setError(null);
+    const params = new URLSearchParams();
+    if (mode === "signup") {
+      if (signupType === "company") {
+        if (companyName.trim().length < 2) {
+          setError("Enter your company name before continuing with Google.");
+          return;
+        }
+        params.set("intent", "company");
+        params.set("companyName", companyName.trim());
+      } else {
+        if (!inviteCode.trim()) {
+          setError("Enter your employee invite code before continuing with Google.");
+          return;
+        }
+        params.set("intent", "employee");
+        params.set("inviteCode", inviteCode.trim());
+      }
+    } else {
+      params.set("intent", "signin");
+    }
+    window.location.assign(`/api/auth/google?${params.toString()}`);
   }
 
   return (
@@ -141,7 +188,7 @@ function AuthPage() {
             ? "Welcome back."
             : signupType === "company"
               ? "Register your company to start collecting tips and ratings."
-              : "Joining a team? Enter the invite code your employer sent you."}
+            : "Joining a team? Enter the 5-digit company code or the invitation code emailed to you."}
         </p>
 
         {mode === "signup" && (
@@ -171,7 +218,25 @@ function AuthPage() {
           </div>
         )}
 
-        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+        <button
+          type="button"
+          onClick={continueWithGoogle}
+          className="mt-6 flex w-full items-center justify-center gap-3 rounded-md border border-input bg-background px-4 py-2.5 text-sm font-medium hover:bg-muted"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+            <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.06H12v3.9h5.38a4.6 4.6 0 0 1-2 3.02v2.53h3.24c1.9-1.75 2.98-4.33 2.98-7.39Z" />
+            <path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.38l-3.24-2.53c-.9.6-2.05.96-3.38.96-2.61 0-4.82-1.77-5.61-4.14H3.04v2.61A10 10 0 0 0 12 22Z" />
+            <path fill="#FBBC05" d="M6.39 13.91A6 6 0 0 1 6.08 12c0-.66.11-1.3.31-1.91V7.48H3.04A10 10 0 0 0 2 12c0 1.61.38 3.14 1.04 4.52l3.35-2.61Z" />
+            <path fill="#EA4335" d="M12 5.95c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.64 9.64 0 0 0 12 2a10 10 0 0 0-8.96 5.48l3.35 2.61C7.18 7.72 9.39 5.95 12 5.95Z" />
+          </svg>
+          {mode === "signin" ? "Continue with Google" : "Create account with Google"}
+        </button>
+
+        <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
+          <div className="h-px flex-1 bg-border" />or continue with email<div className="h-px flex-1 bg-border" />
+        </div>
+
+        <form className="space-y-4" onSubmit={onSubmit}>
           {mode === "signup" && (
             <div>
               <label className="block text-sm font-medium">Full name</label>
@@ -223,17 +288,17 @@ function AuthPage() {
           </div>
           {mode === "signup" && signupType === "employee" && (
             <div>
-              <label className="block text-sm font-medium">Invite code</label>
+              <label className="block text-sm font-medium">Company or invitation code</label>
               <input
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm uppercase"
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                 maxLength={32}
-                placeholder="ABCD1234"
+                placeholder="12345"
                 required
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Ask your company admin for this code, or use the invite link they emailed you.
+                A company code requires admin approval. An invitation sent to this exact email is accepted automatically.
               </p>
             </div>
           )}

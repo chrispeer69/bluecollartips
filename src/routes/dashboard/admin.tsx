@@ -1,8 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { QRCodeCanvas } from "qrcode.react";
-import { supabase } from "@/integrations/supabase/client";
+import { auth } from "@/auth/client";
 import {
   createCompany,
   createDriver,
@@ -15,12 +14,15 @@ import {
 } from "@/lib/admin.functions";
 import { dollars } from "@/lib/constants";
 import { Section, Stat, TopBar } from "./driver";
-import { createInvite, listInvites, revokeInvite } from "@/lib/invites.functions";
+import { createInvite, listInvites, revokeInvite, listJoinRequests, reviewJoinRequest } from "@/lib/invites.functions";
 import { reconciliationOverview } from "@/lib/reconciliation.functions";
 import { platformOverview, suspendTenant } from "@/lib/platform.functions";
 import { sendTipLinkSms } from "@/lib/sms.functions";
 import { listTipDisputes, flagTipDispute, clearTipDispute, refundTip } from "@/lib/disputes.functions";
 import { listLocations, createLocation, deleteLocation, setDriverLocation, updateReviewLinks } from "@/lib/locations.functions";
+import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Building2, CreditCard, LayoutDashboard, MessageSquareText, Settings, ShieldCheck, Users } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/admin")({
   head: () => ({
@@ -36,7 +38,23 @@ export const Route = createFileRoute("/dashboard/admin")({
   component: AdminDashboard,
 });
 
-type Data = Awaited<ReturnType<typeof getAdminDashboard>>;
+type Data = any;
+type CompanyPage = "overview" | "employees" | "feedback" | "payments" | "settings";
+type PlatformPage = "platformOverview" | "platformOrganizations" | "platformUsers" | "platformPayments";
+type AdminPage = CompanyPage | PlatformPage;
+const adminNav: DashboardNavItem<AdminPage>[] = [
+  { id: "overview", label: "Overview", icon: LayoutDashboard, group: "Workspace" },
+  { id: "employees", label: "Employees", icon: Users, group: "Manage" },
+  { id: "feedback", label: "Ratings & feedback", icon: MessageSquareText },
+  { id: "payments", label: "Tips & reconciliation", icon: CreditCard, group: "Money" },
+  { id: "settings", label: "Company settings", icon: Settings, group: "Configure" },
+];
+const platformNav: DashboardNavItem<AdminPage>[] = [
+  { id: "platformOverview", label: "Platform overview", icon: ShieldCheck, group: "Administration" },
+  { id: "platformOrganizations", label: "Organizations", icon: Building2 },
+  { id: "platformUsers", label: "Registered users", icon: Users, group: "Access" },
+  { id: "platformPayments", label: "Platform earnings", icon: CreditCard, group: "Money" },
+];
 
 function AdminDashboard() {
   const navigate = useNavigate();
@@ -50,6 +68,8 @@ function AdminDashboard() {
   const [data, setData] = useState<Data | null>(null);
   const [companyId, setCompanyId] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [page, setPage] = useState<AdminPage>("overview");
   const [inviteInfo, setInviteInfo] = useState<{ label: string; url: string; code: string } | null>(null);
 
   function showInvite(label: string, code: string) {
@@ -58,30 +78,80 @@ function AdminDashboard() {
   }
 
   async function load(id?: string) {
-    const { data: session } = await supabase.auth.getSession();
-    if (!session.session) {
-      navigate({ to: "/auth" });
-      return;
+    setLoadError(null);
+    try {
+      const { data: session } = await auth.getSession();
+      if (!session.session) {
+        navigate({ to: "/auth" });
+        return;
+      }
+      let effectiveId = id;
+      let usedStoredTenant = false;
+      if (!effectiveId && import.meta.env.DEV) {
+        const stored = typeof window !== "undefined" ? localStorage.getItem("devTenantId") : null;
+        if (stored) {
+          effectiveId = stored;
+          usedStoredTenant = true;
+        }
+      }
+
+      let d;
+      try {
+        d = await get({ data: { companyId: effectiveId } });
+      } catch (error) {
+        // A recreated/reseeded local DB makes a remembered tenant UUID stale.
+        if (!usedStoredTenant) throw error;
+        localStorage.removeItem("devTenantId");
+        d = await get({ data: {} });
+      }
+
+      setData(d);
+      if (d.company) setCompanyId(d.company.id);
+      if (import.meta.env.DEV && d.company) {
+        try { localStorage.setItem("devTenantId", d.company.id); } catch { /* ignore */ }
+      }
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Could not load the admin dashboard.");
+    } finally {
+      setLoading(false);
     }
-    let effectiveId = id;
-    if (!effectiveId && import.meta.env.DEV) {
-      const stored = typeof window !== "undefined" ? localStorage.getItem("devTenantId") : null;
-      if (stored) effectiveId = stored;
-    }
-    const d = await get({ data: { companyId: effectiveId } });
-    setData(d);
-    if (d.company) setCompanyId(d.company.id);
-    if (import.meta.env.DEV && d.company) {
-      try { localStorage.setItem("devTenantId", d.company.id); } catch { /* ignore */ }
-    }
-    setLoading(false);
   }
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading) return <Center>Loading…</Center>;
+  if (loading) return <Center>Loading admin dashboard…</Center>;
+  if (loadError) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-6 text-center">
+        <div className="max-w-md rounded-lg border border-border bg-card p-6 shadow-sm">
+          <h1 className="text-lg font-semibold">Could not load the admin dashboard</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{loadError}</p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <button
+              onClick={() => { setLoading(true); load(); }}
+              className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => navigate({ to: "/" })}
+              className="rounded-md border border-border px-4 py-2 text-sm"
+            >
+              Home
+            </button>
+            <button
+              onClick={async () => { await auth.signOut(); navigate({ to: "/auth" }); }}
+              className="rounded-md border border-border px-4 py-2 text-sm"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (!data?.company) {
     return (
       <div className="min-h-screen bg-background">
@@ -100,14 +170,44 @@ function AdminDashboard() {
   const totals = sumTips(data.tips);
   const ratingStats = ratingAgg(data.ratings, data.drivers);
 
+  const isPlatform = page.startsWith("platform");
+  const visibleNav = isPlatform ? platformNav : adminNav;
+  const pageTitle = visibleNav.find((item) => item.id === page)?.label ?? "Overview";
+  const platformWorkspace = "__platform__";
   return (
-    <div className="min-h-screen bg-background">
-      <TopBar
-        title={data.company.name}
-        subtitle={data.isSuper ? "Blue Collar Tips · Super admin" : "Company admin"}
-        onSignOut={signOut(navigate)}
-      />
-      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6">
+    <DashboardShell
+      title={isPlatform ? "Blue Collar Tips" : data.company.name}
+      subtitle={isPlatform ? "Platform administration" : data.isSuper ? "Super admin" : "Company admin"}
+      pageTitle={pageTitle}
+      active={page}
+      items={visibleNav}
+      onChange={setPage}
+      onSignOut={signOut(navigate)}
+      workspace={
+        <label className="block rounded-xl border border-sidebar-border bg-card p-3">
+          <span className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground"><Building2 size={14} /> Workspace</span>
+          {data.isSuper && data.companies?.length ? (
+            <WorkspaceSelect
+              value={isPlatform ? platformWorkspace : companyId ?? data.company.id}
+              onChange={(value) => {
+                if (value === platformWorkspace) {
+                  setPage("platformOverview");
+                  return;
+                }
+                setPage("overview");
+                setCompanyId(value);
+                setLoading(true);
+                load(value);
+              }}
+              options={[
+                { value: platformWorkspace, label: "Platform administration", detail: "All organizations" },
+                ...data.companies.map((c) => ({ value: c.id, label: c.name, detail: "Company workspace" })),
+              ]}
+            />
+          ) : <span className="mt-1 block truncate text-sm font-semibold">{data.company.name}</span>}
+        </label>
+      }
+    >
         {inviteInfo && (
           <div className="rounded-lg border border-primary/40 bg-primary/5 p-4">
             <div className="flex items-start justify-between gap-3">
@@ -138,24 +238,9 @@ function AdminDashboard() {
           </div>
         )}
 
-        {data.isSuper && data.companies && data.companies.length > 0 && (
-          <Section title="Tenant">
+        {page === "platformOrganizations" && data.isSuper && data.companies && data.companies.length > 0 && (
+          <Section title="Organizations">
             <div className="flex flex-wrap items-center gap-3">
-              <select
-                value={companyId}
-                onChange={(e) => {
-                  setCompanyId(e.target.value);
-                  setLoading(true);
-                  load(e.target.value);
-                }}
-                className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                {data.companies.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
               <NewCompanyInline
                 onCreate={async (v) => {
                   const r = await newCo({ data: v });
@@ -167,14 +252,24 @@ function AdminDashboard() {
           </Section>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-4">
+        {page === "overview" && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Stat label="Tips (all-time)" value={dollars(totals.gross)} />
           <Stat label="Company 10%" value={dollars(totals.company)} />
           <Stat label="Employees" value={String(data.drivers.length)} />
           <Stat label="Avg rating" value={ratingStats.avg ? ratingStats.avg.toFixed(2) + " ★" : "—"} />
-        </div>
+        </div>}
 
-        <Section title="Employees">
+        {page === "employees" && <Section title="Employees">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+            <div>
+              <div className="text-sm font-semibold">Company employee code</div>
+              <p className="mt-1 text-xs text-muted-foreground">Share this permanent code. New employees remain pending until an admin approves them below.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-md border border-border bg-background px-4 py-2 font-mono text-xl font-bold tracking-[0.3em]">{data.company.join_code}</span>
+              <button type="button" onClick={() => navigator.clipboard.writeText(data.company.join_code)} className="rounded-md border border-border bg-card px-3 py-2 text-sm">Copy</button>
+            </div>
+          </div>
           <DriverRoster
             drivers={data.drivers}
             ratingsByDriver={ratingStats.byDriver}
@@ -189,12 +284,13 @@ function AdminDashboard() {
               await load(companyId);
             }}
             companySlug={data.company.slug}
+            companyLogo={data.company.logo_url}
             companyId={data.company.id}
             onLocationChanged={() => load(companyId)}
           />
-        </Section>
+        </Section>}
 
-        <Section title="Branding">
+        {page === "settings" && <Section title="Branding">
           <BrandingForm
             initial={data.company}
             onSave={async (v) => {
@@ -202,33 +298,40 @@ function AdminDashboard() {
               await load(companyId);
             }}
           />
-        </Section>
+        </Section>}
 
-        <Section title="Locations / crews">
+        {page === "employees" && <Section title="Locations / crews">
           <LocationsPanel companyId={data.company.id} />
-        </Section>
+        </Section>}
 
-        <Section title="Review syndication links (Google / Yelp / Facebook)">
+        {page === "settings" && <Section title="Review syndication links (Google / Yelp / Facebook)">
           <ReviewLinksPanel
             companyId={data.company.id}
+            companySlug={data.company.slug}
+            companyLogo={data.company.logo_url}
             initial={{
               google: data.company.google_review_url ?? "",
               yelp: data.company.yelp_review_url ?? "",
               facebook: data.company.facebook_review_url ?? "",
+              threshold: data.company.positive_rating_threshold ?? 4,
+              action: data.company.positive_submit_action ?? "success_page",
+              redirectUrl: data.company.positive_redirect_url ?? "",
+              webhookEnabled: data.company.review_webhook_enabled ?? false,
+              webhookUrl: data.company.review_webhook_url ?? "",
             }}
             onSaved={() => load(companyId)}
           />
-        </Section>
+        </Section>}
 
-        <Section title="Automatic thank-you messages">
+        {page === "settings" && <Section title="Automatic thank-you messages">
           <ThankYouTemplatesPanel companyId={data.company.id} />
-        </Section>
+        </Section>}
 
-        <Section title="Recent ratings & feedback">
+        {(page === "overview" || page === "feedback") && <Section title="Recent ratings & feedback">
           <FeedbackList ratings={data.ratings} drivers={data.drivers} />
-        </Section>
+        </Section>}
 
-        <Section title="Discrepancy flags">
+        {page === "feedback" && <Section title="Discrepancy flags">
           <FlagsList
             flags={data.flags}
             drivers={data.drivers}
@@ -237,42 +340,45 @@ function AdminDashboard() {
               await load(companyId);
             }}
           />
-        </Section>
+        </Section>}
 
-        <Section title="Invites">
+        {page === "employees" && <Section title="Employee & admin invite codes">
           <InvitesPanel companyId={data.company.id} />
-        </Section>
+        </Section>}
 
-        <Section title="Tip disputes & refunds">
+        {page === "employees" && <Section title="Pending join requests">
+          <JoinRequestsPanel companyId={data.company.id} onApproved={() => load(companyId)} />
+        </Section>}
+
+        {page === "payments" && <Section title="Tip disputes & refunds">
           <DisputesPanel
             companyId={data.company.id}
             tips={data.tips}
             drivers={data.drivers}
             onChanged={() => load(companyId)}
           />
-        </Section>
+        </Section>}
 
-        <Section title="Reconciliation (last 30 days)">
+        {page === "payments" && <Section title="Reconciliation (last 30 days)">
           <ReconciliationPanel companyId={data.company.id} drivers={data.drivers} />
-        </Section>
+        </Section>}
 
-        <Section title="SMS a tip link to a customer">
+        {page === "employees" && <Section title="SMS a tip link to a customer">
           <AdminSmsPanel drivers={data.drivers} />
-        </Section>
+        </Section>}
 
-        {data.isSuper && (
-          <Section title="Platform overview (super admin)">
-            <PlatformPanel />
+        {isPlatform && data.isSuper && (
+          <Section title={pageTitle}>
+            <PlatformPanel view={page as PlatformPage} />
           </Section>
         )}
-      </div>
-    </div>
+    </DashboardShell>
   );
 }
 
 function signOut(nav: ReturnType<typeof useNavigate>) {
   return async () => {
-    await supabase.auth.signOut();
+    await auth.signOut();
     nav({ to: "/" });
   };
 }
@@ -312,6 +418,7 @@ function DriverRoster({
   onCreate,
   onStatus,
   companySlug,
+  companyLogo,
   companyId,
   onLocationChanged,
 }: {
@@ -321,6 +428,7 @@ function DriverRoster({
   onCreate: (v: { displayName: string; email?: string | null; phone?: string | null; employeeId?: string | null }) => Promise<void>;
   onStatus: (id: string, s: "pending" | "active" | "deactivated") => Promise<void>;
   companySlug: string;
+  companyLogo?: string | null;
   companyId: string;
   onLocationChanged: () => void;
 }) {
@@ -339,7 +447,13 @@ function DriverRoster({
   }, [companyId, listLocs]);
   return (
     <>
-      <div className="mb-3 flex justify-end">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="font-medium">Employee QR codes</div>
+          <p className="text-xs text-muted-foreground">
+            Each code opens that employee's public rating and tip page.
+          </p>
+        </div>
         <button onClick={() => setOpen((v) => !v)} className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground">
           {open ? "Cancel" : "Add employee"}
         </button>
@@ -363,7 +477,7 @@ function DriverRoster({
           }}
         >
           <Input label="Name" value={name} onChange={setName} required />
-          <Input label="Email" value={email} onChange={setEmail} type="email" />
+          <Input label="Email" value={email} onChange={setEmail} type="email" required />
           <Input label="Phone" value={phone} onChange={setPhone} />
           <Input label="Employee ID" value={empId} onChange={setEmpId} />
           <div className="sm:col-span-2">
@@ -374,11 +488,42 @@ function DriverRoster({
       {drivers.length === 0 ? (
         <div className="text-sm text-muted-foreground">No employees yet. Add one to get started.</div>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+          <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {drivers.map((d) => {
+              const path = `/${companySlug}/d/${d.slug}`;
+              const url = typeof window !== "undefined" ? `${window.location.origin}${path}` : path;
+              return (
+                <button
+                  key={`qr-${d.id}`}
+                  type="button"
+                  onClick={() => {
+                    setQrDriverId(d.id);
+                    setQrFor({ name: d.display_name, url });
+                  }}
+                  className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/60 hover:bg-muted/40"
+                  aria-label={`Open QR code for ${d.display_name}`}
+                >
+                  <span className="shrink-0 rounded-md bg-white p-1.5">
+                    <BrandedQRCode value={url} size={76} logoUrl={companyLogo} includeMargin={false} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block font-medium">{d.display_name}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{path}</span>
+                    <span className="mt-1 block text-xs font-medium text-primary">
+                      View, download or print QR →
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="py-2">Name</th>
+                <th className="hidden lg:table-cell">Email</th>
                 <th>Status</th>
                 <th className="hidden sm:table-cell">Location</th>
                 <th className="hidden md:table-cell">Tip link</th>
@@ -394,22 +539,28 @@ function DriverRoster({
                 return (
                   <tr key={d.id}>
                     <td className="py-2 font-medium">{d.display_name}</td>
+                    <td className="hidden lg:table-cell text-muted-foreground">{d.email || "—"}</td>
                     <td>
                       <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize">{d.status}</span>
                     </td>
                     <td className="hidden sm:table-cell">
-                      <select
-                        value={d.location_id ?? ""}
-                        onChange={async (e) => {
-                          const v = e.target.value || null;
-                          await setLoc({ data: { driverId: d.id, locationId: v } });
-                          onLocationChanged();
-                        }}
-                        className="rounded-md border border-input bg-background px-2 py-1 text-xs"
-                      >
-                        <option value="">—</option>
-                        {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-                      </select>
+                      {locations.length ? (
+                        <select
+                          value={d.location_id ?? ""}
+                          aria-label={`Location for ${d.display_name}`}
+                          onChange={async (e) => {
+                            const v = e.target.value || null;
+                            await setLoc({ data: { driverId: d.id, locationId: v } });
+                            onLocationChanged();
+                          }}
+                          className="max-w-36 rounded-md border border-input bg-background px-2 py-1 text-xs"
+                        >
+                          <option value="">Not assigned</option>
+                          {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                        </select>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Not assigned</span>
+                      )}
                     </td>
                     <td className="hidden md:table-cell">
                       <a
@@ -451,13 +602,15 @@ function DriverRoster({
               })}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
       {qrFor && qrDriverId && (
         <DriverQRModal
           driverId={qrDriverId}
           driverName={qrFor.name}
           url={qrFor.url}
+          logoUrl={companyLogo}
           onClose={() => { setQrFor(null); setQrDriverId(null); }}
         />
       )}
@@ -465,7 +618,7 @@ function DriverRoster({
   );
 }
 
-function DriverQRModal({ driverId, driverName, url, onClose }: { driverId: string; driverName: string; url: string; onClose: () => void }) {
+function DriverQRModal({ driverId, driverName, url, logoUrl, onClose }: { driverId: string; driverName: string; url: string; logoUrl?: string | null; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   const download = () => {
     const canvas = document.getElementById("admin-driver-qr") as HTMLCanvasElement | null;
@@ -490,7 +643,7 @@ function DriverQRModal({ driverId, driverName, url, onClose }: { driverId: strin
         </div>
         <div className="flex flex-col items-center gap-4">
           <div className="rounded-lg bg-white p-4">
-            <QRCodeCanvas id="admin-driver-qr" value={url} size={240} includeMargin />
+            <BrandedQRCode id="admin-driver-qr" value={url} size={240} logoUrl={logoUrl} />
           </div>
           <div className="w-full break-all rounded-md bg-muted px-3 py-2 text-xs">{url}</div>
           <div className="flex flex-wrap justify-center gap-2">
@@ -610,7 +763,7 @@ function FeedbackList({ ratings, drivers }: { ratings: Data["ratings"]; drivers:
             <div>
               <span className="text-secondary">{"★".repeat(r.stars)}</span>
               <span className="text-muted-foreground">{"★".repeat(5 - r.stars)}</span>
-              <span className="ml-2 text-xs text-muted-foreground">{byId.get(r.driver_id)}</span>
+              <span className="ml-2 text-xs text-muted-foreground">{String(byId.get(r.driver_id) ?? "Company")}</span>
               {r.flagged && (
                 <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-xs text-destructive">low rating</span>
               )}
@@ -642,7 +795,7 @@ function FlagsList({
         <li key={f.id} className="py-3 text-sm">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <div className="truncate font-medium">{byId.get(f.driver_id) ?? "Employee"}</div>
+              <div className="truncate font-medium">{String(byId.get(f.driver_id) ?? "Employee")}</div>
               <div className="text-xs text-muted-foreground">{f.reason}</div>
             </div>
             <select
@@ -766,6 +919,9 @@ function InvitesPanel({ companyId }: { companyId: string }) {
   }, [companyId]);
   return (
     <>
+      <p className="mb-4 text-sm text-muted-foreground">
+        Email invitations are for a specific person and auto-accept only when that exact email signs in. Use the 5-digit company code above for employees who should request approval.
+      </p>
       <form
         className="mb-3 flex flex-wrap items-end gap-2"
         onSubmit={async (e) => {
@@ -776,7 +932,7 @@ function InvitesPanel({ companyId }: { companyId: string }) {
               data: {
                 companyId,
                 role,
-                email: email || null,
+                email,
                 phone: phone || null,
                 recipientName: name || null,
               },
@@ -802,16 +958,19 @@ function InvitesPanel({ companyId }: { companyId: string }) {
       >
         <label className="text-sm">
           Role
-          <select value={role} onChange={(e) => setRole(e.target.value as typeof role)} className="mt-1 block rounded-md border border-input bg-background px-3 py-2 text-sm">
-            <option value="driver">Employee</option>
-            <option value="company_admin">Company admin</option>
-          </select>
+          <Select value={role} onValueChange={(value) => setRole(value as typeof role)}>
+            <SelectTrigger className="mt-1 min-w-40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="driver">Employee</SelectItem>
+              <SelectItem value="company_admin">Company admin</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
         <Input label="Name (optional)" value={name} onChange={setName} />
-        <Input label="Email (optional)" value={email} onChange={setEmail} type="email" />
+        <Input label="Email" value={email} onChange={setEmail} type="email" required />
         <Input label="Phone (optional)" value={phone} onChange={setPhone} type="tel" placeholder="+1 555 555 5555" />
         <button disabled={busy} className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-60">
-          {busy ? "Sending…" : "Send invite"}
+          {busy ? "Sending…" : "Send email invite"}
         </button>
       </form>
       {items.length === 0 ? (
@@ -851,6 +1010,39 @@ function InvitesPanel({ companyId }: { companyId: string }) {
   );
 }
 
+function JoinRequestsPanel({ companyId, onApproved }: { companyId: string; onApproved: () => void }) {
+  const list = useServerFn(listJoinRequests);
+  const review = useServerFn(reviewJoinRequest);
+  const [items, setItems] = useState<any[]>([]);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const reload = async () => setItems((await list({ data: { companyId } })).items);
+  useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [companyId]);
+  const pending = items.filter((item) => item.status === "pending");
+  if (!pending.length) return <div className="text-sm text-muted-foreground">No pending requests from shared employee codes.</div>;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Name</th><th>Email</th><th>Code</th><th>Requested</th><th></th></tr></thead>
+        <tbody className="divide-y divide-border">
+          {pending.map((item) => {
+            const user = Array.isArray(item.users) ? item.users[0] : item.users;
+            const invite = Array.isArray(item.invites) ? item.invites[0] : item.invites;
+            const decide = async (decision: "approved" | "rejected") => {
+              setBusyId(item.id);
+              try {
+                await review({ data: { requestId: item.id, decision } });
+                await reload();
+                if (decision === "approved") onApproved();
+              } finally { setBusyId(null); }
+            };
+            return <tr key={item.id}><td className="py-2 font-medium">{user?.full_name || "—"}</td><td>{user?.email || "—"}</td><td className="font-mono text-xs">{invite?.code}</td><td>{new Date(item.created_at).toLocaleDateString()}</td><td className="text-right"><button disabled={busyId === item.id} onClick={() => decide("approved")} className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50">Approve</button><button disabled={busyId === item.id} onClick={() => decide("rejected")} className="ml-2 rounded-md border border-border px-3 py-1.5 text-xs disabled:opacity-50">Reject</button></td></tr>;
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function ReconciliationPanel({ companyId, drivers }: { companyId: string; drivers: Data["drivers"] }) {
   const fetchOverview = useServerFn(reconciliationOverview);
   const [rows, setRows] = useState<Awaited<ReturnType<typeof reconciliationOverview>>["rows"]>([]);
@@ -868,7 +1060,7 @@ function ReconciliationPanel({ companyId, drivers }: { companyId: string; driver
         <tbody className="divide-y divide-border">
           {rows.map((r) => (
             <tr key={r.driverId} className={r.unverifiedPct > 20 ? "bg-destructive/5" : undefined}>
-              <td className="py-2 font-medium">{byId.get(r.driverId) ?? "—"}</td>
+              <td className="py-2 font-medium">{String(byId.get(r.driverId) ?? "—")}</td>
               <td>{r.total}</td>
               <td className="hidden sm:table-cell">{r.manual}</td>
               <td>{r.unverified}</td>
@@ -920,29 +1112,87 @@ function AdminSmsPanel({ drivers }: { drivers: Data["drivers"] }) {
   );
 }
 
-function PlatformPanel() {
+function PlatformPanel({ view }: { view: PlatformPage }) {
   const get = useServerFn(platformOverview);
   const suspend = useServerFn(suspendTenant);
   const [data, setData] = useState<Awaited<ReturnType<typeof platformOverview>> | null>(null);
+  const [userSearch, setUserSearch] = useState("");
+  const [userCompany, setUserCompany] = useState("all");
+  const [userRole, setUserRole] = useState("all");
   const reload = async () => setData(await get());
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   if (!data) return <div className="text-sm text-muted-foreground">Loading…</div>;
+  const normalizedSearch = userSearch.trim().toLowerCase();
+  const filteredUsers = data.users.filter((user) => {
+    const matchesSearch = !normalizedSearch || [user.full_name, user.email, ...user.memberships.map((item) => item.companyName)]
+      .some((value) => value?.toLowerCase().includes(normalizedSearch));
+    const matchesCompany = userCompany === "all" || user.memberships.some((item) => item.companyId === userCompany || (userCompany === "platform" && item.role === "super_admin"));
+    const matchesRole = userRole === "all" || user.memberships.some((item) => item.role === userRole);
+    return matchesSearch && matchesCompany && matchesRole;
+  });
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-4">
+      {view === "platformOverview" && <div className="grid gap-3 sm:grid-cols-5">
         <Stat label="Gross tips" value={dollars(data.grossTotal)} />
         <Stat label="Platform 10%" value={dollars(data.platformTotal)} />
         <Stat label="Tenants" value={String(data.tenants.length)} />
         <Stat label="Employees" value={String(data.driverCount)} />
-      </div>
-      <div className="text-xs text-muted-foreground">
+        <Stat label="Registered users" value={String(data.userCount)} />
+      </div>}
+      {view === "platformPayments" && <div className="grid gap-3 sm:grid-cols-3">
+        <Stat label="Gross tips" value={dollars(data.grossTotal)} />
+        <Stat label="Platform fees earned" value={dollars(data.platformTotal)} />
+        <Stat label="Tips processed" value={String(data.tips.length)} />
+      </div>}
+      {view === "platformPayments" && <div className="rounded-lg border border-border p-4">
+        <h3 className="font-semibold">Organization fee breakdown</h3>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Organization</th><th>Tips</th><th>Gross</th><th>Company share</th><th>Platform fees</th></tr></thead><tbody className="divide-y divide-border">
+            {data.tenants.map((tenant) => <tr key={tenant.id}><td className="py-2 font-medium">{tenant.name}</td><td>{tenant.count}</td><td>{dollars(tenant.gross)}</td><td>{dollars(tenant.companyShare)}</td><td>{dollars(tenant.platformShare)}</td></tr>)}
+          </tbody></table>
+        </div>
+      </div>}
+      {view === "platformPayments" && <div className="rounded-lg border border-border p-4">
+        <h3 className="font-semibold">Employee earnings breakdown</h3>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Employee</th><th>Email</th><th>Company</th><th>Tips</th><th>Gross</th><th>Platform share</th></tr></thead><tbody className="divide-y divide-border">
+            {data.employees.map((employee) => <tr key={employee.id}><td className="py-2 font-medium">{employee.display_name}</td><td>{employee.email || "—"}</td><td>{Array.isArray(employee.companies) ? employee.companies[0]?.name : employee.companies?.name}</td><td>{employee.count}</td><td>{dollars(employee.gross)}</td><td>{dollars(employee.platformShare)}</td></tr>)}
+          </tbody></table>
+        </div>
+      </div>}
+      {view === "platformUsers" && <div className="rounded-lg border border-border p-4">
+        <h3 className="font-semibold">Registered users</h3>
+        <div className="mt-3 grid gap-2 md:grid-cols-3">
+          <input value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder="Search name, email or organization" className="rounded-md border border-input bg-background px-3 py-2 text-sm" />
+          <Select value={userCompany} onValueChange={setUserCompany}>
+            <SelectTrigger><SelectValue placeholder="All organizations" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All organizations</SelectItem>
+              <SelectItem value="platform">Platform</SelectItem>
+              {data.tenants.map((tenant) => <SelectItem key={tenant.id} value={tenant.id}>{tenant.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={userRole} onValueChange={setUserRole}>
+            <SelectTrigger><SelectValue placeholder="All roles" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All roles</SelectItem>
+              <SelectItem value="super_admin">Super admin</SelectItem>
+              <SelectItem value="company_admin">Company admin</SelectItem>
+              <SelectItem value="driver">Employee</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="mt-3 overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Name</th><th>Email</th><th>Organization</th><th>Role</th><th>Created</th></tr></thead><tbody className="divide-y divide-border">{filteredUsers.map((user) => <tr key={user.id}><td className="py-2">{user.full_name || "—"}</td><td>{user.email}</td><td>{user.memberships.length ? user.memberships.map((item) => item.companyName).join(", ") : "Unassigned"}</td><td>{user.memberships.length ? user.memberships.map((item) => item.role.replace("driver", "employee").replaceAll("_", " ")).join(", ") : "—"}</td><td>{new Date(user.created_at).toLocaleDateString()}</td></tr>)}</tbody></table></div>
+        <p className="mt-3 text-xs text-muted-foreground">Showing {filteredUsers.length} of {data.users.length} users.</p>
+      </div>}
+      {view === "platformOverview" && <div className="text-xs text-muted-foreground">
         Integrations · Stripe: <span className={data.integrations.stripe ? "text-emerald-600" : ""}>{data.integrations.stripe ? "connected" : "not connected"}</span>{" "}
         · Twilio: <span className={data.integrations.twilio ? "text-emerald-600" : ""}>{data.integrations.twilio ? "connected" : "not connected"}</span>
-      </div>
-      <div className="overflow-x-auto">
+      </div>}
+      {view === "platformOrganizations" && <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="text-left text-xs uppercase text-muted-foreground">
             <tr><th className="py-2">Tenant</th><th>Status</th><th className="hidden sm:table-cell">Tips</th><th>Gross</th><th className="hidden md:table-cell">Co share</th><th className="hidden md:table-cell">Platform 10%</th><th className="hidden lg:table-cell">Pending co payout</th><th></th></tr>
@@ -972,7 +1222,7 @@ function PlatformPanel() {
             ))}
           </tbody>
         </table>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -1126,19 +1376,37 @@ function LocationsPanel({ companyId }: { companyId: string }) {
 
 function ReviewLinksPanel({
   companyId,
+  companySlug,
+  companyLogo,
   initial,
   onSaved,
 }: {
   companyId: string;
-  initial: { google: string; yelp: string; facebook: string };
+  companySlug: string;
+  companyLogo?: string | null;
+  initial: { google: string; yelp: string; facebook: string; threshold: number; action: "success_page" | "redirect"; redirectUrl: string; webhookEnabled: boolean; webhookUrl: string };
   onSaved: () => void;
 }) {
   const save = useServerFn(updateReviewLinks);
   const [google, setGoogle] = useState(initial.google);
   const [yelp, setYelp] = useState(initial.yelp);
   const [facebook, setFacebook] = useState(initial.facebook);
+  const [threshold, setThreshold] = useState(initial.threshold);
+  const [action, setAction] = useState(initial.action);
+  const [redirectUrl, setRedirectUrl] = useState(initial.redirectUrl);
+  const [webhookEnabled, setWebhookEnabled] = useState(initial.webhookEnabled);
+  const [webhookUrl, setWebhookUrl] = useState(initial.webhookUrl);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const companyUrl = typeof window !== "undefined" ? `${window.location.origin}/${companySlug}` : `/${companySlug}`;
+  const downloadCompanyQr = () => {
+    const canvas = document.getElementById("admin-company-qr") as HTMLCanvasElement | null;
+    if (!canvas) return;
+    const anchor = document.createElement("a");
+    anchor.href = canvas.toDataURL("image/png");
+    anchor.download = `${companySlug}-review-qr.png`;
+    anchor.click();
+  };
   return (
     <form
       className="grid gap-3 sm:grid-cols-2"
@@ -1152,6 +1420,11 @@ function ReviewLinksPanel({
               googleUrl: google.trim() || null,
               yelpUrl: yelp.trim() || null,
               facebookUrl: facebook.trim() || null,
+              positiveRatingThreshold: threshold,
+              positiveSubmitAction: action,
+              positiveRedirectUrl: redirectUrl.trim() || null,
+              reviewWebhookEnabled: webhookEnabled,
+              reviewWebhookUrl: webhookUrl.trim() || null,
             },
           });
           setMsg("Saved ✓");
@@ -1164,12 +1437,47 @@ function ReviewLinksPanel({
       <Input label="Google review URL" value={google} onChange={setGoogle} placeholder="https://g.page/r/…/review" />
       <Input label="Yelp review URL" value={yelp} onChange={setYelp} placeholder="https://www.yelp.com/writeareview/biz/…" />
       <Input label="Facebook review URL" value={facebook} onChange={setFacebook} placeholder="https://www.facebook.com/…/reviews" />
+      <label className="text-sm">Positive rating threshold
+        <select value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2">
+          <option value={4}>4 stars and above</option><option value={5}>5 stars only</option>
+        </select>
+      </label>
+      <label className="text-sm">After a positive submission
+        <select value={action} onChange={(e) => setAction(e.target.value as "success_page" | "redirect")} className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2">
+          <option value="success_page">Show success page</option><option value="redirect">Redirect to a link</option>
+        </select>
+      </label>
+      {action === "redirect" && <div className="sm:col-span-2"><Input label="Redirect URL" value={redirectUrl} onChange={setRedirectUrl} placeholder="https://g.page/r/…/review" required /></div>}
+      <div className="sm:col-span-2 rounded-lg border border-border p-4">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={webhookEnabled} onChange={(e) => setWebhookEnabled(e.target.checked)} />
+          Send submitted ratings to this company’s webhook
+        </label>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Input label="Submission webhook URL" value={webhookUrl} onChange={setWebhookUrl} placeholder="https://services.leadconnectorhq.com/hooks/…" required={webhookEnabled} />
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">Requests include an HMAC-SHA256 signature managed by the server environment. Webhooks remain off until enabled.</p>
+      </div>
+      <div className="sm:col-span-2 rounded-lg border border-border p-4">
+        <div className="font-medium">Default company QR and feedback link</div>
+        <p className="mt-1 text-xs text-muted-foreground">Use this when no employee can be matched.</p>
+        <div className="mt-3 flex flex-wrap items-center gap-4">
+          <span className="rounded-md bg-white p-2"><BrandedQRCode id="admin-company-qr" value={companyUrl} size={112} logoUrl={companyLogo} /></span>
+          <div>
+            <div className="break-all text-xs">{companyUrl}</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button type="button" onClick={() => navigator.clipboard.writeText(companyUrl)} className="rounded-md border border-border px-3 py-2 text-sm">Copy company link</button>
+              <button type="button" onClick={downloadCompanyQr} className="rounded-md border border-border px-3 py-2 text-sm">Download QR (PNG)</button>
+            </div>
+          </div>
+        </div>
+      </div>
       <div className="sm:col-span-2 flex items-center gap-3">
         <button disabled={busy} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">
           {busy ? "Saving…" : "Save review links"}
         </button>
         {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
-        <span className="text-xs text-muted-foreground">Shown to happy customers (5★) after they submit a rating.</span>
+        <span className="text-xs text-muted-foreground">Positive customers follow the action configured above.</span>
       </div>
     </form>
   );
@@ -1285,7 +1593,7 @@ function DisputesPanel({
                 const refunded = !!t.refunded_at;
                 return (
                   <tr key={t.id} className={refunded ? undefined : "bg-destructive/5"}>
-                    <td className="py-2 font-medium">{byId.get(t.driver_id) ?? "—"}</td>
+                    <td className="py-2 font-medium">{String(byId.get(t.driver_id) ?? "—")}</td>
                     <td>
                       {dollars(t.amount_cents)}
                       {refunded && t.refund_amount_cents ? (

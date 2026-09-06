@@ -1,14 +1,25 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { QRCodeCanvas } from "qrcode.react";
-import { supabase } from "@/integrations/supabase/client";
-import { getDriverDashboard, logManualTip, updateNotifyPrefs } from "@/lib/driver.functions";
+import { auth } from "@/auth/client";
+import { getDriverDashboard, logManualTip, updateDriverProfile, updateNotifyPrefs } from "@/lib/driver.functions";
 import { getPayoutStatement } from "@/lib/payouts.functions";
 import { PRESET_TIPS, SPLIT, TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib/constants";
 import { createDriverOnboardingLink, refreshStripeStatus } from "@/lib/stripe.functions";
 import { sendTipLinkSms } from "@/lib/sms.functions";
 import { confirmCashTip, disputeCashTip, listUnverifiedTips } from "@/lib/reconciliation.functions";
+import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
+import { JoinWorkspacePanel } from "@/components/JoinWorkspacePanel";
+import { Banknote, Building2, LayoutDashboard, QrCode, Settings, WalletCards } from "lucide-react";
+
+type DriverPage = "overview" | "share" | "tips" | "earnings" | "settings";
+const driverNav: DashboardNavItem<DriverPage>[] = [
+  { id: "overview", label: "Overview", icon: LayoutDashboard, group: "Workspace" },
+  { id: "share", label: "QR & share", icon: QrCode, group: "Customer tools" },
+  { id: "tips", label: "Tips & activity", icon: Banknote, group: "Money" },
+  { id: "earnings", label: "Earnings & payouts", icon: WalletCards },
+  { id: "settings", label: "Settings", icon: Settings, group: "Account" },
+];
 
 export const Route = createFileRoute("/dashboard/driver")({
   head: () => ({
@@ -24,7 +35,7 @@ export const Route = createFileRoute("/dashboard/driver")({
   component: DriverDashboard,
 });
 
-type DashData = Awaited<ReturnType<typeof getDriverDashboard>>;
+type DashData = any;
 
 function DriverDashboard() {
   const navigate = useNavigate();
@@ -32,14 +43,26 @@ function DriverDashboard() {
   const [data, setData] = useState<DashData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showQR, setShowQR] = useState(false);
+  const [page, setPage] = useState<DriverPage>("share");
 
   const load = async (driverId?: string) => {
-    const { data: session } = await supabase.auth.getSession();
+    const { data: session } = await auth.getSession();
     if (!session.session) {
       navigate({ to: "/auth" });
       return;
     }
-    const d = await getDash(driverId ? { data: { driverId } } : undefined);
+    let selectedId = driverId;
+    if (!selectedId && typeof window !== "undefined") {
+      selectedId = localStorage.getItem("employeeWorkspaceId") ?? undefined;
+    }
+    let d = await getDash(selectedId ? { data: { driverId: selectedId } } : undefined);
+    if (!d.driver && selectedId) {
+      localStorage.removeItem("employeeWorkspaceId");
+      d = await getDash();
+    }
+    if (d.driver && typeof window !== "undefined") {
+      localStorage.setItem("employeeWorkspaceId", d.driver.id);
+    }
     setData(d);
     setLoading(false);
   };
@@ -65,48 +88,40 @@ function DriverDashboard() {
   const totals = computeTotals(data.tips);
   const ratingStats = computeRatingStats(data.ratings);
 
+  const pageTitle = driverNav.find((item) => item.id === page)?.label ?? "Overview";
   return (
-    <div className="min-h-screen bg-background">
-      <TopBar
-        title={data.driver.display_name}
-        subtitle={`${data.driver.companies?.name ?? ""}${data.viewingAsAdmin ? " · Developer access" : ""}`}
-        onSignOut={async () => {
-          await supabase.auth.signOut();
+    <DashboardShell
+      title={data.driver.display_name}
+      subtitle={`${data.driver.companies?.name ?? ""}${data.viewingAsAdmin ? " · Admin view" : ""}`}
+      pageTitle={pageTitle}
+      active={page}
+      items={driverNav}
+      onChange={setPage}
+      onSignOut={async () => {
+          await auth.signOut();
           navigate({ to: "/" });
-        }}
-      />
-      <div className="mx-auto max-w-5xl space-y-6 px-4 py-6">
-        {data.accessibleDrivers.length > 1 && (
-          <Section title="Developer employee access">
-            <div className="flex flex-wrap items-center gap-3 text-sm">
-              <label className="flex-1 min-w-64">
-                View any employee dashboard
-                <select
+      }}
+      workspace={
+        <label className="block rounded-xl border border-sidebar-border bg-card p-3">
+          <span className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground"><Building2 size={14} /> Workspace</span>
+          {data.accessibleDrivers.length > 1 ? (
+                <WorkspaceSelect
                   value={data.driver.id}
-                  onChange={(e) => {
+                  onChange={(value) => {
                     setLoading(true);
-                    load(e.target.value);
+                    load(value);
                   }}
-                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  {data.accessibleDrivers.map((driver) => {
+                  options={data.accessibleDrivers.map((driver) => {
                     const company = Array.isArray(driver.companies) ? driver.companies[0] : driver.companies;
-                    return (
-                      <option key={driver.id} value={driver.id}>
-                        {driver.display_name} · {company?.name ?? "Company"} · {driver.status}
-                      </option>
-                    );
+                    return { value: driver.id, label: company?.name ?? "Company", detail: `${driver.display_name} · ${driver.status}` };
                   })}
-                </select>
-              </label>
-              <span className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-                Super admins and company admins can inspect employee views without being assigned to that employee.
-              </span>
-            </div>
-          </Section>
-        )}
+                />
+          ) : <span className="mt-1 block truncate text-sm font-semibold">{data.driver.companies?.name ?? "Company"}</span>}
+        </label>
+      }
+    >
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {page === "overview" && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Stat label="Tips this week (net)" value={dollars(totals.weekNet)} />
           <Stat label="Tips this month (net)" value={dollars(totals.monthNet)} />
           <Stat label="All-time (net)" value={dollars(totals.allNet)} />
@@ -115,18 +130,18 @@ function DriverDashboard() {
             value={dollars(totals.owedToCo)}
             hint="From cash & P2P tips"
           />
-        </div>
+        </div>}
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        {page === "overview" && <div className="grid gap-4 sm:grid-cols-3">
           <Stat label="Avg rating" value={ratingStats.avg ? ratingStats.avg.toFixed(2) + " ★" : "—"} />
           <Stat label="Ratings (all-time)" value={String(ratingStats.count)} />
           <Stat label="Ratings this month" value={String(ratingStats.month)} />
-        </div>
+        </div>}
 
-        <Section title="My QR code & link">
+        {page === "share" && <Section title="My QR code & link">
           <div className="flex flex-col items-center gap-4 sm:flex-row">
             <div className="rounded-lg bg-white p-4">
-              <QRCodeCanvas value={tipUrl} size={180} includeMargin />
+              <BrandedQRCode value={tipUrl} size={180} logoUrl={data.driver.companies?.logo_url} />
             </div>
             <div className="flex-1">
               <div className="break-all rounded-md bg-muted px-3 py-2 text-sm">{tipUrl}</div>
@@ -161,31 +176,35 @@ function DriverDashboard() {
               </p>
             </div>
           </div>
-        </Section>
+        </Section>}
 
-        {showQR && <FullscreenQR url={tipUrl} onClose={() => setShowQR(false)} />}
+        {showQR && <FullscreenQR url={tipUrl} logoUrl={data.driver.companies?.logo_url} onClose={() => setShowQR(false)} />}
 
-        <LogTipPanel driverId={data.driver.id} onLogged={() => load(data.driver.id)} />
+        {page === "tips" && <LogTipPanel driverId={data.driver.id} onLogged={() => load(data.driver.id)} />}
 
-        <EarningsPanel driverId={data.driver.id} driverName={data.driver.display_name} />
+        {page === "earnings" && <EarningsPanel driverId={data.driver.id} driverName={data.driver.display_name} />}
 
-        <NotifyPrefsPanel driverId={data.driver.id} initial={!!data.driver.notify_sms} phone={data.driver.phone ?? null} />
+        {page === "settings" && <ProfileSettingsPanel driver={data.driver} accountEmail={data.accountEmail} onSaved={() => load(data.driver.id)} />}
 
-        <StripePanel driverId={data.driver.id} stripeEnabled={!!data.driver.stripe_charges_enabled} />
+        {page === "settings" && <NotifyPrefsPanel driverId={data.driver.id} initial={!!data.driver.notify_sms} phone={data.driver.phone ?? null} />}
 
-        <SmsPanel driverId={data.driver.id} />
+        {page === "settings" && <JoinWorkspacePanel />}
 
-        <UnverifiedPanel driverId={data.driver.id} onChange={() => load(data.driver.id)} />
+        {page === "earnings" && <StripePanel driverId={data.driver.id} stripeEnabled={!!data.driver.stripe_charges_enabled} />}
 
-        <Section title="Recent tips">
+        {page === "share" && <SmsPanel driverId={data.driver.id} />}
+
+        {page === "tips" && <UnverifiedPanel driverId={data.driver.id} onChange={() => load(data.driver.id)} />}
+
+        {(page === "overview" || page === "tips") && <Section title="Recent tips">
           <TipsTable tips={data.tips} />
-        </Section>
+        </Section>}
 
-        <Section title="Recent ratings & feedback">
+        {page === "overview" && <Section title="Recent ratings & feedback">
           <RatingsList ratings={data.ratings} />
-        </Section>
+        </Section>}
 
-        {data.flags.length > 0 && (
+        {page === "tips" && data.flags.length > 0 && (
           <Section title="Discrepancy flags">
             <ul className="divide-y divide-border">
               {data.flags.map((f) => (
@@ -200,8 +219,7 @@ function DriverDashboard() {
             </ul>
           </Section>
         )}
-      </div>
-    </div>
+    </DashboardShell>
   );
 }
 
@@ -215,7 +233,7 @@ function downloadQR() {
   a.click();
 }
 
-function FullscreenQR({ url, onClose }: { url: string; onClose: () => void }) {
+function FullscreenQR({ url, logoUrl, onClose }: { url: string; logoUrl?: string | null; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -231,7 +249,7 @@ function FullscreenQR({ url, onClose }: { url: string; onClose: () => void }) {
       className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-white p-6"
     >
       <div className="rounded-xl bg-white p-4 shadow-2xl">
-        <QRCodeCanvas value={url} size={Math.min(420, typeof window !== "undefined" ? window.innerWidth - 64 : 320)} includeMargin />
+        <BrandedQRCode value={url} size={Math.min(420, typeof window !== "undefined" ? window.innerWidth - 64 : 320)} logoUrl={logoUrl} />
       </div>
       <div className="max-w-[90vw] break-all text-center text-sm text-neutral-700">{url}</div>
       <button
@@ -364,8 +382,13 @@ function LogTipPanel({ driverId, onLogged }: { driverId: string; onLogged: () =>
 }
 
 function TipsTable({ tips }: { tips: DashData["tips"] }) {
+  const [page, setPage] = useState(0);
+  const pageSize = 10;
   if (!tips.length) return <Empty>No tips yet.</Empty>;
+  const pageCount = Math.ceil(tips.length / pageSize);
+  const visible = tips.slice(page * pageSize, (page + 1) * pageSize);
   return (
+    <div>
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="text-left text-xs uppercase text-muted-foreground">
@@ -378,7 +401,7 @@ function TipsTable({ tips }: { tips: DashData["tips"] }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {tips.map((t) => (
+          {visible.map((t) => (
             <tr key={t.id}>
               <td className="py-2 text-muted-foreground">{new Date(t.created_at).toLocaleString()}</td>
               <td>{t.customer_name ?? "—"}</td>
@@ -389,6 +412,17 @@ function TipsTable({ tips }: { tips: DashData["tips"] }) {
           ))}
         </tbody>
       </table>
+    </div>
+    {pageCount > 1 && (
+      <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
+        <span>{page * pageSize + 1}–{Math.min((page + 1) * pageSize, tips.length)} of {tips.length}</span>
+        <div className="flex items-center gap-2">
+          <button disabled={page === 0} onClick={() => setPage((p) => p - 1)} className="rounded-md border border-border px-3 py-1.5 disabled:opacity-40">Previous</button>
+          <span>Page {page + 1} of {pageCount}</span>
+          <button disabled={page + 1 >= pageCount} onClick={() => setPage((p) => p + 1)} className="rounded-md border border-border px-3 py-1.5 disabled:opacity-40">Next</button>
+        </div>
+      </div>
+    )}
     </div>
   );
 }
@@ -672,6 +706,64 @@ function EarningsPanel({ driverId, driverName }: { driverId: string; driverName:
         </div>
       )}
       {data && data.tips.length === 0 && <div className="mt-3 text-xs text-muted-foreground">No tips in this range.</div>}
+    </Section>
+  );
+}
+
+function ProfileSettingsPanel({ driver, accountEmail, onSaved }: { driver: any; accountEmail: string | null; onSaved: () => void }) {
+  const save = useServerFn(updateDriverProfile);
+  const [displayName, setDisplayName] = useState(driver.display_name ?? "");
+  const [phone, setPhone] = useState(driver.phone ?? "");
+  const [photoUrl, setPhotoUrl] = useState(driver.photo_url ?? "");
+  const [venmo, setVenmo] = useState(driver.venmo_handle ?? "");
+  const [cashapp, setCashapp] = useState(driver.cashapp_handle ?? "");
+  const [zelle, setZelle] = useState(driver.zelle_handle ?? "");
+  const [paypal, setPaypal] = useState(driver.paypal_handle ?? "");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const company = Array.isArray(driver.companies) ? driver.companies[0] : driver.companies;
+  const fieldClass = "mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
+  return (
+    <Section title="Profile & identity">
+      <form className="grid gap-4 sm:grid-cols-2" onSubmit={async (event) => {
+        event.preventDefault();
+        setBusy(true);
+        setMessage(null);
+        try {
+          await save({ data: {
+            driverId: driver.id, displayName, phone: phone || null, photoUrl: photoUrl || null,
+            venmoHandle: venmo || null, cashappHandle: cashapp || null,
+            zelleHandle: zelle || null, paypalHandle: paypal || null,
+          } });
+          setMessage("Profile saved. Your QR code and link remain unchanged.");
+          onSaved();
+        } catch (error) {
+          setMessage(error instanceof Error ? error.message : "Could not save profile");
+        } finally { setBusy(false); }
+      }}>
+        <label className="text-sm">Display name<input className={fieldClass} value={displayName} onChange={(e) => setDisplayName(e.target.value)} required maxLength={80} /></label>
+        <label className="text-sm">Phone<input className={fieldClass} value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={40} /></label>
+        <label className="text-sm sm:col-span-2">Profile photo URL<input className={fieldClass} type="url" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder="https://…" /></label>
+        <div className="rounded-md border border-border bg-muted/50 p-3 text-sm">
+          <div className="text-xs text-muted-foreground">Login email · unique account identifier</div>
+          <div className="mt-1 break-all font-medium">{accountEmail ?? "Unavailable"}</div>
+        </div>
+        <div className="rounded-md border border-border bg-muted/50 p-3 text-sm">
+          <div className="text-xs text-muted-foreground">Organization · controlled by company admin</div>
+          <div className="mt-1 font-medium">{company?.name ?? "Company"}</div>
+        </div>
+        <label className="text-sm">Venmo handle<input className={fieldClass} value={venmo} onChange={(e) => setVenmo(e.target.value)} placeholder="@name" /></label>
+        <label className="text-sm">Cash App handle<input className={fieldClass} value={cashapp} onChange={(e) => setCashapp(e.target.value)} placeholder="$cashtag" /></label>
+        <label className="text-sm">Zelle email or phone<input className={fieldClass} value={zelle} onChange={(e) => setZelle(e.target.value)} /></label>
+        <label className="text-sm">PayPal handle<input className={fieldClass} value={paypal} onChange={(e) => setPaypal(e.target.value)} /></label>
+        <div className="sm:col-span-2 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+          Public path: /{company?.slug}/d/{driver.slug} · This stable identifier does not change when you edit your display name.
+        </div>
+        <div className="sm:col-span-2 flex items-center gap-3">
+          <button disabled={busy} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">{busy ? "Saving…" : "Save profile"}</button>
+          {message && <span className="text-xs text-muted-foreground">{message}</span>}
+        </div>
+      </form>
     </Section>
   );
 }

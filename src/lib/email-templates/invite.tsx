@@ -25,7 +25,7 @@ interface Props {
 const InviteEmail = ({
   recipientName,
   companyName = 'Blue Collar Tips',
-  inviteUrl = 'https://roadsidetips.lovable.app',
+  inviteUrl = 'https://bluecollartips.app',
   inviteCode = '',
   role = 'company_admin',
 }: Props) => {
@@ -87,7 +87,7 @@ export const template = {
   previewData: {
     recipientName: 'Jane',
     companyName: 'Acme Roadside',
-    inviteUrl: 'https://roadsidetips.lovable.app/join/ABC123',
+    inviteUrl: 'https://bluecollartips.app/join/ABC123',
     inviteCode: 'ABC123',
     role: 'company_admin',
   },

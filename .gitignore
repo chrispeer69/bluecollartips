@@ -16,6 +16,11 @@ dist-ssr
 .nitro
 *.local
 
+# Database exports/backups contain production data and credentials metadata.
+*.backup
+*.dump
+*.sql.gz
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
@@ -24,6 +29,9 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Separate reference project cloned locally; not part of this application.
+/mini-qr/
 
 # Editor directories and files
 .vscode/*

@@ -30,7 +30,8 @@ function CompanyReviewPage() {
       if (result?.reviewContact) {
         setCustomerName(result.reviewContact.name ?? "");
         setCustomerPhone(result.reviewContact.phone ?? "");
-        setCustomerEmail(result.reviewContact.email ?? "");
+        const email = result.reviewContact.email ?? "";
+        setCustomerEmail(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "");
       }
     }).finally(() => setLoading(false));
   }, [companySlug, getCompany, reviewToken]);

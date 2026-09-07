@@ -45,6 +45,7 @@ function CompanyReviewPage() {
     </header>
     <form className="mx-auto max-w-md space-y-5 px-5 py-6" onSubmit={async (e) => {
       e.preventDefault(); setError(null); if (!stars) { setError("Please tap a star rating."); return; }
+      if (customerEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) { setError("Please enter a valid email address."); return; }
       setBusy(true);
       try {
         const result = await submit({ data: { companySlug, stars, feedback: feedback.trim() || null, customerName: customerName.trim() || null, customerPhone: customerPhone.trim() || null, customerEmail: customerEmail.trim() || null, reviewToken } });

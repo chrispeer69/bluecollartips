@@ -161,6 +161,10 @@ function TipPage() {
       setError("Please tap a star rating.");
       return;
     }
+    if (customerEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) {
+      setError("Please enter a valid email address.");
+      return;
+    }
     if (finalTipCents > 0 && !tipSource) {
       setError("Choose how you'd like to tip.");
       return;

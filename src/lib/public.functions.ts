@@ -7,6 +7,7 @@ import { deliverReviewWebhook, hashReviewToken } from "./review-webhooks.server"
 
 const RATE_WINDOW_MS = 5 * 60 * 1000;
 const RATE_MAX = 3;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function currentIpHash(): string {
   const fwd = getRequestHeader("x-forwarded-for") || getRequestHeader("cf-connecting-ip") || "unknown";
@@ -119,7 +120,7 @@ export const submitRating = createServerFn({ method: "POST" })
         feedback: z.string().trim().max(2000).optional().nullable(),
         customerName: z.string().trim().max(120).optional().nullable(),
         customerPhone: z.string().trim().max(40).optional().nullable(),
-        customerEmail: z.string().trim().email().max(200).optional().nullable(),
+        customerEmail: z.string().trim().max(200).optional().nullable(),
         tipCents: z
           .number()
           .int()
@@ -144,6 +145,9 @@ export const submitRating = createServerFn({ method: "POST" })
       .eq("slug", data.companySlug)
       .maybeSingle();
     if (!company) throw new Error("Company not found");
+    if (data.customerEmail && !EMAIL_PATTERN.test(data.customerEmail)) {
+      throw new Error("Please enter a valid email address.");
+    }
     const { data: driver } = await db
       .from("drivers")
       .select("id, status")
@@ -247,7 +251,7 @@ export const submitCompanyRating = createServerFn({ method: "POST" })
     feedback: z.string().trim().max(2000).optional().nullable(),
     customerName: z.string().trim().max(120).optional().nullable(),
     customerPhone: z.string().trim().max(40).optional().nullable(),
-    customerEmail: z.string().trim().email().max(200).optional().nullable(),
+    customerEmail: z.string().trim().max(200).optional().nullable(),
     reviewToken: z.string().trim().min(20).max(200).optional().nullable(),
   }).parse(data))
   .handler(async ({ data }) => {
@@ -256,6 +260,9 @@ export const submitCompanyRating = createServerFn({ method: "POST" })
       .select("id, positive_rating_threshold, positive_submit_action, positive_redirect_url, review_webhook_enabled, review_webhook_url, review_webhook_secret_encrypted")
       .eq("slug", data.companySlug).eq("status", "active").maybeSingle();
     if (!company) throw new Error("Company not found");
+    if (data.customerEmail && !EMAIL_PATTERN.test(data.customerEmail)) {
+      throw new Error("Please enter a valid email address.");
+    }
     const reviewContext = await resolveReviewContext(db, data.reviewToken, company.id, null);
     await enforceCompanyRateLimit(company.id);
     const { data: rating, error } = await db.from("ratings").insert({

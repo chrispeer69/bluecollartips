@@ -29,7 +29,7 @@ const Body = z.object({
   contact: z
     .object({
       name: optionalText(z.string().trim().max(200)),
-      email: optionalText(z.string().trim().email()),
+      email: optionalText(z.string().trim().max(200)),
       phone: optionalText(z.string().trim().max(40)),
     })
     .optional(),
@@ -59,6 +59,12 @@ function verifySecret(request: Request): boolean {
 
 function normalizePhone(raw: string): string {
   return raw.replace(/[^0-9]/g, "").slice(-10);
+}
+
+function validEmail(value: string | undefined): string | null {
+  if (!value) return null;
+  const email = value.trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
 }
 
 export const Route = createFileRoute("/api/public/webhooks/ghl")({
@@ -111,7 +117,7 @@ export const Route = createFileRoute("/api/public/webhooks/ghl")({
           external_job_id: jobId, external_contact_id: ghlContactId ?? null, expires_at: expiresAt,
           customer_name: contact?.name ?? null,
           customer_phone: contact?.phone ?? null,
-          customer_email: contact?.email ?? null,
+          customer_email: validEmail(contact?.email),
         }, { onConflict: "company_id,external_job_id" });
         if (contextError) return json(500, { error: "Could not create review link" });
         const path = driver ? `/${company.slug}/d/${driver.slug}` : `/${company.slug}`;

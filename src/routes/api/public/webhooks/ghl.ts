@@ -95,7 +95,10 @@ export const Route = createFileRoute("/api/public/webhooks/ghl")({
         }
 
         const url = new URL(request.url);
-        const origin = `${url.protocol}//${url.host}`;
+        const configuredOrigin = process.env.APP_PUBLIC_URL?.trim().replace(/\/$/, "");
+        const origin = configuredOrigin?.startsWith("https://")
+          ? configuredOrigin
+          : `https://${url.host}`;
         const token = newReviewToken();
         const expiresAt = new Date(Date.now() + (expiresInDays ?? 10) * 86_400_000).toISOString();
         const { error: contextError } = await db.from("review_contexts").upsert({

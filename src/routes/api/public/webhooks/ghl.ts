@@ -3,6 +3,11 @@ import { z } from "zod";
 import { timingSafeEqual } from "crypto";
 import { hashReviewToken, newReviewToken } from "@/lib/review-webhooks.server";
 
+const optionalText = (schema: z.ZodString) => z.preprocess(
+  (value) => value === null || value === undefined || value === "" ? undefined : String(value),
+  schema.optional(),
+) as unknown as z.ZodOptional<z.ZodString>;
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -11,21 +16,21 @@ const CORS = {
 
 const Body = z.object({
   companySlug: z.string().min(1),
-  jobId: z.string().trim().min(1).max(200),
-  ghlContactId: z.string().trim().max(200).optional(),
+  jobId: z.preprocess((value) => String(value), z.string().trim().min(1).max(200)),
+  ghlContactId: optionalText(z.string().trim().max(200)),
   expiresInDays: z.number().int().min(1).max(30).optional(),
   driver: z.object({
     // At least one of these must be provided to match a driver.
-    slug: z.string().trim().min(1).optional(),
-    name: z.string().trim().min(1).max(120).optional(),
-    email: z.string().trim().email().optional(),
-    phone: z.string().trim().min(5).optional(),
+    slug: optionalText(z.string().trim().min(1)),
+    name: optionalText(z.string().trim().min(1).max(120)),
+    email: optionalText(z.string().trim().email()),
+    phone: optionalText(z.string().trim().min(5)),
   }).optional(),
   contact: z
     .object({
-      name: z.string().trim().max(200).optional(),
-      email: z.string().trim().email().optional(),
-      phone: z.string().trim().max(40).optional(),
+      name: optionalText(z.string().trim().max(200)),
+      email: optionalText(z.string().trim().email()),
+      phone: optionalText(z.string().trim().max(40)),
     })
     .optional(),
 });
@@ -82,7 +87,7 @@ export const Route = createFileRoute("/api/public/webhooks/ghl")({
           .maybeSingle();
         if (!company) return json(404, { error: `Company not found: ${companySlug}` });
 
-        let driver = null;
+        let driver: { id: string; slug: string; display_name: string; email: string | null; phone: string | null; status: string } | null = null;
         if (driverKey) {
           let query = db.from("drivers").select("id, slug, display_name, email, phone, status")
             .eq("company_id", company.id).eq("status", "active").limit(1);
@@ -104,6 +109,9 @@ export const Route = createFileRoute("/api/public/webhooks/ghl")({
         const { error: contextError } = await db.from("review_contexts").upsert({
           company_id: company.id, driver_id: driver?.id ?? null, token_hash: hashReviewToken(token),
           external_job_id: jobId, external_contact_id: ghlContactId ?? null, expires_at: expiresAt,
+          customer_name: contact?.name ?? null,
+          customer_phone: contact?.phone ?? null,
+          customer_email: contact?.email ?? null,
         }, { onConflict: "company_id,external_job_id" });
         if (contextError) return json(500, { error: "Could not create review link" });
         const path = driver ? `/${company.slug}/d/${driver.slug}` : `/${company.slug}`;

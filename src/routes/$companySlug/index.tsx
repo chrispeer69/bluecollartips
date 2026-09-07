@@ -24,7 +24,16 @@ function CompanyReviewPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { getCompany({ data: { companySlug } }).then(setCompany).finally(() => setLoading(false)); }, [companySlug, getCompany]);
+  useEffect(() => {
+    getCompany({ data: { companySlug, reviewToken } }).then((result) => {
+      setCompany(result);
+      if (result?.reviewContact) {
+        setCustomerName(result.reviewContact.name ?? "");
+        setCustomerPhone(result.reviewContact.phone ?? "");
+        setCustomerEmail(result.reviewContact.email ?? "");
+      }
+    }).finally(() => setLoading(false));
+  }, [companySlug, getCompany, reviewToken]);
   const brand = useMemo(() => ({ primary: company?.primary_color || "#0b2545", secondary: company?.secondary_color || "#f59e0b" }), [company]);
   if (loading) return <div className="grid min-h-screen place-items-center">Loading…</div>;
   if (!company) return <div className="grid min-h-screen place-items-center">Link not active</div>;

@@ -61,22 +61,30 @@ async function resolveReviewContext(db: any, token: string | null | undefined, c
   if (!context || context.consumed_at || new Date(context.expires_at).getTime() <= Date.now()) {
     throw new Error("This review link is invalid, expired, or has already been used.");
   }
-  if (driverId && context.driver_id && context.driver_id !== driverId) throw new Error("Review link does not match this employee.");
+  if (driverId && context.driver_id && context.driver_id !== driverId) {
+    throw new Error("This review link is for a different employee. Please use the latest link from your service provider.");
+  }
   return context;
 }
 
 export const getPublicCompany = createServerFn({ method: "GET" })
-  .inputValidator((data) => z.object({ companySlug: z.string().min(1) }).parse(data))
+  .inputValidator((data) => z.object({ companySlug: z.string().min(1), reviewToken: z.string().trim().min(20).max(200).optional().nullable() }).parse(data))
   .handler(async ({ data }) => {
     const { db } = await import("@/db/client.server");
     const { data: company } = await db.from("companies").select(PUBLIC_COMPANY_FIELDS)
       .eq("slug", data.companySlug).eq("status", "active").maybeSingle();
-    return company;
+    if (!company) return null;
+    const context = await resolveReviewContext(db, data.reviewToken, company.id);
+    return { ...company, reviewContact: context ? {
+      name: context.customer_name ?? null,
+      phone: context.customer_phone ?? null,
+      email: context.customer_email ?? null,
+    } : null };
   });
 
 export const getPublicDriver = createServerFn({ method: "GET" })
   .inputValidator((data) =>
-    z.object({ companySlug: z.string().min(1), driverSlug: z.string().min(1) }).parse(data),
+    z.object({ companySlug: z.string().min(1), driverSlug: z.string().min(1), reviewToken: z.string().trim().min(20).max(200).optional().nullable() }).parse(data),
   )
   .handler(async ({ data }) => {
     const { db } = await import("@/db/client.server");
@@ -93,7 +101,12 @@ export const getPublicDriver = createServerFn({ method: "GET" })
       .eq("slug", data.driverSlug)
       .eq("status", "active")
       .maybeSingle();
-    return { company, driver };
+    const context = driver ? await resolveReviewContext(db, data.reviewToken, company.id, driver.id) : null;
+    return { company, driver, reviewContact: context ? {
+      name: context.customer_name ?? null,
+      phone: context.customer_phone ?? null,
+      email: context.customer_email ?? null,
+    } : null };
   });
 
 export const submitRating = createServerFn({ method: "POST" })

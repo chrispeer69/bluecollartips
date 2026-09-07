@@ -45,10 +45,17 @@ function TipPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getDriver({ data: { companySlug, driverSlug } })
-      .then(setData)
+    getDriver({ data: { companySlug, driverSlug, reviewToken } })
+      .then((result) => {
+        setData(result);
+        if (result.reviewContact) {
+          setCustomerName(result.reviewContact.name ?? "");
+          setCustomerPhone(result.reviewContact.phone ?? "");
+          setCustomerEmail(result.reviewContact.email ?? "");
+        }
+      })
       .finally(() => setLoading(false));
-  }, [companySlug, driverSlug, getDriver]);
+  }, [companySlug, driverSlug, getDriver, reviewToken]);
 
   const brand = useMemo(() => {
     const primary = data?.company?.primary_color || "#0b2545";

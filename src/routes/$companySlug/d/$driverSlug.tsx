@@ -227,7 +227,7 @@ function TipPage() {
             />
           )}
           <div className="text-left">
-            <div className="text-xs uppercase tracking-wider opacity-80">Your service pro</div>
+            <div className="text-xs uppercase tracking-wider opacity-80">Your driver</div>
             <div className="text-lg font-semibold">{driver.display_name}</div>
           </div>
         </div>
@@ -271,7 +271,7 @@ function TipPage() {
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium">Your name (optional)</label>
+              <label className="block text-sm font-medium">Your name</label>
               <input
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
@@ -280,7 +280,7 @@ function TipPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium">Phone (for a thank-you text)</label>
+              <label className="block text-sm font-medium">Phone</label>
               <input
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
@@ -290,7 +290,7 @@ function TipPage() {
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium">Email (for a thank-you email)</label>
+              <label className="block text-sm font-medium">Email</label>
               <input
                 type="email"
                 value={customerEmail}

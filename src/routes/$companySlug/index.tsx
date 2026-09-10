@@ -46,7 +46,7 @@ function CompanyReviewPage() {
   const tipValid = finalTipCents === 0 || (finalTipCents >= TIP_MIN_CENTS && finalTipCents <= TIP_MAX_CENTS);
   if (loading) return <div className="grid min-h-screen place-items-center">Loading…</div>;
   if (!company) return <div className="grid min-h-screen place-items-center">Link not active</div>;
-  if (done) return <div className="grid min-h-screen place-items-center px-6 text-center" style={{ background: brand.primary, color: "white" }}><div><h1 className="text-3xl font-bold">Thank you!</h1><p className="mt-3">Your feedback helps {company.name} keep raising the bar.</p></div></div>;
+  if (done) return <div className="grid min-h-screen place-items-center px-6 text-center" style={{ background: brand.primary, color: "white" }}><div><h1 className="text-3xl font-bold">Thank you!</h1><p className="mt-3">Your support helps {company.name} keep raising the bar.</p></div></div>;
 
   return <div className="min-h-screen bg-background">
     <header className="px-5 py-6 text-white" style={{ background: brand.primary }}>
@@ -75,7 +75,12 @@ function CompanyReviewPage() {
             <button
               type="button"
               key={c}
-              onClick={() => { setTipCents(c); setCustomTip(""); setCustomTipOpen(false); setError(null); }}
+              onClick={() => {
+                setTipCents(tipCents === c ? null : c);
+                setCustomTip("");
+                setCustomTipOpen(false);
+                setError(null);
+              }}
               className="rounded-md border px-2 py-3 text-sm font-medium"
               style={tipCents === c ? { background: brand.secondary, color: "white", borderColor: brand.secondary } : undefined}
             >
@@ -84,7 +89,12 @@ function CompanyReviewPage() {
           ))}
           <button
             type="button"
-            onClick={() => { setTipCents(null); setCustomTip(""); setCustomTipOpen(true); setError(null); }}
+            onClick={() => {
+              setTipCents(null);
+              setCustomTip("");
+              setCustomTipOpen((open) => !open);
+              setError(null);
+            }}
             className="rounded-md border px-2 py-3 text-sm font-medium"
             style={customTipOpen ? { background: brand.secondary, color: "white", borderColor: brand.secondary } : undefined}
           >
@@ -109,7 +119,7 @@ function CompanyReviewPage() {
         )}
         {finalTipCents > 0 && (
           <>
-            {tipValid && stars > 0 && (!customerEmail.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) && (
+            {tipValid && (!customerEmail.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) && (
               <StripeCardPanel
                 companySlug={companySlug}
                 amountCents={finalTipCents}
@@ -119,30 +129,24 @@ function CompanyReviewPage() {
                 stars={stars || null}
                 brandColor={brand.primary}
                 onPaid={async () => {
-                  try {
-                    const result = await submit({ data: {
-                      companySlug,
-                      stars,
-                      feedback: feedback.trim() || null,
-                      customerName: customerName.trim() || null,
-                      customerPhone: customerPhone.trim() || null,
-                      customerEmail: customerEmail.trim() || null,
-                      reviewToken,
-                    } });
-                    if (result.redirectUrl) { window.location.assign(result.redirectUrl); return; }
-                  } catch { /* The payment is still safely recorded by Stripe's webhook. */ }
+                  if (stars) {
+                    try {
+                      const result = await submit({ data: {
+                        companySlug,
+                        stars,
+                        feedback: feedback.trim() || null,
+                        customerName: customerName.trim() || null,
+                        customerPhone: customerPhone.trim() || null,
+                        customerEmail: customerEmail.trim() || null,
+                        reviewToken,
+                      } });
+                      if (result.redirectUrl) { window.location.assign(result.redirectUrl); return; }
+                    } catch { /* The payment is still safely recorded by Stripe's webhook. */ }
+                  }
                   setDone(true);
                 }}
               />
             )}
-            {!stars && <p className="mt-3 text-sm text-muted-foreground">Choose a star rating to continue to payment.</p>}
-            <button
-              type="button"
-              onClick={() => { setTipCents(null); setCustomTip(""); setCustomTipOpen(false); setError(null); }}
-              className="mt-3 text-sm text-muted-foreground underline"
-            >
-              Continue without a tip
-            </button>
           </>
         )}
       </section>

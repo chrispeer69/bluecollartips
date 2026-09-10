@@ -86,7 +86,7 @@ function CardForm({ amountCents, brandColor, onPaid }: Props) {
 
   return (
     <div className="mt-3 rounded-md border border-border p-3">
-      <PaymentElement />
+      <PaymentElement options={{ paymentMethodOrder: ["cashapp", "card"] }} />
       {err && <p className="mt-2 text-sm text-destructive">{err}</p>}
       <button
         type="button"

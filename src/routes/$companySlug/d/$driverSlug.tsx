@@ -94,7 +94,7 @@ function TipPage() {
           )}
           <h1 className="display mt-10 text-3xl font-bold">Thank you!</h1>
           <p className="mt-3 text-base opacity-90">
-            Your feedback helps {driver.display_name} and the {company.name} team keep raising the
+            Your support helps {driver.display_name} and the {company.name} team keep raising the
             bar.
           </p>
           {stars >= company.positive_rating_threshold && (company.google_review_url || company.yelp_review_url || company.facebook_review_url) && (
@@ -306,7 +306,7 @@ function TipPage() {
                   type="button"
                   key={c}
                   onClick={() => {
-                    setTipCents(c);
+                    setTipCents(tipCents === c ? null : c);
                     setCustomTip("");
                     setCustomTipOpen(false);
                     setError(null);
@@ -327,7 +327,7 @@ function TipPage() {
               onClick={() => {
                 setTipCents(null);
                 setCustomTip("");
-                setCustomTipOpen(true);
+                setCustomTipOpen((open) => !open);
                 setError(null);
               }}
               className="rounded-md border px-2 py-3 text-sm font-medium"
@@ -363,7 +363,7 @@ function TipPage() {
 
           {finalTipCents > 0 && (
             <>
-              {tipValid && stars > 0 && (!customerEmail.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) && (
+              {tipValid && (!customerEmail.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) && (
                 <StripeCardPanel
                   companySlug={companySlug}
                   driverSlug={driverSlug}
@@ -383,10 +383,11 @@ function TipPage() {
                             stars,
                             feedback: feedback.trim() || null,
                             customerName: customerName.trim() || null,
-                          customerPhone: customerPhone.trim() || null,
-                          customerEmail: customerEmail.trim() || null,
+                            customerPhone: customerPhone.trim() || null,
+                            customerEmail: customerEmail.trim() || null,
                             tipCents: null,
                             tipSource: null,
+                            reviewToken,
                           },
                         });
                       } catch { /* rating optional after payment */ }
@@ -395,19 +396,6 @@ function TipPage() {
                   }}
                 />
               )}
-              {!stars && <p className="mt-3 text-sm text-muted-foreground">Choose a star rating to continue to payment.</p>}
-              <button
-                type="button"
-                onClick={() => {
-                  setTipCents(null);
-                  setCustomTip("");
-                  setCustomTipOpen(false);
-                  setError(null);
-                }}
-                className="mt-3 text-sm text-muted-foreground underline"
-              >
-                Continue without a tip
-              </button>
             </>
           )}
         </section>

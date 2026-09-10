@@ -78,7 +78,12 @@ export const refreshStripeStatus = createServerFn({ method: "POST" })
     return { enabled: true, charges: !!acct.charges_enabled, payouts: !!acct.payouts_enabled };
   });
 
-/** Public: creates a PaymentIntent with 20% application fee, transferring 80% to driver. */
+/** Public: collects a tip into the platform Stripe account.
+ *
+ * Driver/company attribution is retained in metadata and the tips ledger. Payouts
+ * are handled separately, so a driver does not need a connected Stripe account
+ * before a customer can leave a card tip.
+ */
 export const createTipPaymentIntent = createServerFn({ method: "POST" })
   .inputValidator((d) =>
     z
@@ -106,21 +111,16 @@ export const createTipPaymentIntent = createServerFn({ method: "POST" })
     if (!company) throw new Error("Company not found");
     const { data: driver } = await db
       .from("drivers")
-      .select("id, stripe_account_id, stripe_charges_enabled, status, display_name")
+      .select("id, status, display_name")
       .eq("company_id", company.id)
       .eq("slug", data.driverSlug)
       .maybeSingle();
     if (!driver || driver.status !== "active") throw new Error("Driver not available");
-    if (!driver.stripe_account_id || !driver.stripe_charges_enabled)
-      throw new Error("This driver isn't accepting card tips yet.");
 
-    const applicationFee = Math.round((data.amountCents * 20) / 100);
     const pi = await stripe.paymentIntents.create({
       amount: data.amountCents,
       currency: "usd",
       automatic_payment_methods: { enabled: true },
-      application_fee_amount: applicationFee,
-      transfer_data: { destination: driver.stripe_account_id },
       metadata: {
         company_id: company.id,
         driver_id: driver.id,

@@ -24,7 +24,7 @@ function CompanyReviewPage() {
   const [customerEmail, setCustomerEmail] = useState("");
   const [tipCents, setTipCents] = useState<number | null>(null);
   const [customTip, setCustomTip] = useState("");
-  const [payingByCard, setPayingByCard] = useState(false);
+  const [customTipOpen, setCustomTipOpen] = useState(false);
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,8 +56,7 @@ function CompanyReviewPage() {
       e.preventDefault(); setError(null); if (!stars) { setError("Please tap a star rating."); return; }
       if (customerEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) { setError("Please enter a valid email address."); return; }
       if (!tipValid) { setError(`Tip must be between ${dollars(TIP_MIN_CENTS)} and ${dollars(TIP_MAX_CENTS)}.`); return; }
-      if (finalTipCents > 0 && !payingByCard) { setError("Choose Card / Apple Pay / Google Pay to finish your tip."); return; }
-      if (finalTipCents > 0 && payingByCard) { setError("Tap the Pay-by-card button above to finish your tip."); return; }
+      if (finalTipCents > 0) { setError("Use the secure payment button above to finish your tip."); return; }
       setBusy(true);
       try {
         const result = await submit({ data: { companySlug, stars, feedback: feedback.trim() || null, customerName: customerName.trim() || null, customerPhone: customerPhone.trim() || null, customerEmail: customerEmail.trim() || null, reviewToken } });
@@ -76,46 +75,41 @@ function CompanyReviewPage() {
             <button
               type="button"
               key={c}
-              onClick={() => { setTipCents(c); setCustomTip(""); setPayingByCard(false); }}
+              onClick={() => { setTipCents(c); setCustomTip(""); setCustomTipOpen(false); setError(null); }}
               className="rounded-md border px-2 py-3 text-sm font-medium"
               style={tipCents === c ? { background: brand.secondary, color: "white", borderColor: brand.secondary } : undefined}
             >
               ${(c / 100).toFixed(0)}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => { setTipCents(null); setCustomTip(""); setCustomTipOpen(true); setError(null); }}
+            className="rounded-md border px-2 py-3 text-sm font-medium"
+            style={customTipOpen ? { background: brand.secondary, color: "white", borderColor: brand.secondary } : undefined}
+          >
+            Custom
+          </button>
         </div>
-        <div className="mt-3 flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Custom $</span>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            inputMode="decimal"
-            value={customTip}
-            onChange={(e) => { setCustomTip(e.target.value); setTipCents(null); setPayingByCard(false); }}
-            placeholder="0.00"
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          />
-        </div>
+        {customTipOpen && (
+          <div className="mt-3 flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">$</span>
+            <input
+              autoFocus
+              type="number"
+              min={0}
+              step="0.01"
+              inputMode="decimal"
+              value={customTip}
+              onChange={(e) => { setCustomTip(e.target.value); setTipCents(null); setError(null); }}
+              placeholder="Enter tip amount"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
+        )}
         {finalTipCents > 0 && (
           <>
-            <button
-              type="button"
-              onClick={() => {
-                setError(null);
-                if (!stars) { setError("Please tap a star rating first."); return; }
-                if (customerEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) {
-                  setError("Please enter a valid email address.");
-                  return;
-                }
-                setPayingByCard(true);
-              }}
-              className="mt-3 w-full rounded-md px-4 py-3 text-sm font-semibold text-white"
-              style={{ background: brand.primary }}
-            >
-              Card / Apple Pay / Google Pay
-            </button>
-            {payingByCard && tipValid && (
+            {tipValid && stars > 0 && (!customerEmail.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) && (
               <StripeCardPanel
                 companySlug={companySlug}
                 amountCents={finalTipCents}
@@ -141,10 +135,18 @@ function CompanyReviewPage() {
                 }}
               />
             )}
+            {!stars && <p className="mt-3 text-sm text-muted-foreground">Choose a star rating to continue to payment.</p>}
+            <button
+              type="button"
+              onClick={() => { setTipCents(null); setCustomTip(""); setCustomTipOpen(false); setError(null); }}
+              className="mt-3 text-sm text-muted-foreground underline"
+            >
+              Continue without a tip
+            </button>
           </>
         )}
       </section>
-      {error && <p className="text-sm text-destructive">{error}</p>}<button disabled={busy} className="w-full rounded-md bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50">{busy ? "Submitting…" : "Submit feedback"}</button>
+      {error && <p className="text-sm text-destructive">{error}</p>}{finalTipCents === 0 && <button disabled={busy} className="w-full rounded-md bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50">{busy ? "Submitting…" : "Submit feedback"}</button>}
     </form>
   </div>;
 }

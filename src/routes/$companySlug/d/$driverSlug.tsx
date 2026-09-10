@@ -21,8 +21,6 @@ export const Route = createFileRoute("/$companySlug/d/$driverSlug")({
   component: TipPage,
 });
 
-type TipSource = "stripe" | "venmo" | "cashapp" | "zelle" | "paypal" | "cash" | "other";
-
 function TipPage() {
   const { companySlug, driverSlug } = useParams({ from: "/$companySlug/d/$driverSlug" });
   const { t: reviewToken } = Route.useSearch();
@@ -39,7 +37,7 @@ function TipPage() {
   const [customerEmail, setCustomerEmail] = useState("");
   const [tipCents, setTipCents] = useState<number | null>(null);
   const [customTip, setCustomTip] = useState("");
-  const [tipSource, setTipSource] = useState<TipSource | null>(null);
+  const [customTipOpen, setCustomTipOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -166,17 +164,12 @@ function TipPage() {
       setError("Please enter a valid email address.");
       return;
     }
-    if (finalTipCents > 0 && !tipSource) {
-      setError("Choose how you'd like to tip.");
-      return;
-    }
     if (!tipValid) {
       setError(`Tip must be between ${dollars(TIP_MIN_CENTS)} and ${dollars(TIP_MAX_CENTS)}.`);
       return;
     }
-    // Stripe card path: rating must be submitted first; webhook records the tip when payment succeeds.
-    if (finalTipCents > 0 && tipSource === "stripe") {
-      setError("Tap the blue Pay-by-card button above to finish your tip.");
+    if (finalTipCents > 0) {
+      setError("Use the secure payment button above to finish your tip.");
       return;
     }
     setSubmitting(true);
@@ -190,19 +183,14 @@ function TipPage() {
           customerName: customerName.trim() || null,
           customerPhone: customerPhone.trim() || null,
           customerEmail: customerEmail.trim() || null,
-          tipCents: finalTipCents > 0 ? finalTipCents : null,
-          tipSource: finalTipCents > 0 ? tipSource : null,
+          tipCents: null,
+          tipSource: null,
           reviewToken,
         },
       });
       if (result.redirectUrl) {
         window.location.assign(result.redirectUrl);
         return;
-      }
-      // If they chose a P2P deep link, open it now.
-      if (finalTipCents > 0 && tipSource && tipSource !== "stripe" && tipSource !== "cash") {
-        const url = p2pLink(tipSource, driver, finalTipCents);
-        if (url) window.open(url, "_blank");
       }
       setDone(true);
     } catch (err: unknown) {
@@ -320,6 +308,8 @@ function TipPage() {
                   onClick={() => {
                     setTipCents(c);
                     setCustomTip("");
+                    setCustomTipOpen(false);
+                    setError(null);
                   }}
                   className="rounded-md border px-2 py-3 text-sm font-medium"
                   style={
@@ -332,52 +322,48 @@ function TipPage() {
                 </button>
               );
             })}
-          </div>
-          <div className="mt-3 flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Custom $</span>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              inputMode="decimal"
-              value={customTip}
-              onChange={(e) => {
-                setCustomTip(e.target.value);
+            <button
+              type="button"
+              onClick={() => {
                 setTipCents(null);
+                setCustomTip("");
+                setCustomTipOpen(true);
+                setError(null);
               }}
-              placeholder="0.00"
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            />
-            {(tipCents || customTip) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setTipCents(null);
-                  setCustomTip("");
-                  setTipSource(null);
-                }}
-                className="text-xs text-muted-foreground underline"
-              >
-                clear
-              </button>
-            )}
+              className="rounded-md border px-2 py-3 text-sm font-medium"
+              style={
+                customTipOpen
+                  ? { background: brand.secondary, color: "white", borderColor: brand.secondary }
+                  : { borderColor: "var(--border)" }
+              }
+            >
+              Custom
+            </button>
           </div>
+          {customTipOpen && (
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">$</span>
+              <input
+                autoFocus
+                type="number"
+                min={0}
+                step="0.01"
+                inputMode="decimal"
+                value={customTip}
+                onChange={(e) => {
+                  setCustomTip(e.target.value);
+                  setTipCents(null);
+                  setError(null);
+                }}
+                placeholder="Enter tip amount"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </div>
+          )}
 
           {finalTipCents > 0 && (
             <>
-              <div className="mt-2 text-sm font-medium">Payment method</div>
-              <button
-                type="button"
-                onClick={() => setTipSource("stripe")}
-                className="mt-2 w-full rounded-md px-4 py-3 text-sm font-semibold text-white"
-                style={{
-                  background: tipSource === "stripe" ? brand.primary : brand.secondary,
-                  outline: tipSource === "stripe" ? `2px solid ${brand.primary}` : undefined,
-                }}
-              >
-                Card / Apple Pay / Google Pay
-              </button>
-              {tipSource === "stripe" && (
+              {tipValid && stars > 0 && (!customerEmail.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) && (
                 <StripeCardPanel
                   companySlug={companySlug}
                   driverSlug={driverSlug}
@@ -409,41 +395,19 @@ function TipPage() {
                   }}
                 />
               )}
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {(
-                  [
-                    ["venmo", "Venmo", driver.venmo_handle],
-                    ["cashapp", "Cash App", driver.cashapp_handle],
-                    ["zelle", "Zelle", driver.zelle_handle],
-                    ["paypal", "PayPal", driver.paypal_handle],
-                  ] as const
-                )
-                  .filter(([, , handle]) => !!handle)
-                  .map(([key, label]) => {
-                    const selected = tipSource === key;
-                    return (
-                      <button
-                        type="button"
-                        key={key}
-                        onClick={() => setTipSource(key)}
-                        className="rounded-md border px-3 py-2 text-sm"
-                        style={
-                          selected
-                            ? { borderColor: brand.primary, background: "var(--muted)" }
-                            : { borderColor: "var(--border)" }
-                        }
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-              </div>
-              {tipSource && tipSource !== "stripe" && (
-                <p className="mt-3 text-xs text-muted-foreground">
-                  You'll be sent to the {tipSource} app to complete the tip. Your service pro will
-                  manually confirm receipt — the rating is recorded either way.
-                </p>
-              )}
+              {!stars && <p className="mt-3 text-sm text-muted-foreground">Choose a star rating to continue to payment.</p>}
+              <button
+                type="button"
+                onClick={() => {
+                  setTipCents(null);
+                  setCustomTip("");
+                  setCustomTipOpen(false);
+                  setError(null);
+                }}
+                className="mt-3 text-sm text-muted-foreground underline"
+              >
+                Continue without a tip
+              </button>
             </>
           )}
         </section>
@@ -454,14 +418,16 @@ function TipPage() {
           </div>
         )}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-6 w-full rounded-md px-4 py-3 text-base font-semibold text-white disabled:opacity-50"
-          style={{ background: brand.primary }}
-        >
-          {submitting ? "Submitting…" : finalTipCents > 0 ? `Submit & tip ${dollars(finalTipCents)}` : "Submit rating"}
-        </button>
+        {finalTipCents === 0 && (
+          <button
+            type="submit"
+            disabled={submitting}
+            className="mt-6 w-full rounded-md px-4 py-3 text-base font-semibold text-white disabled:opacity-50"
+            style={{ background: brand.primary }}
+          >
+            {submitting ? "Submitting…" : "Submit rating"}
+          </button>
+        )}
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
           Powered by Blue Collar Tips
@@ -477,30 +443,4 @@ function TipPage() {
       </form>
     </div>
   );
-}
-
-function p2pLink(
-  source: TipSource,
-  driver: { venmo_handle: string | null; cashapp_handle: string | null; zelle_handle: string | null; paypal_handle: string | null },
-  cents: number,
-): string | null {
-  const amount = (cents / 100).toFixed(2);
-  switch (source) {
-    case "venmo":
-      return driver.venmo_handle
-        ? `https://venmo.com/${encodeURIComponent(driver.venmo_handle.replace(/^@/, ""))}?txn=pay&amount=${amount}&note=Tip`
-        : null;
-    case "cashapp":
-      return driver.cashapp_handle
-        ? `https://cash.app/${encodeURIComponent(driver.cashapp_handle.startsWith("$") ? driver.cashapp_handle : `$${driver.cashapp_handle}`)}/${amount}`
-        : null;
-    case "paypal":
-      return driver.paypal_handle
-        ? `https://paypal.me/${encodeURIComponent(driver.paypal_handle)}/${amount}`
-        : null;
-    case "zelle":
-      return null; // Zelle has no public deep link; handle is shown on confirmation
-    default:
-      return null;
-  }
 }

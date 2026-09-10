@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { useServerFn } from "@tanstack/react-start";
@@ -66,8 +66,11 @@ function CardForm({ amountCents, brandColor, onPaid }: Props) {
   const elements = useElements();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
+  const [paymentDetailsComplete, setPaymentDetailsComplete] = useState(false);
+  const cashAppAttemptStarted = useRef(false);
 
-  async function pay() {
+  const pay = useCallback(async () => {
     if (!stripe || !elements) return;
     setBusy(true);
     setErr(null);
@@ -78,25 +81,61 @@ function CardForm({ amountCents, brandColor, onPaid }: Props) {
     });
     setBusy(false);
     if (error) {
-      setErr(error.message ?? "Card declined");
+      setErr(error.message ?? "Payment could not be completed");
       return;
     }
     if (paymentIntent?.status === "succeeded") onPaid();
-  }
+  }, [elements, onPaid, stripe]);
+
+  useEffect(() => {
+    if (paymentMethod !== "cashapp") {
+      cashAppAttemptStarted.current = false;
+      return;
+    }
+    if (!paymentDetailsComplete || cashAppAttemptStarted.current || busy) return;
+
+    // Cash App has no details to type. Confirm as soon as it is selected so
+    // Stripe can immediately display its desktop QR (or open the mobile app).
+    cashAppAttemptStarted.current = true;
+    void pay();
+  }, [busy, pay, paymentDetailsComplete, paymentMethod]);
 
   return (
     <div className="mt-3 rounded-md border border-border p-3">
-      <PaymentElement options={{ paymentMethodOrder: ["cashapp", "card"] }} />
+      <PaymentElement
+        onChange={(event) => {
+          setPaymentMethod(event.value.type);
+          setPaymentDetailsComplete(event.complete);
+        }}
+      />
       {err && <p className="mt-2 text-sm text-destructive">{err}</p>}
-      <button
-        type="button"
-        onClick={pay}
-        disabled={busy || !stripe}
-        className="mt-3 w-full rounded-md px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
-        style={{ background: brandColor }}
-      >
-        {busy ? "Processing…" : `Pay ${dollars(amountCents)} securely`}
-      </button>
+      {paymentMethod === "cashapp" ? (
+        err ? (
+          <button
+            type="button"
+            onClick={() => void pay()}
+            disabled={busy || !stripe}
+            className="mt-3 w-full rounded-md px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+            style={{ background: brandColor }}
+          >
+            {busy ? "Processing…" : "Try Cash App Pay again"}
+          </button>
+        ) : (
+          <p className="mt-3 text-center text-sm text-muted-foreground">
+            {busy ? "Opening Cash App Pay…" : "Select Cash App Pay to display the QR code."}
+          </p>
+        )
+      ) : (
+        <button
+          type="button"
+          onClick={() => void pay()}
+          disabled={busy || !stripe || !paymentDetailsComplete}
+          className="mt-3 w-full rounded-md px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+          style={{ background: brandColor }}
+        >
+          {busy ? "Processing…" : `Pay ${dollars(amountCents)} by card`}
+        </button>
+      )}
     </div>
   );
 }

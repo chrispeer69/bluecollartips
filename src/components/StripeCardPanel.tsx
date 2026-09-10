@@ -95,7 +95,7 @@ function CardForm({ amountCents, brandColor, onPaid }: Props) {
         className="mt-3 w-full rounded-md px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
         style={{ background: brandColor }}
       >
-        {busy ? "Charging…" : `Pay ${dollars(amountCents)} by card`}
+        {busy ? "Processing…" : `Pay ${dollars(amountCents)} securely`}
       </button>
     </div>
   );

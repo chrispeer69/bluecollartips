@@ -376,7 +376,7 @@ function TipPage() {
                   onPaid={async () => {
                     if (stars) {
                       try {
-                        await submit({
+                        const result = await submit({
                           data: {
                             companySlug,
                             driverSlug,
@@ -390,6 +390,10 @@ function TipPage() {
                             reviewToken,
                           },
                         });
+                        if (result.redirectUrl) {
+                          window.location.assign(result.redirectUrl);
+                          return;
+                        }
                       } catch { /* rating optional after payment */ }
                     }
                     setDone(true);

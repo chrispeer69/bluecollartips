@@ -31,11 +31,11 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
           };
           const driverId = pi.metadata?.driver_id;
           const companyId = pi.metadata?.company_id;
-          if (driverId && companyId) {
-            await db.from("tips").upsert(
+          if (companyId) {
+            const { error: tipError } = await db.from("tips").upsert(
               {
                 company_id: companyId,
-                driver_id: driverId,
+                driver_id: driverId || null,
                 amount_cents: pi.amount,
                 source: "stripe",
                 stripe_payment_intent_id: pi.id,
@@ -49,7 +49,11 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
               },
               { onConflict: "stripe_payment_intent_id" },
             );
-            try {
+            if (tipError) {
+              console.error("stripe tip ledger write failed", tipError);
+              return new Response("Could not record tip", { status: 500 });
+            }
+            if (driverId) try {
               const { sendThankYou } = await import("@/lib/thankyou.server");
               await sendThankYou(db, {
                 companyId,
@@ -64,7 +68,7 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
               console.error("thank-you (stripe webhook) failed", e);
             }
             // Notify the employee and send the customer a receipt.
-            try {
+            if (driverId) try {
               const { notifyEmployee, sendCustomerReceipt } = await import("@/lib/notify.server");
               await notifyEmployee(db, {
                 companyId,

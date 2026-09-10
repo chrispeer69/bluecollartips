@@ -53,11 +53,11 @@ function TermsPage() {
             <h2 className="text-base font-semibold text-foreground">3. Tips and payments</h2>
             <p className="mt-2">
               Tips are voluntary payments made by customers. Card payments are processed by Stripe,
-              Inc.; you must accept Stripe's Connected Account Agreement to receive payouts. Tips are
-              split between the employee, the company, and the platform according to the percentages
-              configured for the company at the time of the tip. We do not hold funds; Stripe
-              disburses payouts to the bank account you connect. Cash and peer-to-peer tips logged in
-              the app are self-reported and are not processed or guaranteed by us.
+              Inc. Tips are recorded between the employee, the company, and the platform according
+              to the percentages configured for the company at the time of the tip. Card funds are
+              collected in the platform Stripe account and distributed separately. Cash and
+              peer-to-peer tips logged in the app are self-reported and are not processed or
+              guaranteed by us.
             </p>
           </section>
           <section>

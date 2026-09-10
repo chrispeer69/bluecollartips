@@ -54,8 +54,9 @@ export const platformOverview = createServerFn({ method: "GET" })
       m.companyShare += t.company_amount_cents;
       m.platformShare += t.platform_amount_cents;
       m.count += 1;
-      // Card tips routed via Stripe — company share is held in platform balance pending sweep
-      if (t.source !== "stripe") m.pendingCompany += t.company_amount_cents;
+      // Stage one: card tips are collected in the platform Stripe balance and
+      // the company's ledger share remains pending until it is paid manually.
+      if (t.source === "stripe") m.pendingCompany += t.company_amount_cents;
       byCompany.set(t.company_id, m);
       platformTotal += t.platform_amount_cents;
       grossTotal += t.amount_cents;

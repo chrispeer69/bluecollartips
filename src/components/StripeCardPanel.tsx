@@ -7,7 +7,7 @@ import { dollars } from "@/lib/constants";
 
 type Props = {
   companySlug: string;
-  driverSlug: string;
+  driverSlug?: string | null;
   amountCents: number;
   customerName?: string | null;
   customerPhone?: string | null;

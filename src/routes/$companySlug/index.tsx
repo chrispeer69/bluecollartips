@@ -2,6 +2,8 @@ import { createFileRoute, useParams } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getPublicCompany, submitCompanyRating } from "@/lib/public.functions";
+import { StripeCardPanel } from "@/components/StripeCardPanel";
+import { PRESET_TIPS, TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib/constants";
 
 export const Route = createFileRoute("/$companySlug/")({
   validateSearch: (search: Record<string, unknown>) => ({ t: typeof search.t === "string" ? search.t : undefined }),
@@ -20,6 +22,9 @@ function CompanyReviewPage() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
+  const [tipCents, setTipCents] = useState<number | null>(null);
+  const [customTip, setCustomTip] = useState("");
+  const [payingByCard, setPayingByCard] = useState(false);
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +41,9 @@ function CompanyReviewPage() {
     }).finally(() => setLoading(false));
   }, [companySlug, getCompany, reviewToken]);
   const brand = useMemo(() => ({ primary: company?.primary_color || "#0b2545", secondary: company?.secondary_color || "#f59e0b" }), [company]);
+  const customTipCents = Math.round(Number.parseFloat(customTip || "0") * 100);
+  const finalTipCents = tipCents ?? (Number.isFinite(customTipCents) ? customTipCents : 0);
+  const tipValid = finalTipCents === 0 || (finalTipCents >= TIP_MIN_CENTS && finalTipCents <= TIP_MAX_CENTS);
   if (loading) return <div className="grid min-h-screen place-items-center">Loading…</div>;
   if (!company) return <div className="grid min-h-screen place-items-center">Link not active</div>;
   if (done) return <div className="grid min-h-screen place-items-center px-6 text-center" style={{ background: brand.primary, color: "white" }}><div><h1 className="text-3xl font-bold">Thank you!</h1><p className="mt-3">Your feedback helps {company.name} keep raising the bar.</p></div></div>;
@@ -47,6 +55,9 @@ function CompanyReviewPage() {
     <form className="mx-auto max-w-md space-y-5 px-5 py-6" onSubmit={async (e) => {
       e.preventDefault(); setError(null); if (!stars) { setError("Please tap a star rating."); return; }
       if (customerEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) { setError("Please enter a valid email address."); return; }
+      if (!tipValid) { setError(`Tip must be between ${dollars(TIP_MIN_CENTS)} and ${dollars(TIP_MAX_CENTS)}.`); return; }
+      if (finalTipCents > 0 && !payingByCard) { setError("Choose Card / Apple Pay / Google Pay to finish your tip."); return; }
+      if (finalTipCents > 0 && payingByCard) { setError("Tap the Pay-by-card button above to finish your tip."); return; }
       setBusy(true);
       try {
         const result = await submit({ data: { companySlug, stars, feedback: feedback.trim() || null, customerName: customerName.trim() || null, customerPhone: customerPhone.trim() || null, customerEmail: customerEmail.trim() || null, reviewToken } });
@@ -57,6 +68,82 @@ function CompanyReviewPage() {
       <section className="rounded-xl border border-border bg-card p-5"><h1 className="text-lg font-semibold">How did we do?</h1><div className="mt-3 flex justify-between">{[1,2,3,4,5].map((n) => <button type="button" key={n} onClick={() => setStars(n)} className="p-1 text-4xl" style={{ color: stars >= n ? brand.secondary : "var(--muted-foreground)" }} aria-label={`${n} stars`}>★</button>)}</div>
       <label className="mt-5 block text-sm font-medium">Anything you'd like to share?</label><textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} rows={4} maxLength={2000} className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2" /></section>
       <section className="grid gap-3 rounded-xl border border-border bg-card p-5 sm:grid-cols-2"><Field label="Your name" value={customerName} setValue={setCustomerName} /><Field label="Phone" value={customerPhone} setValue={setCustomerPhone} /><div className="sm:col-span-2"><Field label="Email" value={customerEmail} setValue={setCustomerEmail} type="email" /></div></section>
+      <section className="rounded-xl border border-border bg-card p-5">
+        <h2 className="text-base font-semibold">Leave a tip (optional)</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Your tip supports the {company.name} team.</p>
+        <div className="mt-3 grid grid-cols-4 gap-2">
+          {PRESET_TIPS.map((c) => (
+            <button
+              type="button"
+              key={c}
+              onClick={() => { setTipCents(c); setCustomTip(""); setPayingByCard(false); }}
+              className="rounded-md border px-2 py-3 text-sm font-medium"
+              style={tipCents === c ? { background: brand.secondary, color: "white", borderColor: brand.secondary } : undefined}
+            >
+              ${(c / 100).toFixed(0)}
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Custom $</span>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            inputMode="decimal"
+            value={customTip}
+            onChange={(e) => { setCustomTip(e.target.value); setTipCents(null); setPayingByCard(false); }}
+            placeholder="0.00"
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        {finalTipCents > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                if (!stars) { setError("Please tap a star rating first."); return; }
+                if (customerEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) {
+                  setError("Please enter a valid email address.");
+                  return;
+                }
+                setPayingByCard(true);
+              }}
+              className="mt-3 w-full rounded-md px-4 py-3 text-sm font-semibold text-white"
+              style={{ background: brand.primary }}
+            >
+              Card / Apple Pay / Google Pay
+            </button>
+            {payingByCard && tipValid && (
+              <StripeCardPanel
+                companySlug={companySlug}
+                amountCents={finalTipCents}
+                customerName={customerName || null}
+                customerPhone={customerPhone || null}
+                customerEmail={customerEmail || null}
+                stars={stars || null}
+                brandColor={brand.primary}
+                onPaid={async () => {
+                  try {
+                    const result = await submit({ data: {
+                      companySlug,
+                      stars,
+                      feedback: feedback.trim() || null,
+                      customerName: customerName.trim() || null,
+                      customerPhone: customerPhone.trim() || null,
+                      customerEmail: customerEmail.trim() || null,
+                      reviewToken,
+                    } });
+                    if (result.redirectUrl) { window.location.assign(result.redirectUrl); return; }
+                  } catch { /* The payment is still safely recorded by Stripe's webhook. */ }
+                  setDone(true);
+                }}
+              />
+            )}
+          </>
+        )}
+      </section>
       {error && <p className="text-sm text-destructive">{error}</p>}<button disabled={busy} className="w-full rounded-md bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50">{busy ? "Submitting…" : "Submit feedback"}</button>
     </form>
   </div>;

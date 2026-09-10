@@ -89,11 +89,11 @@ export const createTipPaymentIntent = createServerFn({ method: "POST" })
     z
       .object({
         companySlug: z.string().min(1),
-        driverSlug: z.string().min(1),
+        driverSlug: z.string().min(1).optional().nullable(),
         amountCents: z.number().int().min(TIP_MIN_CENTS).max(TIP_MAX_CENTS),
         customerName: z.string().trim().max(120).optional().nullable(),
         customerPhone: z.string().trim().max(40).optional().nullable(),
-        customerEmail: z.string().trim().email().max(200).optional().nullable(),
+        customerEmail: z.string().trim().max(200).optional().nullable(),
         stars: z.number().int().min(1).max(5).optional().nullable(),
       })
       .parse(d),
@@ -102,20 +102,28 @@ export const createTipPaymentIntent = createServerFn({ method: "POST" })
     const { getStripe } = await import("./stripe.server");
     const stripe = getStripe();
     if (!stripe) throw new Error("Card payments are not configured yet.");
+    if (data.customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.customerEmail)) {
+      throw new Error("Please enter a valid email address.");
+    }
     const { db } = await import("@/db/client.server");
     const { data: company } = await db
       .from("companies")
       .select("id")
       .eq("slug", data.companySlug)
+      .eq("status", "active")
       .maybeSingle();
     if (!company) throw new Error("Company not found");
-    const { data: driver } = await db
-      .from("drivers")
-      .select("id, status, display_name")
-      .eq("company_id", company.id)
-      .eq("slug", data.driverSlug)
-      .maybeSingle();
-    if (!driver || driver.status !== "active") throw new Error("Driver not available");
+    const { data: driver } = data.driverSlug
+      ? await db
+          .from("drivers")
+          .select("id, status, display_name")
+          .eq("company_id", company.id)
+          .eq("slug", data.driverSlug)
+          .maybeSingle()
+      : { data: null };
+    if (data.driverSlug && (!driver || driver.status !== "active")) {
+      throw new Error("Driver not available");
+    }
 
     const pi = await stripe.paymentIntents.create({
       amount: data.amountCents,
@@ -123,7 +131,7 @@ export const createTipPaymentIntent = createServerFn({ method: "POST" })
       automatic_payment_methods: { enabled: true },
       metadata: {
         company_id: company.id,
-        driver_id: driver.id,
+        driver_id: driver?.id ?? "",
         customer_name: data.customerName ?? "",
         customer_phone: data.customerPhone ?? "",
         customer_email: data.customerEmail ?? "",

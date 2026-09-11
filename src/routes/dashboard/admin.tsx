@@ -1291,34 +1291,37 @@ function UnassignedTipsPanel({ tips, drivers, onChanged }: {
 }) {
   const assignTip = useServerFn(assignCompanyTipToDriver);
   const activeDrivers = drivers.filter((driver: any) => driver.status === "active");
-  const unassigned = tips.filter((tip: any) => !tip.driver_id && tip.verified && !tip.disputed && !tip.refunded_at);
+  const unassigned = tips.filter((tip: any) => !tip.driver_id && !tip.assigned_at && tip.verified && !tip.disputed && !tip.refunded_at);
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   if (!unassigned.length) return <p className="text-sm text-muted-foreground">No verified company tips are waiting for employee assignment.</p>;
   return <div>
-    <p className="mb-3 text-xs text-muted-foreground">Assign a company-level tip when you later identify the employee. The configured split moves the employee share into that employee’s wallet.</p>
+    <p className="mb-3 text-xs text-muted-foreground">Choose an employee when identified, or finalize the tip for the company. Until a choice is made, the tip remains temporarily unassigned and its available share stays with the company.</p>
     {message && <p className="mb-3 text-sm text-muted-foreground">{message}</p>}
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead className="text-xs uppercase text-muted-foreground"><tr><th className="py-2">Customer</th><th>Amount</th><th>Date</th><th>Employee</th><th></th></tr></thead>
         <tbody className="divide-y divide-border">{unassigned.map((tip: any) => {
-          const selected = selections[tip.id] ?? activeDrivers[0]?.id ?? "";
+          const selected = selections[tip.id] ?? "";
           return <tr key={tip.id}>
             <td className="py-3">{tip.customer_name || "Customer"}</td>
             <td>{dollars(Number(tip.amount_cents))}</td>
             <td>{new Date(tip.created_at).toLocaleString()}</td>
-            <td>{activeDrivers.length ? <Select value={selected} onValueChange={(value) => setSelections((current) => ({ ...current, [tip.id]: value }))}>
-              <SelectTrigger className="min-w-48"><SelectValue placeholder="Select employee" /></SelectTrigger>
-              <SelectContent>{activeDrivers.map((driver: any) => <SelectItem key={driver.id} value={driver.id}>{driver.display_name}</SelectItem>)}</SelectContent>
-            </Select> : <span className="text-xs text-muted-foreground">No active employees</span>}</td>
+            <td><Select value={selected || undefined} onValueChange={(value) => setSelections((current) => ({ ...current, [tip.id]: value }))}>
+              <SelectTrigger className="min-w-48"><SelectValue placeholder="Choose destination" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="company">Company</SelectItem>
+                {activeDrivers.map((driver: any) => <SelectItem key={driver.id} value={driver.id}>{driver.display_name}</SelectItem>)}
+              </SelectContent>
+            </Select></td>
             <td className="text-right"><button disabled={!selected || busyId === tip.id} onClick={async () => {
               setBusyId(tip.id);
               setMessage(null);
               try {
-                await assignTip({ data: { tipId: tip.id, driverId: selected } });
-                setMessage("Tip assigned successfully.");
+                const result = await assignTip({ data: { tipId: tip.id, driverId: selected === "company" ? null : selected } });
+                setMessage(result.assignedTo === "company" ? "Tip finalized for the company." : "Tip assigned to the employee successfully.");
                 await onChanged();
               } catch (error) {
                 setMessage(error instanceof Error ? error.message : "Could not assign tip");

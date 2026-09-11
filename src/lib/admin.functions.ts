@@ -190,7 +190,7 @@ export const assignCompanyTipToDriver = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator((d) => z.object({
     tipId: z.string().uuid(),
-    driverId: z.string().uuid(),
+    driverId: z.string().uuid().nullable(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { sql } = await import("@/db/client.server");
@@ -207,16 +207,16 @@ export const assignCompanyTipToDriver = createServerFn({ method: "POST" })
       if (!tip) throw new Error("Tip not found");
       if (tip.driver_id) throw new Error("This tip is already assigned to an employee");
       if (!tip.verified || tip.disputed || tip.refunded_at) throw new Error("Only verified, undisputed tips can be assigned");
-      const [driver] = await tx`
+      const [driver] = data.driverId ? await tx`
         SELECT id, company_id, status FROM drivers WHERE id = ${data.driverId}
-      `;
-      if (!driver || driver.company_id !== tip.company_id) throw new Error("Employee does not belong to this company");
-      if (driver.status !== "active") throw new Error("Employee must be active");
+      ` : [null];
+      if (data.driverId && (!driver || driver.company_id !== tip.company_id)) throw new Error("Employee does not belong to this company");
+      if (driver && driver.status !== "active") throw new Error("Employee must be active");
       await tx`
-        UPDATE tips SET driver_id = ${driver.id}, assigned_by = ${context.userId}, assigned_at = NOW()
+        UPDATE tips SET driver_id = ${driver?.id ?? null}, assigned_by = ${context.userId}, assigned_at = NOW()
         WHERE id = ${tip.id}
       `;
-      return { ok: true };
+      return { ok: true, assignedTo: driver ? "employee" : "company" };
     });
   });
 

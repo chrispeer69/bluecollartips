@@ -52,8 +52,10 @@ test("company admins can assign verified company tips without cross-company acce
   assert.match(adminFunctions, /export const assignCompanyTipToDriver/);
   assert.match(adminFunctions, /Employee does not belong to this company/);
   assert.match(adminFunctions, /Only verified, undisputed tips can be assigned/);
+  assert.match(adminFunctions, /assignedTo: driver \? "employee" : "company"/);
   assert.match(adminDashboard, /Unassigned company tips/);
-  assert.match(adminDashboard, /Tip assigned successfully/);
+  assert.match(adminDashboard, /Tip finalized for the company/);
+  assert.match(adminDashboard, /<SelectItem value="company">Company<\/SelectItem>/);
 });
 
 test("company share is configurable from zero to ten while platform remains ten", () => {

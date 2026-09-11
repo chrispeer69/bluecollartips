@@ -20,7 +20,11 @@ import { platformOverview, suspendTenant } from "@/lib/platform.functions";
 import { sendTipLinkSms } from "@/lib/sms.functions";
 import { listTipDisputes, flagTipDispute, clearTipDispute, refundTip } from "@/lib/disputes.functions";
 import { listLocations, createLocation, deleteLocation, setDriverLocation, updateReviewLinks } from "@/lib/locations.functions";
-import { getCompanyWallet, reviewWalletPayout, updateWalletSettings } from "@/lib/wallet.functions";
+import {
+  getPlatformWallet,
+  reviewPlatformWalletPayout,
+  updatePlatformWalletSettings,
+} from "@/lib/wallet.functions";
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, CreditCard, LayoutDashboard, MessageSquareText, Settings, ShieldCheck, Users } from "lucide-react";
@@ -41,7 +45,7 @@ export const Route = createFileRoute("/dashboard/admin")({
 
 type Data = any;
 type CompanyPage = "overview" | "employees" | "feedback" | "payments" | "settings";
-type PlatformPage = "platformOverview" | "platformOrganizations" | "platformUsers" | "platformPayments";
+type PlatformPage = "platformOverview" | "platformOrganizations" | "platformUsers" | "platformPayments" | "platformSettings";
 type AdminPage = CompanyPage | PlatformPage;
 const adminNav: DashboardNavItem<AdminPage>[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, group: "Workspace" },
@@ -55,6 +59,7 @@ const platformNav: DashboardNavItem<AdminPage>[] = [
   { id: "platformOrganizations", label: "Organizations", icon: Building2 },
   { id: "platformUsers", label: "Registered users", icon: Users, group: "Access" },
   { id: "platformPayments", label: "Platform earnings", icon: CreditCard, group: "Money" },
+  { id: "platformSettings", label: "Platform settings", icon: Settings, group: "Configure" },
 ];
 
 function AdminDashboard() {
@@ -350,8 +355,6 @@ function AdminDashboard() {
         {page === "employees" && <Section title="Pending join requests">
           <JoinRequestsPanel companyId={data.company.id} onApproved={() => load(companyId)} />
         </Section>}
-
-        {page === "payments" && <WalletAdminPanel companyId={data.company.id} />}
 
         {page === "payments" && <Section title="Tip disputes & refunds">
           <DisputesPanel
@@ -1055,18 +1058,18 @@ function JoinRequestsPanel({ companyId, onApproved }: { companyId: string; onApp
   );
 }
 
-function WalletAdminPanel({ companyId }: { companyId: string }) {
-  const getWallet = useServerFn(getCompanyWallet);
-  const saveSettings = useServerFn(updateWalletSettings);
-  const reviewPayout = useServerFn(reviewWalletPayout);
-  const [wallet, setWallet] = useState<Awaited<ReturnType<typeof getCompanyWallet>> | null>(null);
+function PlatformWalletPanel({ mode }: { mode: "settings" | "requests" }) {
+  const getWallet = useServerFn(getPlatformWallet);
+  const saveSettings = useServerFn(updatePlatformWalletSettings);
+  const reviewPayout = useServerFn(reviewPlatformWalletPayout);
+  const [wallet, setWallet] = useState<Awaited<ReturnType<typeof getPlatformWallet>> | null>(null);
   const [minimum, setMinimum] = useState("25.00");
   const [processingDays, setProcessingDays] = useState("5");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function reload() {
-    const result = await getWallet({ data: { companyId } });
+    const result = await getWallet();
     setWallet(result);
     setMinimum((result.minimumCents / 100).toFixed(2));
     setProcessingDays(String(result.processingDays));
@@ -1075,7 +1078,7 @@ function WalletAdminPanel({ companyId }: { companyId: string }) {
   useEffect(() => {
     reload().catch((error) => setMessage(error instanceof Error ? error.message : "Could not load payouts"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId]);
+  }, []);
 
   async function act(requestId: string, action: "approve" | "reject" | "mark_paid") {
     let paymentMethod: string | null = null;
@@ -1103,8 +1106,8 @@ function WalletAdminPanel({ companyId }: { companyId: string }) {
   }
 
   return (
-    <Section title="Employee wallets & payout requests">
-      <form
+    <div>
+      {mode === "settings" && <form
         className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-muted/30 p-4"
         onSubmit={async (event) => {
           event.preventDefault();
@@ -1117,7 +1120,7 @@ function WalletAdminPanel({ companyId }: { companyId: string }) {
           setBusy(true);
           setMessage(null);
           try {
-            await saveSettings({ data: { companyId, minimumCents, processingDays: days } });
+            await saveSettings({ data: { minimumCents, processingDays: days } });
             setMessage("Wallet settings saved.");
             await reload();
           } catch (error) {
@@ -1132,23 +1135,24 @@ function WalletAdminPanel({ companyId }: { companyId: string }) {
         <button disabled={busy} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">
           Save settings
         </button>
-      </form>
-      <p className="mt-2 text-xs text-muted-foreground">
+      </form>}
+      {mode === "settings" && <p className="mt-2 text-xs text-muted-foreground">
         Stripe tips are available to employees immediately. The processing window is how long your team may take to complete an approved payout; it is not a hold on earnings.
-      </p>
+      </p>}
       {message && <p className="mt-3 text-sm text-muted-foreground">{message}</p>}
-      {!wallet ? <p className="mt-4 text-sm text-muted-foreground">Loading payout requests…</p> : wallet.requests.length === 0 ? (
+      {mode === "requests" && (!wallet ? <p className="mt-4 text-sm text-muted-foreground">Loading payout requests…</p> : wallet.requests.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">No payout requests yet.</p>
       ) : (
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
-              <tr><th className="py-2">Employee</th><th>Amount</th><th>Status</th><th>Requested</th><th className="text-right">Actions</th></tr>
+              <tr><th className="py-2">Employee</th><th>Company</th><th>Amount</th><th>Status</th><th>Requested</th><th className="text-right">Actions</th></tr>
             </thead>
             <tbody className="divide-y divide-border">
               {wallet.requests.map((request: any) => (
                 <tr key={request.id}>
                   <td className="py-3 font-medium">{request.driver_name}</td>
+                  <td>{request.company_name}</td>
                   <td>{dollars(Number(request.amount_cents))}</td>
                   <td className="capitalize">{String(request.status)}</td>
                   <td>{new Date(request.requested_at).toLocaleString()}</td>
@@ -1163,8 +1167,8 @@ function WalletAdminPanel({ companyId }: { companyId: string }) {
             </tbody>
           </table>
         </div>
-      )}
-    </Section>
+      ))}
+    </div>
   );
 }
 
@@ -1260,6 +1264,8 @@ function PlatformPanel({ view }: { view: PlatformPage }) {
   });
   return (
     <div className="space-y-4">
+      {view === "platformPayments" && <PlatformWalletPanel mode="requests" />}
+      {view === "platformSettings" && <PlatformWalletPanel mode="settings" />}
       {view === "platformOverview" && <div className="grid gap-3 sm:grid-cols-5">
         <Stat label="Gross tips" value={dollars(data.grossTotal)} />
         <Stat label="Platform 10%" value={dollars(data.platformTotal)} />

@@ -8,7 +8,7 @@ Project Overview
 
 Build a multi-tenant SaaS web app called Blue Collar AI that serves as both a review/reputation-generation tool and a tip platform for towing companies (and similar blue-collar service businesses). The platform is sold to towing companies as tenants. The first tenant is Roadside Towing.
 
-Core flow: a driver finishes a job → shows the customer a QR code or link → customer rates the service 1-5 stars, optionally leaves feedback, optionally tips through the platform's Stripe account or via the driver's personal Venmo/CashApp/Zelle (logged manually) → customer is invited to leave a Google review → revenue splits automatically on any tip → driver and company see real-time and historical ratings, feedback, and earnings → the driver requests a wallet payout once the company-configured minimum is reached.
+Core flow: a driver finishes a job → shows the customer a QR code or link → customer rates the service 1-5 stars, optionally leaves feedback, optionally tips through the platform's Stripe account or via the driver's personal Venmo/CashApp/Zelle (logged manually) → customer is invited to leave a Google review → revenue splits automatically on any tip → driver and company see real-time and historical ratings, feedback, and earnings → the driver requests a wallet payout once the platform-configured minimum is reached.
 
 This is a promotional and reputation tool first, tipping mechanism second — the rating/review capture must never be hidden behind or gated by the tip flow.
 
@@ -72,7 +72,7 @@ On the tip page, show the driver's personal Venmo/CashApp/Zelle/PayPal handle as
 
 Any tip sent this way happens outside the platform and must be manually logged by the driver as a "P2P tip" in the app (similar to the cash tip flow below), since Blue Collar AI never sees that money.
 
-Successful Stripe tips become available in the driver's wallet immediately. Once the company-configured minimum is reached, the driver requests the full available balance. Company admins approve and record the external payment within their configured 0–5 day processing window; this window is an operational service target, not an earnings hold.
+Successful Stripe tips become available in the driver's wallet immediately. Once the platform-configured minimum is reached, the driver requests the full available balance. Platform administrators approve and record the external payment within the global 0–5 day processing window; this window is an operational service target, not an earnings hold.
 
 All Stripe-processed tips land in the platform's Stripe Connect structure — there is no need for "one bank account" manual reconciliation; Stripe's ledger is the source of truth, and the app's dashboard is a reporting layer on top of it.
 

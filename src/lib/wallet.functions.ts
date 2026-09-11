@@ -29,11 +29,9 @@ async function requireDriverAccess(userId: string, driverId: string, ownAccountO
   return driver;
 }
 
-async function requireCompanyAdmin(userId: string, companyId: string) {
+async function requireSuperAdmin(userId: string) {
   const roles = await rolesFor(userId);
-  const allowed = roles.some(
-    (role) => role.role === "super_admin" || (role.role === "company_admin" && role.company_id === companyId),
-  );
+  const allowed = roles.some((role) => role.role === "super_admin");
   if (!allowed) throw new Error("Forbidden");
 }
 
@@ -44,12 +42,12 @@ export const getDriverWallet = createServerFn({ method: "POST" })
     const driver = await requireDriverAccess(context.userId, data.driverId);
     const { sql } = await import("@/db/client.server");
     const database = sql();
-    const [company] = await database`
+    const [settings] = await database`
       SELECT payout_minimum_cents, payout_processing_days
-      FROM companies
-      WHERE id = ${driver.company_id}
+      FROM platform_settings
+      WHERE singleton = true
     `;
-    if (!company) throw new Error("Company not found");
+    if (!settings) throw new Error("Platform payout settings are unavailable");
 
     const [earnings] = await database`
       SELECT
@@ -84,8 +82,8 @@ export const getDriverWallet = createServerFn({ method: "POST" })
       driverId: driver.id,
       availableCents: Math.max(0, earnedCents - reservedCents),
       paidCents: Number(payouts?.paid_cents ?? 0),
-      minimumCents: Number(company.payout_minimum_cents),
-      processingDays: Number(company.payout_processing_days),
+      minimumCents: Number(settings.payout_minimum_cents),
+      processingDays: Number(settings.payout_processing_days),
       canRequest: driver.user_id === context.userId && !openRequest,
       openRequest: openRequest ?? null,
     };
@@ -101,15 +99,20 @@ export const requestWalletPayout = createServerFn({ method: "POST" })
 
     return database.begin(async (tx) => {
       const [driver] = await tx`
-        SELECT d.id, d.user_id, d.company_id, d.status,
-               c.payout_minimum_cents, c.payout_processing_days
+        SELECT d.id, d.user_id, d.company_id, d.status
         FROM drivers d
-        JOIN companies c ON c.id = d.company_id
         WHERE d.id = ${data.driverId}
         FOR UPDATE
       `;
       if (!driver || driver.user_id !== context.userId) throw new Error("Only the employee can request this payout");
       if (driver.status !== "active") throw new Error("Employee account is not active");
+
+      const [settings] = await tx`
+        SELECT payout_minimum_cents, payout_processing_days
+        FROM platform_settings
+        WHERE singleton = true
+      `;
+      if (!settings) throw new Error("Platform payout settings are unavailable");
 
       const [openRequest] = await tx`
         SELECT id FROM payout_requests
@@ -136,8 +139,8 @@ export const requestWalletPayout = createServerFn({ method: "POST" })
           AND status IN ${tx(RESERVED_PAYOUT_STATUSES)}
       `;
       const available = Math.max(0, Number(earnings.earned_cents) - Number(reserved.amount_cents));
-      if (available < Number(driver.payout_minimum_cents)) {
-        throw new Error(`A minimum balance of $${(Number(driver.payout_minimum_cents) / 100).toFixed(2)} is required`);
+      if (available < Number(settings.payout_minimum_cents)) {
+        throw new Error(`A minimum balance of $${(Number(settings.payout_minimum_cents) / 100).toFixed(2)} is required`);
       }
 
       const [request] = await tx`
@@ -152,25 +155,25 @@ export const requestWalletPayout = createServerFn({ method: "POST" })
     });
   });
 
-export const getCompanyWallet = createServerFn({ method: "POST" })
+export const getPlatformWallet = createServerFn({ method: "GET" })
   .middleware([requireAuth])
-  .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
-  .handler(async ({ data, context }) => {
-    await requireCompanyAdmin(context.userId, data.companyId);
+  .handler(async ({ context }) => {
+    await requireSuperAdmin(context.userId);
     const { sql } = await import("@/db/client.server");
     const database = sql();
     const [settings] = await database`
       SELECT payout_minimum_cents, payout_processing_days
-      FROM companies WHERE id = ${data.companyId}
+      FROM platform_settings WHERE singleton = true
     `;
     const requests = await database`
       SELECT pr.id, pr.driver_id, d.display_name AS driver_name,
+             c.name AS company_name,
              pr.amount_cents, pr.status, pr.payment_method,
              pr.payment_reference, pr.admin_note, pr.requested_at,
              pr.reviewed_at, pr.paid_at
       FROM payout_requests pr
       JOIN drivers d ON d.id = pr.driver_id
-      WHERE pr.company_id = ${data.companyId}
+      JOIN companies c ON c.id = pr.company_id
       ORDER BY pr.requested_at DESC
       LIMIT 200
     `;
@@ -181,25 +184,26 @@ export const getCompanyWallet = createServerFn({ method: "POST" })
     };
   });
 
-export const updateWalletSettings = createServerFn({ method: "POST" })
+export const updatePlatformWalletSettings = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator((d) => z.object({
-    companyId: z.string().uuid(),
     minimumCents: z.number().int().min(100).max(100000),
     processingDays: z.number().int().min(0).max(5),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    await requireCompanyAdmin(context.userId, data.companyId);
+    await requireSuperAdmin(context.userId);
     const { db } = await import("@/db/client.server");
-    const { error } = await db.from("companies").update({
+    const { error } = await db.from("platform_settings").update({
       payout_minimum_cents: data.minimumCents,
       payout_processing_days: data.processingDays,
-    }).eq("id", data.companyId);
+      updated_at: new Date().toISOString(),
+      updated_by: context.userId,
+    }).eq("singleton", true);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
 
-export const reviewWalletPayout = createServerFn({ method: "POST" })
+export const reviewPlatformWalletPayout = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator((d) => z.object({
     requestId: z.string().uuid(),
@@ -213,6 +217,7 @@ export const reviewWalletPayout = createServerFn({ method: "POST" })
     }
   }).parse(d))
   .handler(async ({ data, context }) => {
+    await requireSuperAdmin(context.userId);
     const { sql } = await import("@/db/client.server");
     const database = sql();
     return database.begin(async (tx) => {
@@ -222,7 +227,6 @@ export const reviewWalletPayout = createServerFn({ method: "POST" })
         FOR UPDATE
       `;
       if (!request) throw new Error("Payout request not found");
-      await requireCompanyAdmin(context.userId, request.company_id);
 
       if (data.action === "approve") {
         if (request.status !== "pending") throw new Error("Only pending requests can be approved");

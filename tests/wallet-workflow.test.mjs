@@ -79,6 +79,9 @@ test("only platform admins configure and process manual wallet payouts", () => {
   assert.match(wallet, /paymentIntents\.retrieve/);
   assert.match(adminDashboard, /Stripe tip recovery/);
   assert.match(adminDashboard, /recoverPayment/);
+  assert.match(adminDashboard, /Recent Stripe tips/);
+  assert.match(adminDashboard, /stripe_payment_intent_id/);
+  assert.match(adminDashboard, /onTipsChanged/);
   assert.match(wallet, /action: z\.enum\(\["approve", "reject", "mark_paid"\]\)/);
   assert.doesNotMatch(wallet, /updateWalletSettings|getCompanyWallet|reviewWalletPayout/);
 });

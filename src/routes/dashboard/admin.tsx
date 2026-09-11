@@ -1077,7 +1077,7 @@ function JoinRequestsPanel({ companyId, onApproved }: { companyId: string; onApp
   );
 }
 
-function PlatformWalletPanel({ mode }: { mode: "settings" | "requests" }) {
+function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requests"; onTipsChanged?: () => void | Promise<void> }) {
   const getWallet = useServerFn(getPlatformWallet);
   const saveSettings = useServerFn(updatePlatformWalletSettings);
   const reviewPayout = useServerFn(reviewPlatformWalletPayout);
@@ -1175,6 +1175,7 @@ function PlatformWalletPanel({ mode }: { mode: "settings" | "requests" }) {
               const result = await syncHistory();
               setMessage(`Stripe sync complete: ${result.recorded} added, ${result.alreadyRecorded} already recorded, ${result.skipped} unrelated or incomplete, ${result.failed} failed${result.capped ? "; stopped at 1,000 payments" : ""}.`);
               await reload();
+              await onTipsChanged?.();
             } catch (error) {
               setMessage(error instanceof Error ? error.message : "Could not sync Stripe history");
             } finally {
@@ -1191,6 +1192,7 @@ function PlatformWalletPanel({ mode }: { mode: "settings" | "requests" }) {
             setMessage(result.alreadyRecorded ? "This Stripe payment was already recorded." : `Recovered ${dollars(result.amountCents)} Stripe tip.`);
             setPaymentIntentId("");
             await reload();
+            await onTipsChanged?.();
           } catch (error) {
             setMessage(error instanceof Error ? error.message : "Could not recover Stripe payment");
           } finally {
@@ -1413,7 +1415,7 @@ function PlatformPanel({ view }: { view: PlatformPage }) {
   });
   return (
     <div className="space-y-4">
-      {view === "platformPayments" && <PlatformWalletPanel mode="requests" />}
+      {view === "platformPayments" && <PlatformWalletPanel mode="requests" onTipsChanged={reload} />}
       {view === "platformSettings" && <PlatformWalletPanel mode="settings" />}
       {view === "platformOverview" && <div className="grid gap-3 sm:grid-cols-5">
         <Stat label="Gross tips" value={dollars(data.grossTotal)} />
@@ -1426,6 +1428,18 @@ function PlatformPanel({ view }: { view: PlatformPage }) {
         <Stat label="Gross tips" value={dollars(data.grossTotal)} />
         <Stat label="Platform fees earned" value={dollars(data.platformTotal)} />
         <Stat label="Tips processed" value={String(data.tips.length)} />
+      </div>}
+      {view === "platformPayments" && <div className="rounded-lg border border-border p-4">
+        <h3 className="font-semibold">Recent Stripe tips</h3>
+        {data.tips.filter((tip) => tip.source === "stripe").length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No Stripe tips are recorded yet.</p> : <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Paid</th><th>Stripe ID</th><th>Company</th><th>Employee</th><th>Gross</th><th>After platform fee</th><th>Employee net</th><th>Company share</th></tr></thead><tbody className="divide-y divide-border">
+            {data.tips.filter((tip) => tip.source === "stripe").slice(0, 100).map((tip) => {
+              const company = data.tenants.find((tenant) => tenant.id === tip.company_id);
+              const employee = data.employees.find((item) => item.id === tip.driver_id);
+              return <tr key={tip.id}><td className="py-2">{new Date(tip.created_at).toLocaleString()}</td><td className="font-mono text-xs">{tip.stripe_payment_intent_id || "—"}</td><td>{company?.name || "—"}</td><td>{employee?.display_name || "Company / unassigned"}</td><td>{dollars(tip.amount_cents)}</td><td>{dollars(tip.amount_cents - tip.platform_amount_cents)}</td><td>{dollars(tip.driver_amount_cents)}</td><td>{dollars(tip.company_amount_cents)}</td></tr>;
+            })}
+          </tbody></table>
+        </div>}
       </div>}
       {view === "platformPayments" && <div className="rounded-lg border border-border p-4">
         <h3 className="font-semibold">Organization fee breakdown</h3>

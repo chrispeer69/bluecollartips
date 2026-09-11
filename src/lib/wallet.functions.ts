@@ -203,6 +203,33 @@ export const updatePlatformWalletSettings = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Super-admin recovery path for a successful PaymentIntent whose webhook
+ * failed before the tip ledger was updated. Stripe remains the authority: the
+ * server retrieves the intent and only records it when Stripe says succeeded.
+ */
+export const recoverStripeTip = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({
+    paymentIntentId: z.string().trim().regex(/^pi_[A-Za-z0-9_]+$/).max(255),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireSuperAdmin(context.userId);
+    const { getStripe } = await import("./stripe.server");
+    const stripe = getStripe();
+    if (!stripe) throw new Error("Stripe is not configured");
+    const intent = await stripe.paymentIntents.retrieve(data.paymentIntentId);
+    if (intent.status !== "succeeded") throw new Error(`Stripe payment is ${intent.status}, not succeeded`);
+    const { db } = await import("@/db/client.server");
+    const { recordSuccessfulStripeTip } = await import("./stripe-tip-ledger.server");
+    const result = await recordSuccessfulStripeTip(db, {
+      id: intent.id,
+      amount: intent.amount,
+      metadata: intent.metadata,
+      status: intent.status,
+    });
+    return { ok: true, alreadyRecorded: !result.recorded, amountCents: intent.amount };
+  });
+
 export const reviewPlatformWalletPayout = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator((d) => z.object({

@@ -517,7 +517,7 @@ function WalletPanel({ driverId, viewingAsAdmin }: { driverId: string; viewingAs
             <div>
               <p>Successful online tips are available immediately.</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                After you request a payout, the company team will complete it within {wallet.processingDays === 0 ? "the same day" : `0–${wallet.processingDays} days`}.
+                After you request a payout, the Blue Collar Tips platform team will complete it within {wallet.processingDays === 0 ? "the same day" : `0–${wallet.processingDays} days`}.
               </p>
               {wallet.openRequest && (
                 <p className="mt-2 font-medium">

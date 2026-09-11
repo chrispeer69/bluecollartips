@@ -22,6 +22,7 @@ import { listTipDisputes, flagTipDispute, clearTipDispute, refundTip } from "@/l
 import { listLocations, createLocation, deleteLocation, setDriverLocation, updateReviewLinks } from "@/lib/locations.functions";
 import {
   getPlatformWallet,
+  recoverStripeTip,
   reviewPlatformWalletPayout,
   updatePlatformWalletSettings,
 } from "@/lib/wallet.functions";
@@ -1062,11 +1063,13 @@ function PlatformWalletPanel({ mode }: { mode: "settings" | "requests" }) {
   const getWallet = useServerFn(getPlatformWallet);
   const saveSettings = useServerFn(updatePlatformWalletSettings);
   const reviewPayout = useServerFn(reviewPlatformWalletPayout);
+  const recoverPayment = useServerFn(recoverStripeTip);
   const [wallet, setWallet] = useState<Awaited<ReturnType<typeof getPlatformWallet>> | null>(null);
   const [minimum, setMinimum] = useState("25.00");
   const [processingDays, setProcessingDays] = useState("5");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [paymentIntentId, setPaymentIntentId] = useState("");
 
   async function reload() {
     const result = await getWallet();
@@ -1140,10 +1143,33 @@ function PlatformWalletPanel({ mode }: { mode: "settings" | "requests" }) {
         Stripe tips are available to employees immediately. The processing window is how long your team may take to complete an approved payout; it is not a hold on earnings.
       </p>}
       {message && <p className="mt-3 text-sm text-muted-foreground">{message}</p>}
+      {mode === "requests" && <div className="rounded-lg border border-border p-4">
+        <h3 className="font-semibold">Recover a successful Stripe tip</h3>
+        <p className="mt-1 text-xs text-muted-foreground">Use this only when Stripe shows a successful payment but it is missing from Blue Collar Tips.</p>
+        <form className="mt-3 flex flex-wrap gap-2" onSubmit={async (event) => {
+          event.preventDefault();
+          setBusy(true);
+          setMessage(null);
+          try {
+            const result = await recoverPayment({ data: { paymentIntentId: paymentIntentId.trim() } });
+            setMessage(result.alreadyRecorded ? "This Stripe payment was already recorded." : `Recovered ${dollars(result.amountCents)} Stripe tip.`);
+            setPaymentIntentId("");
+            await reload();
+          } catch (error) {
+            setMessage(error instanceof Error ? error.message : "Could not recover Stripe payment");
+          } finally {
+            setBusy(false);
+          }
+        }}>
+          <input value={paymentIntentId} onChange={(event) => setPaymentIntentId(event.target.value)} placeholder="pi_..." required className="min-w-64 rounded-md border border-input bg-background px-3 py-2 text-sm" />
+          <button disabled={busy} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">Recover payment</button>
+        </form>
+      </div>}
       {mode === "requests" && (!wallet ? <p className="mt-4 text-sm text-muted-foreground">Loading payout requests…</p> : wallet.requests.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">No payout requests yet.</p>
       ) : (
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4 overflow-x-auto rounded-lg border border-border p-4">
+          <h3 className="mb-3 font-semibold">Employee payout requests</h3>
           <table className="w-full text-left text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
               <tr><th className="py-2">Employee</th><th>Company</th><th>Amount</th><th>Status</th><th>Requested</th><th className="text-right">Actions</th></tr>

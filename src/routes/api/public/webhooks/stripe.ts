@@ -1,24 +1,33 @@
 import { createFileRoute } from "@tanstack/react-router";
+import type Stripe from "stripe";
 
 export const Route = createFileRoute("/api/public/webhooks/stripe")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env.STRIPE_WEBHOOK_SECRET;
+        const secrets = [
+          process.env.STRIPE_WEBHOOK_SECRET,
+          process.env.STRIPE_LIVE_WEBHOOK_SECRET,
+          process.env.STRIPE_TEST_WEBHOOK_SECRET,
+        ].filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index);
         const sig = request.headers.get("stripe-signature");
         const body = await request.text();
-        if (!secret || !sig) return new Response("Not configured", { status: 400 });
+        if (!secrets.length || !sig) return new Response("Not configured", { status: 400 });
 
         const { getStripe } = await import("@/lib/stripe.server");
         const stripe = getStripe();
         if (!stripe) return new Response("Stripe not configured", { status: 500 });
 
-        let event;
-        try {
-          event = stripe.webhooks.constructEvent(body, sig, secret);
-        } catch (e) {
-          return new Response(`Invalid signature: ${e instanceof Error ? e.message : ""}`, { status: 400 });
+        let event: Stripe.Event | null = null;
+        for (const secret of secrets) {
+          try {
+            event = stripe.webhooks.constructEvent(body, sig, secret);
+            break;
+          } catch {
+            // Live and sandbox destinations have different signing secrets.
+          }
         }
+        if (!event) return new Response("Invalid Stripe signature", { status: 400 });
 
         const { db } = await import("@/db/client.server");
 
@@ -82,13 +91,17 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
             charges_enabled?: boolean;
             payouts_enabled?: boolean;
           };
-          await db
+          const { error } = await db
             .from("drivers")
             .update({
               stripe_charges_enabled: !!acct.charges_enabled,
               stripe_payouts_enabled: !!acct.payouts_enabled,
             })
             .eq("stripe_account_id", acct.id);
+          if (error) {
+            console.error("stripe account status update failed", error);
+            return new Response("Could not update Stripe account", { status: 500 });
+          }
         }
 
         return new Response("ok", { status: 200 });

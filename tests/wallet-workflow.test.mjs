@@ -48,6 +48,10 @@ test("only platform admins configure and process manual wallet payouts", () => {
   assert.match(adminDashboard, /view === "platformPayments" && <PlatformWalletPanel mode="requests"/);
   assert.match(adminDashboard, /view === "platformSettings" && <PlatformWalletPanel mode="settings"/);
   assert.match(wallet, /requireSuperAdmin/);
+  assert.match(wallet, /export const recoverStripeTip/);
+  assert.match(wallet, /paymentIntents\.retrieve/);
+  assert.match(adminDashboard, /Recover a successful Stripe tip/);
+  assert.match(adminDashboard, /recoverPayment/);
   assert.match(wallet, /action: z\.enum\(\["approve", "reject", "mark_paid"\]\)/);
   assert.doesNotMatch(wallet, /updateWalletSettings|getCompanyWallet|reviewWalletPayout/);
 });

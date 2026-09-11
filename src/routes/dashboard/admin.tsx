@@ -570,19 +570,20 @@ function DriverRoster({
                     </td>
                     <td className="hidden sm:table-cell">
                       {locations.length ? (
-                        <select
-                          value={d.location_id ?? ""}
-                          aria-label={`Location for ${d.display_name}`}
-                          onChange={async (e) => {
-                            const v = e.target.value || null;
+                        <Select
+                          value={d.location_id ?? "unassigned"}
+                          onValueChange={async (value) => {
+                            const v = value === "unassigned" ? null : value;
                             await setLoc({ data: { driverId: d.id, locationId: v } });
                             onLocationChanged();
                           }}
-                          className="max-w-36 rounded-md border border-input bg-background px-2 py-1 text-xs"
                         >
-                          <option value="">Not assigned</option>
-                          {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-                        </select>
+                          <SelectTrigger className="h-8 max-w-40 text-xs" aria-label={`Location for ${d.display_name}`}><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="unassigned">Not assigned</SelectItem>
+                            {locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
                       ) : (
                         <span className="text-xs text-muted-foreground">Not assigned</span>
                       )}
@@ -612,15 +613,17 @@ function DriverRoster({
                       >
                         QR / Link
                       </button>
-                      <select
+                      <Select
                         value={d.status}
-                        onChange={(e) => onStatus(d.id, e.target.value as "pending" | "active" | "deactivated")}
-                        className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+                        onValueChange={(value) => onStatus(d.id, value as "pending" | "active" | "deactivated")}
                       >
-                        <option value="pending">pending</option>
-                        <option value="active">active</option>
-                        <option value="deactivated">deactivated</option>
-                      </select>
+                        <SelectTrigger className="ml-auto h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="deactivated">Deactivated</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </td>
                   </tr>
                 );
@@ -823,15 +826,17 @@ function FlagsList({
               <div className="truncate font-medium">{String(byId.get(f.driver_id) ?? "Employee")}</div>
               <div className="text-xs text-muted-foreground">{f.reason}</div>
             </div>
-            <select
+            <Select
               value={f.status}
-              onChange={(e) => onResolve(f.id, e.target.value as "open" | "resolved" | "violation")}
-              className="shrink-0 rounded-md border border-input bg-background px-2 py-1 text-xs"
+              onValueChange={(value) => onResolve(f.id, value as "open" | "resolved" | "violation")}
             >
-              <option value="open">open</option>
-              <option value="resolved">resolved</option>
-              <option value="violation">violation</option>
-            </select>
+              <SelectTrigger className="h-8 w-32 shrink-0 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="violation">Violation</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           {f.notes && <p className="mt-1 text-muted-foreground">{f.notes}</p>}
         </li>
@@ -946,6 +951,7 @@ function InvitesPanel({ companyId }: { companyId: string }) {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const reload = async () => setItems((await list({ data: { companyId } })).items);
   useEffect(() => {
     reload();
@@ -961,6 +967,7 @@ function InvitesPanel({ companyId }: { companyId: string }) {
         onSubmit={async (e) => {
           e.preventDefault();
           setBusy(true);
+          setMessage(null);
           try {
             const r = await create({
               data: {
@@ -978,13 +985,13 @@ function InvitesPanel({ companyId }: { companyId: string }) {
               r.texted ? "✓ Text sent" : phone ? "⚠ Text not sent" : "",
               r.error ?? "",
             ].filter(Boolean);
-            alert(bits.join("\n"));
+            setMessage({ tone: "success", text: bits.join("\n") });
             setEmail("");
             setPhone("");
             setName("");
             await reload();
           } catch (err) {
-            alert(err instanceof Error ? err.message : "Failed to create invite");
+            setMessage({ tone: "error", text: err instanceof Error ? err.message : "Failed to create invite" });
           } finally {
             setBusy(false);
           }
@@ -1007,6 +1014,11 @@ function InvitesPanel({ companyId }: { companyId: string }) {
           {busy ? "Sending…" : "Send email invite"}
         </button>
       </form>
+      {message && (
+        <div className={`mb-3 whitespace-pre-wrap rounded-lg border p-3 text-sm ${message.tone === "error" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`} role="status">
+          {message.text}
+        </div>
+      )}
       {items.length === 0 ? (
         <div className="text-sm text-muted-foreground">No invites yet.</div>
       ) : (
@@ -1089,6 +1101,10 @@ function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requ
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState("");
+  const [pendingAction, setPendingAction] = useState<{ requestId: string; action: "reject" | "mark_paid" } | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [payoutNote, setPayoutNote] = useState("");
 
   async function reload() {
     const result = await getWallet();
@@ -1102,23 +1118,21 @@ function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function act(requestId: string, action: "approve" | "reject" | "mark_paid") {
-    let paymentMethod: string | null = null;
-    let paymentReference: string | null = null;
-    let note: string | null = null;
-    if (action === "mark_paid") {
-      paymentMethod = window.prompt("Payment method (bank transfer, Cash App, check, etc.):")?.trim() || null;
-      if (!paymentMethod) return;
-      paymentReference = window.prompt("Payment reference (optional):")?.trim() || null;
-    }
-    if (action === "reject") {
-      note = window.prompt("Reason for rejection (optional):")?.trim() || null;
-    }
+  async function act(requestId: string, action: "approve" | "reject" | "mark_paid", details?: { paymentMethod?: string; paymentReference?: string; note?: string }) {
     setBusy(true);
     setMessage(null);
     try {
-      await reviewPayout({ data: { requestId, action, paymentMethod, paymentReference, note } });
+      await reviewPayout({ data: {
+        requestId,
+        action,
+        paymentMethod: details?.paymentMethod?.trim() || null,
+        paymentReference: details?.paymentReference?.trim() || null,
+        note: details?.note?.trim() || null,
+      } });
       setMessage(action === "mark_paid" ? "Payout marked paid." : action === "approve" ? "Payout approved." : "Payout rejected.");
+      setPendingAction(null);
+      setPaymentReference("");
+      setPayoutNote("");
       await reload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not update payout");
@@ -1162,6 +1176,40 @@ function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requ
         Stripe tips are available to employees immediately. The processing window is how long your team may take to complete an approved payout; it is not a hold on earnings.
       </p>}
       {message && <p className="mt-3 text-sm text-muted-foreground">{message}</p>}
+      {mode === "requests" && pendingAction && <form onSubmit={(event) => {
+        event.preventDefault();
+        if (pendingAction.action === "mark_paid") {
+          act(pendingAction.requestId, "mark_paid", { paymentMethod, paymentReference });
+        } else {
+          act(pendingAction.requestId, "reject", { note: payoutNote });
+        }
+      }} className="mt-4 rounded-lg border border-border bg-muted/30 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-semibold">{pendingAction.action === "mark_paid" ? "Record completed payout" : "Reject payout request"}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">{pendingAction.action === "mark_paid" ? "Record how this employee was paid. A reference is optional." : "Add an optional internal reason before rejecting this request."}</p>
+          </div>
+          <button type="button" onClick={() => setPendingAction(null)} className="rounded-md border border-border px-3 py-2 text-sm">Cancel</button>
+        </div>
+        {pendingAction.action === "mark_paid" ? <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="text-sm">Payment method
+            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="bank_transfer">Bank transfer</SelectItem>
+                <SelectItem value="cash_app">Cash App</SelectItem>
+                <SelectItem value="check">Check</SelectItem>
+                <SelectItem value="cash">Cash</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          <Input label="Payment reference (optional)" value={paymentReference} onChange={setPaymentReference} />
+        </div> : <div className="mt-3"><Input label="Reason (optional)" value={payoutNote} onChange={setPayoutNote} /></div>}
+        <button disabled={busy} className={`mt-3 rounded-md px-4 py-2 text-sm text-white disabled:opacity-50 ${pendingAction.action === "reject" ? "bg-destructive" : "bg-primary"}`}>
+          {pendingAction.action === "mark_paid" ? "Confirm payment" : "Reject request"}
+        </button>
+      </form>}
       {mode === "requests" && <div className="rounded-lg border border-border p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -1222,8 +1270,8 @@ function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requ
                   <td>{new Date(request.requested_at).toLocaleString()}</td>
                   <td className="whitespace-nowrap text-right">
                     {request.status === "pending" && <button disabled={busy} onClick={() => act(request.id, "approve")} className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50">Approve</button>}{" "}
-                    {["pending", "approved"].includes(request.status) && <button disabled={busy} onClick={() => act(request.id, "reject")} className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50">Reject</button>}{" "}
-                    {["pending", "approved", "processing"].includes(request.status) && <button disabled={busy} onClick={() => act(request.id, "mark_paid")} className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50">Mark paid</button>}
+                    {["pending", "approved"].includes(request.status) && <button disabled={busy} onClick={() => setPendingAction({ requestId: request.id, action: "reject" })} className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50">Reject</button>}{" "}
+                    {["pending", "approved", "processing"].includes(request.status) && <button disabled={busy} onClick={() => setPendingAction({ requestId: request.id, action: "mark_paid" })} className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50">Mark paid</button>}
                     {request.status === "paid" && <span className="text-xs text-muted-foreground">{request.payment_method}{request.payment_reference ? ` · ${request.payment_reference}` : ""}</span>}
                   </td>
                 </tr>
@@ -1261,10 +1309,10 @@ function UnassignedTipsPanel({ tips, drivers, onChanged }: {
             <td className="py-3">{tip.customer_name || "Customer"}</td>
             <td>{dollars(Number(tip.amount_cents))}</td>
             <td>{new Date(tip.created_at).toLocaleString()}</td>
-            <td><select value={selected} onChange={(event) => setSelections((current) => ({ ...current, [tip.id]: event.target.value }))} className="rounded-md border border-input bg-background px-3 py-2 text-sm">
-              {!activeDrivers.length && <option value="">No active employees</option>}
-              {activeDrivers.map((driver: any) => <option key={driver.id} value={driver.id}>{driver.display_name}</option>)}
-            </select></td>
+            <td>{activeDrivers.length ? <Select value={selected} onValueChange={(value) => setSelections((current) => ({ ...current, [tip.id]: value }))}>
+              <SelectTrigger className="min-w-48"><SelectValue placeholder="Select employee" /></SelectTrigger>
+              <SelectContent>{activeDrivers.map((driver: any) => <SelectItem key={driver.id} value={driver.id}>{driver.display_name}</SelectItem>)}</SelectContent>
+            </Select> : <span className="text-xs text-muted-foreground">No active employees</span>}</td>
             <td className="text-right"><button disabled={!selected || busyId === tip.id} onClick={async () => {
               setBusyId(tip.id);
               setMessage(null);
@@ -1314,7 +1362,13 @@ function TipShareSettings({ company, onSaved }: { company: Data["company"]; onSa
     <p className="text-sm text-muted-foreground">Blue Collar Tips keeps a fixed 10% platform fee. Choose whether the company keeps 0–10%; the employee automatically receives the remainder.</p>
     <div className="grid gap-3 sm:grid-cols-3">
       <Stat label="Platform fee" value="10%" />
-      <label className="text-sm">Company share (0–10%)<input type="number" min="0" max="10" step="1" required value={companyPercent} onChange={(event) => setCompanyPercent(event.target.value)} className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2" /></label>
+      <label className="rounded-lg border border-border bg-card p-4 text-sm">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground">Company share (0–10%)</span>
+        <Select value={companyPercent} onValueChange={setCompanyPercent}>
+          <SelectTrigger className="mt-2 w-full"><SelectValue /></SelectTrigger>
+          <SelectContent>{Array.from({ length: 11 }, (_, value) => <SelectItem key={value} value={String(value)}>{value}%</SelectItem>)}</SelectContent>
+        </Select>
+      </label>
       <Stat label="Employee receives" value={employeePercent == null ? "—" : `${employeePercent}%`} />
     </div>
     <p className="text-xs text-muted-foreground">Changes apply to future tips. Historical tips retain their recorded distribution.</p>
@@ -1380,9 +1434,10 @@ function AdminSmsPanel({ drivers }: { drivers: Data["drivers"] }) {
     >
       <label className="text-sm">
         Employee
-        <select value={driverId} onChange={(e) => setDriverId(e.target.value)} className="mt-1 block rounded-md border border-input bg-background px-3 py-2 text-sm">
-          {drivers.map((d) => <option key={d.id} value={d.id}>{d.display_name}</option>)}
-        </select>
+        <Select value={driverId} onValueChange={setDriverId}>
+          <SelectTrigger className="mt-1 min-w-48"><SelectValue /></SelectTrigger>
+          <SelectContent>{drivers.map((d) => <SelectItem key={d.id} value={d.id}>{d.display_name}</SelectItem>)}</SelectContent>
+        </Select>
       </label>
       <Input label="Customer phone" value={phone} onChange={setPhone} required />
       <Input label="Name (optional)" value={name} onChange={setName} />
@@ -1628,6 +1683,7 @@ function LocationsPanel({ companyId }: { companyId: string }) {
   const [items, setItems] = useState<Awaited<ReturnType<typeof listLocations>>>([]);
   const [name, setName] = useState("");
   const [addr, setAddr] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const reload = async () => setItems(await list({ data: { companyId } }));
   useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [companyId]);
   return (
@@ -1656,10 +1712,11 @@ function LocationsPanel({ companyId }: { companyId: string }) {
                 <div className="font-medium">{l.name}</div>
                 {l.address && <div className="text-xs text-muted-foreground">{l.address}</div>}
               </div>
-              <button
-                onClick={async () => { if (confirm(`Delete location "${l.name}"?`)) { await del({ data: { locationId: l.id } }); await reload(); } }}
-                className="rounded border border-border px-2 py-1 text-xs"
-              >Delete</button>
+              {deletingId === l.id ? <div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/5 p-2">
+                <span className="text-xs text-destructive">Delete this location?</span>
+                <button type="button" onClick={async () => { await del({ data: { locationId: l.id } }); setDeletingId(null); await reload(); }} className="rounded-md bg-destructive px-2 py-1 text-xs text-destructive-foreground">Delete</button>
+                <button type="button" onClick={() => setDeletingId(null)} className="rounded-md border border-border px-2 py-1 text-xs">Cancel</button>
+              </div> : <button type="button" onClick={() => setDeletingId(l.id)} className="rounded-md border border-border px-2 py-1 text-xs">Delete</button>}
             </li>
           ))}
         </ul>
@@ -1732,14 +1789,16 @@ function ReviewLinksPanel({
       <Input label="Yelp review URL" value={yelp} onChange={setYelp} placeholder="https://www.yelp.com/writeareview/biz/…" />
       <Input label="Facebook review URL" value={facebook} onChange={setFacebook} placeholder="https://www.facebook.com/…/reviews" />
       <label className="text-sm">Positive rating threshold
-        <select value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2">
-          <option value={4}>4 stars and above</option><option value={5}>5 stars only</option>
-        </select>
+        <Select value={String(threshold)} onValueChange={(value) => setThreshold(Number(value))}>
+          <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="4">4 stars and above</SelectItem><SelectItem value="5">5 stars only</SelectItem></SelectContent>
+        </Select>
       </label>
       <label className="text-sm">After a positive submission
-        <select value={action} onChange={(e) => setAction(e.target.value as "success_page" | "redirect")} className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2">
-          <option value="success_page">Show success page</option><option value="redirect">Redirect to a link</option>
-        </select>
+        <Select value={action} onValueChange={(value) => setAction(value as "success_page" | "redirect")}>
+          <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="success_page">Show success page</SelectItem><SelectItem value="redirect">Redirect to a link</SelectItem></SelectContent>
+        </Select>
       </label>
       {action === "redirect" && <div className="sm:col-span-2"><Input label="Redirect URL" value={redirectUrl} onChange={setRedirectUrl} placeholder="https://g.page/r/…/review" required /></div>}
       <div className="sm:col-span-2 rounded-lg border border-border p-4">
@@ -1796,6 +1855,8 @@ function DisputesPanel({
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [refundTipId, setRefundTipId] = useState<string | null>(null);
+  const [refundAmount, setRefundAmount] = useState("");
   const byId = new Map(drivers.map((d) => [d.id, d.display_name]));
 
   const reload = async () => {
@@ -1842,19 +1903,17 @@ function DisputesPanel({
       >
         <label className="text-sm">
           Flag a tip
-          <select
-            value={tipId}
-            onChange={(e) => setTipId(e.target.value)}
-            className="mt-1 block max-w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          >
-            <option value="">Select a tip…</option>
+          <Select value={tipId || undefined} onValueChange={setTipId}>
+            <SelectTrigger className="mt-1 min-w-64 max-w-full"><SelectValue placeholder="Select a tip…" /></SelectTrigger>
+            <SelectContent>
             {openTips.map((t) => (
-              <option key={t.id} value={t.id}>
+              <SelectItem key={t.id} value={t.id}>
                 {dollars(t.amount_cents)} · {byId.get(t.driver_id) ?? "—"} · {t.source} ·{" "}
                 {new Date(t.created_at).toLocaleDateString()}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+            </SelectContent>
+          </Select>
         </label>
         <Input label="Reason" value={reason} onChange={setReason} />
         <button
@@ -1920,32 +1979,26 @@ function DisputesPanel({
                           <button
                             disabled={busy}
                             onClick={() => {
-                              const input = window.prompt(
-                                `Refund amount in dollars (max ${(t.amount_cents / 100).toFixed(2)}):`,
-                                (t.amount_cents / 100).toFixed(2),
-                              );
-                              if (input === null) return;
-                              const cents = Math.round(Number(input) * 100);
-                              if (!Number.isFinite(cents) || cents <= 0) {
-                                setMsg("Enter a valid refund amount.");
-                                return;
-                              }
-                              run(
-                                () =>
-                                  refund({
-                                    data: {
-                                      tipId: t.id,
-                                      amountCents: cents,
-                                      reason: t.dispute_reason ?? undefined,
-                                    },
-                                  }),
-                                "Refund issued — employee and customer notified.",
-                              );
+                              setRefundTipId(t.id);
+                              setRefundAmount((t.amount_cents / 100).toFixed(2));
                             }}
                             className="rounded bg-destructive px-2 py-1 text-xs text-destructive-foreground disabled:opacity-60"
                           >
                             Refund
                           </button>
+                          {refundTipId === t.id && <div className="mt-2 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-left">
+                            <label className="text-xs font-medium">Refund amount (maximum {dollars(t.amount_cents)})
+                              <input type="number" min="0.01" max={(t.amount_cents / 100).toFixed(2)} step="0.01" value={refundAmount} onChange={(event) => setRefundAmount(event.target.value)} className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+                            </label>
+                            <div className="mt-2 flex justify-end gap-2">
+                              <button type="button" onClick={() => setRefundTipId(null)} className="rounded-md border border-border px-3 py-1.5 text-xs">Cancel</button>
+                              <button type="button" disabled={busy} onClick={() => {
+                                const cents = Math.round(Number(refundAmount) * 100);
+                                if (!Number.isFinite(cents) || cents <= 0 || cents > t.amount_cents) { setMsg("Enter a valid refund amount."); return; }
+                                run(() => refund({ data: { tipId: t.id, amountCents: cents, reason: t.dispute_reason ?? undefined } }), "Refund issued — employee and customer notified.").then(() => setRefundTipId(null));
+                              }} className="rounded-md bg-destructive px-3 py-1.5 text-xs text-destructive-foreground disabled:opacity-60">Confirm refund</button>
+                            </div>
+                          </div>}
                         </>
                       )}
                     </td>

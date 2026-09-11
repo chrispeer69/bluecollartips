@@ -10,6 +10,7 @@ import { sendTipLinkSms } from "@/lib/sms.functions";
 import { confirmCashTip, disputeCashTip, listUnverifiedTips } from "@/lib/reconciliation.functions";
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
 import { JoinWorkspacePanel } from "@/components/JoinWorkspacePanel";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Banknote, Building2, LayoutDashboard, QrCode, Settings, WalletCards } from "lucide-react";
 
 type DriverPage = "overview" | "share" | "tips" | "earnings" | "settings";
@@ -323,18 +324,20 @@ function LogTipPanel({ driverId, onLogged }: { driverId: string; onLogged: () =>
         </label>
         <label className="text-sm">
           Method
-          <select
+          <Select
             value={source}
-            onChange={(e) => setSource(e.target.value as typeof source)}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            onValueChange={(value) => setSource(value as typeof source)}
           >
-            <option value="cash">Cash</option>
-            <option value="venmo">Venmo</option>
-            <option value="cashapp">Cash App</option>
-            <option value="zelle">Zelle</option>
-            <option value="paypal">PayPal</option>
-            <option value="other">Other</option>
-          </select>
+            <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="cash">Cash</SelectItem>
+              <SelectItem value="venmo">Venmo</SelectItem>
+              <SelectItem value="cashapp">Cash App</SelectItem>
+              <SelectItem value="zelle">Zelle</SelectItem>
+              <SelectItem value="paypal">PayPal</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
         <label className="text-sm sm:col-span-1">
           Customer name (optional)
@@ -601,6 +604,10 @@ function UnverifiedPanel({ driverId, onChange }: { driverId: string; onChange: (
   const confirm = useServerFn(confirmCashTip);
   const dispute = useServerFn(disputeCashTip);
   const [items, setItems] = useState<Awaited<ReturnType<typeof listUnverifiedTips>>["items"]>([]);
+  const [disputingId, setDisputingId] = useState<string | null>(null);
+  const [disputeReason, setDisputeReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
   const reload = async () => setItems((await list({ data: { driverId } })).items);
   useEffect(() => {
     reload();
@@ -623,21 +630,45 @@ function UnverifiedPanel({ driverId, onChange }: { driverId: string; onChange: (
             </div>
             <div className="flex gap-2">
               <button
-                onClick={async () => { await confirm({ data: { tipId: t.id } }); await reload(); onChange(); }}
-                className="rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground"
+                disabled={busy}
+                onClick={async () => { setBusy(true); setMessage(null); try { await confirm({ data: { tipId: t.id } }); await reload(); onChange(); } catch (error) { setMessage(error instanceof Error ? error.message : "Could not confirm tip"); } finally { setBusy(false); } }}
+                className="rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground disabled:opacity-50"
               >
                 Confirm
               </button>
               <button
-                onClick={async () => { const r = window.prompt("Why dispute this?") ?? undefined; await dispute({ data: { tipId: t.id, reason: r } }); await reload(); onChange(); }}
+                disabled={busy}
+                onClick={() => { setDisputingId(t.id); setDisputeReason(""); setMessage(null); }}
                 className="rounded-md border border-border px-3 py-1 text-xs"
               >
                 Dispute
               </button>
             </div>
+            {disputingId === t.id && <form className="basis-full rounded-lg border border-border bg-muted/30 p-3" onSubmit={async (event) => {
+              event.preventDefault();
+              setBusy(true);
+              setMessage(null);
+              try {
+                await dispute({ data: { tipId: t.id, reason: disputeReason.trim() || undefined } });
+                setDisputingId(null);
+                await reload();
+                onChange();
+              } catch (error) {
+                setMessage(error instanceof Error ? error.message : "Could not dispute tip");
+              } finally { setBusy(false); }
+            }}>
+              <label className="text-xs font-medium">Why are you disputing this tip? (optional)
+                <input value={disputeReason} onChange={(event) => setDisputeReason(event.target.value)} className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              </label>
+              <div className="mt-2 flex justify-end gap-2">
+                <button type="button" onClick={() => setDisputingId(null)} className="rounded-md border border-border px-3 py-1.5 text-xs">Cancel</button>
+                <button disabled={busy} className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50">Submit dispute</button>
+              </div>
+            </form>}
           </li>
         ))}
       </ul>
+      {message && <p className="mt-2 text-xs text-destructive">{message}</p>}
     </Section>
   );
 }

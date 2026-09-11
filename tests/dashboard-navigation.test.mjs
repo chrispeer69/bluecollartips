@@ -77,3 +77,14 @@ test("platform user administration exposes memberships and filters", () => {
   assert.match(admin, /Organization fee breakdown/);
   assert.match(admin, /\{d\.email \|\| "—"\}/);
 });
+
+test("dashboard actions use the shared UI instead of browser-native prompts and dropdowns", () => {
+  for (const source of [admin, driver]) {
+    assert.doesNotMatch(source, /window\.(?:alert|prompt|confirm)\s*\(/);
+    assert.doesNotMatch(source, /<select(?:\s|>)/);
+  }
+  assert.match(admin, /Record completed payout/);
+  assert.match(admin, /Confirm refund/);
+  assert.match(admin, /Company share/);
+  assert.match(driver, /Submit dispute/);
+});

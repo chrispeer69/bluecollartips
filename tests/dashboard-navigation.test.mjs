@@ -53,10 +53,12 @@ test("customer tips use Stripe while external tips are employee-recorded", () =>
   assert.doesNotMatch(publicFunctions, /venmo_handle|cashapp_handle|zelle_handle|paypal_handle/);
 });
 
-test("dashboard shell supports desktop, mobile, and independently scrolling content", () => {
+test("dashboard shell supports desktop, mobile, and normal browser scrolling", () => {
   assert.match(shell, /lg:block/);
   assert.match(shell, /lg:hidden/);
-  assert.match(shell, /overflow-y-auto/);
+  assert.doesNotMatch(shell, /lg:h-screen lg:overflow-hidden/);
+  assert.doesNotMatch(shell, /<main className="flex-1 overflow-y-auto/);
+  assert.match(shell, /sticky top-0/);
   assert.match(shell, /pageTitle/);
 });
 

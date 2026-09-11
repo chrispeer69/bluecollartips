@@ -158,18 +158,18 @@ export function DashboardShell<T extends string>({
   );
 
   return (
-    <div className="min-h-screen bg-muted/45 lg:h-screen lg:overflow-hidden">
+    <div className="min-h-screen bg-muted/45">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-sidebar-border lg:block">{sidebar}</aside>
       {open && <div className="fixed inset-0 z-40 bg-black/35 lg:hidden" onClick={() => setOpen(false)}><aside className="h-full w-[min(19rem,88vw)]" onClick={(e) => e.stopPropagation()}>{sidebar}</aside></div>}
-      <div className="lg:ml-72 lg:flex lg:h-screen lg:flex-col">
-        <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-card px-4 sm:px-6">
+      <div className="lg:ml-72">
+        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-card px-4 sm:px-6">
           <button className="rounded-md border border-border p-2 lg:hidden" onClick={() => setOpen(true)} aria-label="Open navigation"><Menu size={18} /></button>
           <div className="min-w-0">
             <div className="truncate text-xs text-muted-foreground">{subtitle} · {title}</div>
             <h1 className="truncate text-lg font-semibold">{pageTitle}</h1>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+        <main className="p-4 sm:p-6">
           <div className="mx-auto max-w-7xl space-y-5">{children}</div>
         </main>
       </div>

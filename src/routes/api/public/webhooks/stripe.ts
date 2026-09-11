@@ -45,22 +45,6 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
             const driverId = recorded.driverId;
             const companyId = recorded.companyId;
 
-            // Webhook retries are normal. Only send notifications the first
-            // time this PaymentIntent becomes a verified ledger entry.
-            if (recorded.recorded && driverId) try {
-              const { sendThankYou } = await import("@/lib/thankyou.server");
-              await sendThankYou(db, {
-                companyId,
-                driverId,
-                stars: Number(pi.metadata?.stars ?? 5),
-                tipCents: pi.amount,
-                customerName: pi.metadata?.customer_name || null,
-                customerPhone: pi.metadata?.customer_phone || null,
-                customerEmail: pi.metadata?.customer_email || null,
-              });
-            } catch (e) {
-              console.error("thank-you (stripe webhook) failed", e);
-            }
             // Notify the employee and send the customer a receipt.
             if (recorded.recorded && driverId) try {
               const { notifyEmployee, sendCustomerReceipt } = await import("@/lib/notify.server");

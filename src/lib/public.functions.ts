@@ -198,23 +198,6 @@ export const submitRating = createServerFn({ method: "POST" })
       if (tErr) throw tErr;
     }
 
-    // Fire-and-await thank-you notifications (per-company templates).
-    try {
-      const { sendThankYou } = await import("@/lib/thankyou.server");
-      await sendThankYou(db, {
-        companyId: company.id,
-        driverId: driver.id,
-        ratingId: rating.id,
-        stars: data.stars,
-        tipCents: data.tipCents ?? null,
-        customerName: data.customerName ?? null,
-        customerPhone: data.customerPhone ?? null,
-        customerEmail: data.customerEmail ?? null,
-      });
-    } catch (e) {
-      console.error("thank-you send failed", e);
-    }
-
     // Notify the employee (SMS) about the new rating/tip.
     try {
       const { notifyEmployee } = await import("@/lib/notify.server");

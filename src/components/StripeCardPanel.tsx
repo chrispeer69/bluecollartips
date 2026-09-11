@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { useServerFn } from "@tanstack/react-start";
-import { createTipPaymentIntent, getStripePublishableKey } from "@/lib/stripe.functions";
+import { createTipPaymentIntent, finalizeTipPayment, getStripePublishableKey } from "@/lib/stripe.functions";
 import { dollars } from "@/lib/constants";
 
 type Props = {
@@ -20,8 +20,10 @@ type Props = {
 export function StripeCardPanel(props: Props) {
   const getKey = useServerFn(getStripePublishableKey);
   const createPi = useServerFn(createTipPaymentIntent);
+  const finalizePi = useServerFn(finalizeTipPayment);
   const [pk, setPk] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,7 +43,10 @@ export function StripeCardPanel(props: Props) {
         stars: props.stars ?? null,
       },
     })
-      .then((r) => setClientSecret(r.clientSecret as string))
+      .then((r) => {
+        setClientSecret(r.clientSecret as string);
+        setPaymentIntentId(r.paymentIntentId);
+      })
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : "Card not available"));
   }, [pk, props.amountCents, props.companySlug, props.driverSlug, props.customerName, props.customerPhone, props.customerEmail, props.stars, createPi]);
 
@@ -56,12 +61,30 @@ export function StripeCardPanel(props: Props) {
 
   return (
     <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "stripe" } }}>
-      <CardForm {...props} />
+      <CardForm
+        {...props}
+        clientSecret={clientSecret}
+        paymentIntentId={paymentIntentId}
+        finalizePayment={finalizePi}
+      />
     </Elements>
   );
 }
 
-function CardForm({ amountCents, brandColor, onPaid }: Props) {
+function CardForm({
+  amountCents,
+  brandColor,
+  onPaid,
+  clientSecret,
+  paymentIntentId,
+  finalizePayment,
+}: Props & {
+  clientSecret: string;
+  paymentIntentId: string | null;
+  finalizePayment: (options: {
+    data: { paymentIntentId: string; clientSecret: string };
+  }) => Promise<{ ok: boolean }>;
+}) {
   const stripe = useStripe();
   const elements = useElements();
   const [busy, setBusy] = useState(false);
@@ -84,8 +107,19 @@ function CardForm({ amountCents, brandColor, onPaid }: Props) {
       setErr(error.message ?? "Payment could not be completed");
       return;
     }
-    if (paymentIntent?.status === "succeeded") onPaid();
-  }, [elements, onPaid, stripe]);
+    if (paymentIntent?.status === "succeeded") {
+      if (!paymentIntentId) {
+        setErr("Payment received. Your balance is still being updated.");
+        return;
+      }
+      try {
+        await finalizePayment({ data: { paymentIntentId, clientSecret } });
+        onPaid();
+      } catch {
+        setErr("Payment received. Your balance is still being updated.");
+      }
+    }
+  }, [clientSecret, elements, finalizePayment, onPaid, paymentIntentId, stripe]);
 
   useEffect(() => {
     if (paymentMethod !== "cashapp") {

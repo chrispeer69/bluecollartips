@@ -4,8 +4,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { auth } from "@/auth/client";
 import { getDriverDashboard, logManualTip, updateDriverProfile, updateNotifyPrefs } from "@/lib/driver.functions";
 import { getPayoutStatement } from "@/lib/payouts.functions";
+import { getDriverWallet, requestWalletPayout } from "@/lib/wallet.functions";
 import { PRESET_TIPS, SPLIT, TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib/constants";
-import { createDriverOnboardingLink, refreshStripeStatus } from "@/lib/stripe.functions";
 import { sendTipLinkSms } from "@/lib/sms.functions";
 import { confirmCashTip, disputeCashTip, listUnverifiedTips } from "@/lib/reconciliation.functions";
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
@@ -182,6 +182,8 @@ function DriverDashboard() {
 
         {page === "tips" && <LogTipPanel driverId={data.driver.id} onLogged={() => load(data.driver.id)} />}
 
+        {page === "earnings" && <WalletPanel driverId={data.driver.id} viewingAsAdmin={!!data.viewingAsAdmin} />}
+
         {page === "earnings" && <EarningsPanel driverId={data.driver.id} driverName={data.driver.display_name} />}
 
         {page === "settings" && <ProfileSettingsPanel driver={data.driver} accountEmail={data.accountEmail} onSaved={() => load(data.driver.id)} />}
@@ -189,8 +191,6 @@ function DriverDashboard() {
         {page === "settings" && <NotifyPrefsPanel driverId={data.driver.id} initial={!!data.driver.notify_sms} phone={data.driver.phone ?? null} />}
 
         {page === "settings" && <JoinWorkspacePanel />}
-
-        {page === "earnings" && <StripePanel driverId={data.driver.id} stripeEnabled={!!data.driver.stripe_charges_enabled} />}
 
         {page === "share" && <SmsPanel driverId={data.driver.id} />}
 
@@ -488,56 +488,66 @@ export function Stat({ label, value, hint }: { label: string; value: string; hin
   );
 }
 
-function StripePanel({ driverId, stripeEnabled }: { driverId: string; stripeEnabled: boolean }) {
-  const onboard = useServerFn(createDriverOnboardingLink);
-  const refresh = useServerFn(refreshStripeStatus);
+function WalletPanel({ driverId, viewingAsAdmin }: { driverId: string; viewingAsAdmin: boolean }) {
+  const getWallet = useServerFn(getDriverWallet);
+  const requestPayout = useServerFn(requestWalletPayout);
+  const [wallet, setWallet] = useState<Awaited<ReturnType<typeof getDriverWallet>> | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+
+  async function reload() {
+    setWallet(await getWallet({ data: { driverId } }));
+  }
+
+  useEffect(() => {
+    reload().catch((error) => setMsg(error instanceof Error ? error.message : "Could not load wallet"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [driverId]);
+
   return (
-    <Section title="Card tips (Stripe)">
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-        <div>
-          Status:{" "}
-          <span className={stripeEnabled ? "font-medium text-emerald-600" : "text-muted-foreground"}>
-            {stripeEnabled ? "Ready to accept cards" : "Not connected"}
-          </span>
-        </div>
-        <div className="flex gap-2">
+    <Section title="Tip wallet">
+      {!wallet ? <p className="text-sm text-muted-foreground">Loading wallet…</p> : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Stat label="Available now" value={dollars(wallet.availableCents)} />
+            <Stat label="Paid out" value={dollars(wallet.paidCents)} />
+            <Stat label="Minimum withdrawal" value={dollars(wallet.minimumCents)} />
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-4 text-sm">
+            <div>
+              <p>Successful online tips are available immediately.</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                After you request a payout, the company team will complete it within {wallet.processingDays === 0 ? "the same day" : `0–${wallet.processingDays} days`}.
+              </p>
+              {wallet.openRequest && (
+                <p className="mt-2 font-medium">
+                  {dollars(Number(wallet.openRequest.amount_cents))} payout requested · {String(wallet.openRequest.status)}
+                </p>
+              )}
+              {viewingAsAdmin && <p className="mt-2 text-xs text-muted-foreground">The employee must sign in to request their own payout.</p>}
+            </div>
           <button
-            disabled={busy}
+            disabled={busy || !wallet.canRequest || wallet.availableCents < wallet.minimumCents}
             onClick={async () => {
               setBusy(true);
               setMsg(null);
               try {
-                const r = await onboard({ data: { returnUrl: window.location.href, driverId } });
-                window.location.href = r.url;
+                await requestPayout({ data: { driverId } });
+                setMsg("Payout requested.");
+                await reload();
               } catch (e) {
-                setMsg(e instanceof Error ? e.message : "Stripe not configured");
+                setMsg(e instanceof Error ? e.message : "Could not request payout");
               } finally {
                 setBusy(false);
               }
             }}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground disabled:opacity-50"
+            className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
           >
-            {stripeEnabled ? "Update payout info" : "Connect Stripe"}
+            {busy ? "Requesting…" : "Request full payout"}
           </button>
-          <button
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                const r = await refresh({ data: { driverId } });
-                setMsg(r.enabled ? "Refreshed." : "Stripe is not configured by the platform yet.");
-              } finally {
-                setBusy(false);
-              }
-            }}
-            className="rounded-md border border-border px-3 py-1.5 text-sm"
-          >
-            Refresh status
-          </button>
-        </div>
-      </div>
+          </div>
+        </>
+      )}
       {msg && <p className="mt-2 text-xs text-muted-foreground">{msg}</p>}
     </Section>
   );

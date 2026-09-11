@@ -20,6 +20,7 @@ import { platformOverview, suspendTenant } from "@/lib/platform.functions";
 import { sendTipLinkSms } from "@/lib/sms.functions";
 import { listTipDisputes, flagTipDispute, clearTipDispute, refundTip } from "@/lib/disputes.functions";
 import { listLocations, createLocation, deleteLocation, setDriverLocation, updateReviewLinks } from "@/lib/locations.functions";
+import { getCompanyWallet, reviewWalletPayout, updateWalletSettings } from "@/lib/wallet.functions";
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, CreditCard, LayoutDashboard, MessageSquareText, Settings, ShieldCheck, Users } from "lucide-react";
@@ -349,6 +350,8 @@ function AdminDashboard() {
         {page === "employees" && <Section title="Pending join requests">
           <JoinRequestsPanel companyId={data.company.id} onApproved={() => load(companyId)} />
         </Section>}
+
+        {page === "payments" && <WalletAdminPanel companyId={data.company.id} />}
 
         {page === "payments" && <Section title="Tip disputes & refunds">
           <DisputesPanel
@@ -879,6 +882,9 @@ function Input({
   type = "text",
   required,
   placeholder,
+  min,
+  max,
+  step,
 }: {
   label: string;
   value: string;
@@ -886,6 +892,9 @@ function Input({
   type?: string;
   required?: boolean;
   placeholder?: string;
+  min?: string;
+  max?: string;
+  step?: string;
 }) {
   return (
     <label className="text-sm">
@@ -896,6 +905,9 @@ function Input({
         onChange={(e) => onChange(e.target.value)}
         required={required}
         placeholder={placeholder}
+        min={min}
+        max={max}
+        step={step}
         className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
       />
     </label>
@@ -1040,6 +1052,119 @@ function JoinRequestsPanel({ companyId, onApproved }: { companyId: string; onApp
         </tbody>
       </table>
     </div>
+  );
+}
+
+function WalletAdminPanel({ companyId }: { companyId: string }) {
+  const getWallet = useServerFn(getCompanyWallet);
+  const saveSettings = useServerFn(updateWalletSettings);
+  const reviewPayout = useServerFn(reviewWalletPayout);
+  const [wallet, setWallet] = useState<Awaited<ReturnType<typeof getCompanyWallet>> | null>(null);
+  const [minimum, setMinimum] = useState("25.00");
+  const [processingDays, setProcessingDays] = useState("5");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function reload() {
+    const result = await getWallet({ data: { companyId } });
+    setWallet(result);
+    setMinimum((result.minimumCents / 100).toFixed(2));
+    setProcessingDays(String(result.processingDays));
+  }
+
+  useEffect(() => {
+    reload().catch((error) => setMessage(error instanceof Error ? error.message : "Could not load payouts"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId]);
+
+  async function act(requestId: string, action: "approve" | "reject" | "mark_paid") {
+    let paymentMethod: string | null = null;
+    let paymentReference: string | null = null;
+    let note: string | null = null;
+    if (action === "mark_paid") {
+      paymentMethod = window.prompt("Payment method (bank transfer, Cash App, check, etc.):")?.trim() || null;
+      if (!paymentMethod) return;
+      paymentReference = window.prompt("Payment reference (optional):")?.trim() || null;
+    }
+    if (action === "reject") {
+      note = window.prompt("Reason for rejection (optional):")?.trim() || null;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      await reviewPayout({ data: { requestId, action, paymentMethod, paymentReference, note } });
+      setMessage(action === "mark_paid" ? "Payout marked paid." : action === "approve" ? "Payout approved." : "Payout rejected.");
+      await reload();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not update payout");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Section title="Employee wallets & payout requests">
+      <form
+        className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-muted/30 p-4"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const minimumCents = Math.round(Number(minimum) * 100);
+          const days = Number(processingDays);
+          if (!Number.isFinite(minimumCents) || minimumCents < 100 || !Number.isInteger(days) || days < 0 || days > 5) {
+            setMessage("Enter a minimum of at least $1 and a processing window from 0 to 5 days.");
+            return;
+          }
+          setBusy(true);
+          setMessage(null);
+          try {
+            await saveSettings({ data: { companyId, minimumCents, processingDays: days } });
+            setMessage("Wallet settings saved.");
+            await reload();
+          } catch (error) {
+            setMessage(error instanceof Error ? error.message : "Could not save settings");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <Input label="Minimum withdrawal ($)" value={minimum} onChange={setMinimum} type="number" min="1" step="0.01" required />
+        <Input label="Payout processing window (0–5 days)" value={processingDays} onChange={setProcessingDays} type="number" min="0" max="5" step="1" required />
+        <button disabled={busy} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">
+          Save settings
+        </button>
+      </form>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Stripe tips are available to employees immediately. The processing window is how long your team may take to complete an approved payout; it is not a hold on earnings.
+      </p>
+      {message && <p className="mt-3 text-sm text-muted-foreground">{message}</p>}
+      {!wallet ? <p className="mt-4 text-sm text-muted-foreground">Loading payout requests…</p> : wallet.requests.length === 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">No payout requests yet.</p>
+      ) : (
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="text-xs uppercase text-muted-foreground">
+              <tr><th className="py-2">Employee</th><th>Amount</th><th>Status</th><th>Requested</th><th className="text-right">Actions</th></tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {wallet.requests.map((request: any) => (
+                <tr key={request.id}>
+                  <td className="py-3 font-medium">{request.driver_name}</td>
+                  <td>{dollars(Number(request.amount_cents))}</td>
+                  <td className="capitalize">{String(request.status)}</td>
+                  <td>{new Date(request.requested_at).toLocaleString()}</td>
+                  <td className="whitespace-nowrap text-right">
+                    {request.status === "pending" && <button disabled={busy} onClick={() => act(request.id, "approve")} className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50">Approve</button>}{" "}
+                    {["pending", "approved"].includes(request.status) && <button disabled={busy} onClick={() => act(request.id, "reject")} className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50">Reject</button>}{" "}
+                    {["pending", "approved", "processing"].includes(request.status) && <button disabled={busy} onClick={() => act(request.id, "mark_paid")} className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50">Mark paid</button>}
+                    {request.status === "paid" && <span className="text-xs text-muted-foreground">{request.payment_method}{request.payment_reference ? ` · ${request.payment_reference}` : ""}</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Section>
   );
 }
 

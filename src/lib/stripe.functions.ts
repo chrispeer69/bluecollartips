@@ -144,3 +144,36 @@ export const createTipPaymentIntent = createServerFn({ method: "POST" })
 export const getStripePublishableKey = createServerFn({ method: "GET" }).handler(async () => {
   return { publishableKey: process.env.STRIPE_PUBLISHABLE_KEY ?? null };
 });
+
+/**
+ * Browser-confirmed fallback for the Stripe webhook. The PaymentIntent is
+ * retrieved from Stripe and its client secret is checked before any ledger
+ * write, so the browser cannot invent or alter a successful tip.
+ */
+export const finalizeTipPayment = createServerFn({ method: "POST" })
+  .inputValidator((d) =>
+    z.object({
+      paymentIntentId: z.string().trim().regex(/^pi_[A-Za-z0-9_]+$/).max(255),
+      clientSecret: z.string().trim().min(20).max(500),
+    }).parse(d),
+  )
+  .handler(async ({ data }) => {
+    const { getStripe } = await import("./stripe.server");
+    const stripe = getStripe();
+    if (!stripe) throw new Error("Stripe is not configured yet.");
+    const pi = await stripe.paymentIntents.retrieve(data.paymentIntentId);
+    if (!pi.client_secret || pi.client_secret !== data.clientSecret) {
+      throw new Error("Payment verification failed");
+    }
+    if (pi.status !== "succeeded") throw new Error("Payment has not completed yet");
+
+    const { db } = await import("@/db/client.server");
+    const { recordSuccessfulStripeTip } = await import("./stripe-tip-ledger.server");
+    await recordSuccessfulStripeTip(db, {
+      id: pi.id,
+      amount: pi.amount,
+      metadata: pi.metadata,
+      status: pi.status,
+    });
+    return { ok: true };
+  });

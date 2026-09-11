@@ -8,7 +8,7 @@ Project Overview
 
 Build a multi-tenant SaaS web app called Blue Collar AI that serves as both a review/reputation-generation tool and a tip platform for towing companies (and similar blue-collar service businesses). The platform is sold to towing companies as tenants. The first tenant is Roadside Towing.
 
-Core flow: a driver finishes a job → shows the customer a QR code or link → customer rates the service 1-5 stars, optionally leaves feedback, optionally tips via card, Apple Pay, Google Pay (in-app, processed by Stripe) or via the driver's personal Venmo/CashApp/Zelle (logged manually) → customer is invited to leave a Google review → revenue splits automatically on any tip → driver and company see real-time and historical ratings, feedback, and earnings → weekly automated payout every Wednesday.
+Core flow: a driver finishes a job → shows the customer a QR code or link → customer rates the service 1-5 stars, optionally leaves feedback, optionally tips through the platform's Stripe account or via the driver's personal Venmo/CashApp/Zelle (logged manually) → customer is invited to leave a Google review → revenue splits automatically on any tip → driver and company see real-time and historical ratings, feedback, and earnings → the driver requests a wallet payout once the company-configured minimum is reached.
 
 This is a promotional and reputation tool first, tipping mechanism second — the rating/review capture must never be hidden behind or gated by the tip flow.
 
@@ -62,7 +62,7 @@ Primary rail: Stripe Connect (Express accounts) — each driver gets their own c
 
 Customer tip page accepts credit/debit card, Apple Pay, and Google Pay via Stripe Checkout or Stripe Payment Element.
 
-Use Stripe Connect destination charges with application_fee_amount (or equivalent split logic) so that on every transaction: 80% routes to the driver's connected account, 10% to the company's connected account, 10% stays with the Blue Collar AI platform account — automatically, at the moment of payment.
+Stripe collects online tips into the platform account. The internal ledger allocates every transaction as 80% driver / 10% company / 10% platform. Direct Stripe Connect distribution is a later phase.
 
 Stripe handles PCI compliance, fraud checks, and identity verification for payouts — do not build custom card handling.
 
@@ -72,7 +72,7 @@ On the tip page, show the driver's personal Venmo/CashApp/Zelle/PayPal handle as
 
 Any tip sent this way happens outside the platform and must be manually logged by the driver as a "P2P tip" in the app (similar to the cash tip flow below), since Blue Collar AI never sees that money.
 
-Weekly payout to drivers (their 80% share) happens via Stripe's automated payout schedule (or a scheduled Stripe Transfer + Payout) configured for every Wednesday morning. Company's 10% and Blue Collar AI's 10% are settled to their respective Stripe balances continuously and can be withdrawn on their own schedule.
+Successful Stripe tips become available in the driver's wallet immediately. Once the company-configured minimum is reached, the driver requests the full available balance. Company admins approve and record the external payment within their configured 0–5 day processing window; this window is an operational service target, not an earnings hold.
 
 All Stripe-processed tips land in the platform's Stripe Connect structure — there is no need for "one bank account" manual reconciliation; Stripe's ledger is the source of truth, and the app's dashboard is a reporting layer on top of it.
 
@@ -84,7 +84,7 @@ Required fields: customer name (or description), amount, date/time, job referenc
 
 On submission, the system automatically calculates and records the same 80/10/10 split for that logged tip, and adds it to the driver's tip ledger exactly like a Stripe-processed tip.
 
-Important distinction: for cash/P2P tips, the driver owes the company+platform's 20% themselves, since Blue Collar AI never touched that money. The driver's weekly automated payout should net this against their logged cash/P2P tip obligations (i.e., the 20% owed on cash/P2P tips is deducted from their next Stripe payout, or — if insufficient Stripe-processed tips exist to cover it — flagged for the Company Admin to collect via another method). Build this as a clear running balance: "Owed to company/platform from cash tips: $X."
+Important distinction: for cash/P2P tips, the driver owes the company+platform's 20% themselves, since Blue Collar AI never touched that money. This obligation is tracked separately for company reconciliation and is not treated as platform-collected wallet cash. Build this as a clear running balance: "Owed to company/platform from cash tips: $X."
 
 Policy & verification workflow:
 
@@ -106,9 +106,9 @@ Running balances:
 
 Total tips this week / this month / this year / all-time (gross and net-to-driver)
 
-Next payout amount and date (next Wednesday)
+Available wallet balance, configured withdrawal minimum, and open payout-request status
 
-Payout history (past Wednesdays, amounts, status)
+Payout history (requested, approved, paid/rejected, amount, and payment reference)
 
 Cash/P2P tip balance owed to company/platform (per Section 5)
 
@@ -222,7 +222,7 @@ Design the data model multi-tenant from day one: Company → Drivers → Tips, w
 
 Build the 80/10/10 split as a single configurable constant in the backend logic (even though not exposed in UI), so it can be changed centrally later.
 
-Weekly payout automation (Wednesday mornings) should be a scheduled job against Stripe's payout/transfer APIs.
+Automated bank transfers can be added later. The current payout workflow uses the wallet ledger, employee payout requests, and admin-recorded payments.
 
 Please ask me clarifying questions about anything ambiguous in this spec before or during the build — especially around: exact Stripe Connect charge-type implementation, SMS/email provider for invites, and any state-specific tip/labor law considerations I should be aware of (I am not a lawyer and this hasn't been legally reviewed).
 
@@ -238,7 +238,7 @@ Minimum/maximum tip amounts?
 
 Should there be a "thank you" SMS/email sent to the customer after tipping?
 
-What happens if a driver is deactivated mid-week with an unpaid balance — manual payout, hold, or forfeiture?
+What happens if a driver is deactivated with an unpaid wallet balance — manual final payout or admin review?
 
 For the future TowBook auto-trigger: does TowBook offer webhooks/API access on job-completion status, or will this require polling/manual export integration?
 

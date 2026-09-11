@@ -29,31 +29,15 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
             metadata?: Record<string, string>;
             status: string;
           };
-          const driverId = pi.metadata?.driver_id;
-          const companyId = pi.metadata?.company_id;
-          if (companyId) {
-            const { error: tipError } = await db.from("tips").upsert(
-              {
-                company_id: companyId,
-                driver_id: driverId || null,
-                amount_cents: pi.amount,
-                source: "stripe",
-                stripe_payment_intent_id: pi.id,
-                stripe_status: pi.status,
-                verified: true,
-                verified_at: new Date().toISOString(),
-                customer_name: pi.metadata?.customer_name || null,
-                driver_amount_cents: 0,
-                company_amount_cents: 0,
-                platform_amount_cents: 0,
-              },
-              { onConflict: "stripe_payment_intent_id" },
-            );
-            if (tipError) {
-              console.error("stripe tip ledger write failed", tipError);
-              return new Response("Could not record tip", { status: 500 });
-            }
-            if (driverId) try {
+          try {
+            const { recordSuccessfulStripeTip } = await import("@/lib/stripe-tip-ledger.server");
+            const recorded = await recordSuccessfulStripeTip(db, pi);
+            const driverId = recorded.driverId;
+            const companyId = recorded.companyId;
+
+            // Webhook retries are normal. Only send notifications the first
+            // time this PaymentIntent becomes a verified ledger entry.
+            if (recorded.recorded && driverId) try {
               const { sendThankYou } = await import("@/lib/thankyou.server");
               await sendThankYou(db, {
                 companyId,
@@ -68,7 +52,7 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
               console.error("thank-you (stripe webhook) failed", e);
             }
             // Notify the employee and send the customer a receipt.
-            if (driverId) try {
+            if (recorded.recorded && driverId) try {
               const { notifyEmployee, sendCustomerReceipt } = await import("@/lib/notify.server");
               await notifyEmployee(db, {
                 companyId,
@@ -88,6 +72,9 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
             } catch (e) {
               console.error("notify/receipt (stripe webhook) failed", e);
             }
+          } catch (e) {
+            console.error("stripe tip ledger write failed", e);
+            return new Response("Could not record tip", { status: 500 });
           }
         } else if (event.type === "account.updated") {
           const acct = event.data.object as {

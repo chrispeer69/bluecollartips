@@ -11,6 +11,7 @@ import { confirmCashTip, disputeCashTip, listUnverifiedTips } from "@/lib/reconc
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
 import { JoinWorkspacePanel } from "@/components/JoinWorkspacePanel";
 import { PayoutDestinationForm } from "@/components/PayoutDestinationForm";
+import { LeaveWorkspacePanel } from "@/components/LeaveWorkspacePanel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Banknote, Building2, LayoutDashboard, QrCode, Settings, WalletCards } from "lucide-react";
 
@@ -198,6 +199,8 @@ function DriverDashboard() {
         {page === "settings" && <NotifyPrefsPanel driverId={data.driver.id} initial={!!data.driver.notify_sms} phone={data.driver.phone ?? null} />}
 
         {page === "settings" && <JoinWorkspacePanel />}
+
+        {page === "settings" && !data.viewingAsAdmin && <LeaveWorkspacePanel companyId={data.driver.company_id} companyName={data.driver.companies?.name ?? "this workspace"} />}
 
         {page === "share" && <SmsPanel driverId={data.driver.id} />}
 

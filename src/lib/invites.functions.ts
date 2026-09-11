@@ -258,6 +258,38 @@ export const reviewJoinRequest = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const leaveDriverWorkspace = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { sql } = await import("@/db/client.server");
+    const database = sql();
+    return database.begin(async (tx) => {
+      const memberships = await tx`
+        SELECT id FROM user_roles
+        WHERE user_id = ${context.userId}
+          AND company_id = ${data.companyId}
+          AND role = 'driver'
+        FOR UPDATE
+      `;
+      if (!memberships.length) throw new Error("You are not an employee in this workspace");
+
+      // Preserve the employee profile, public page, historical tips, ratings,
+      // and payout audit. Only detach this login from the workspace.
+      await tx`
+        UPDATE drivers SET user_id = NULL
+        WHERE company_id = ${data.companyId} AND user_id = ${context.userId}
+      `;
+      await tx`
+        DELETE FROM user_roles
+        WHERE user_id = ${context.userId}
+          AND company_id = ${data.companyId}
+          AND role = 'driver'
+      `;
+      return { ok: true };
+    });
+  });
+
 /** Public: peek at an invite by code (for the join landing page). */
 export const peekInvite = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ code: z.string().trim().min(1).max(64) }).parse(d))

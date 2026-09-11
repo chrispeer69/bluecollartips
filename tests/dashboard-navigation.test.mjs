@@ -6,7 +6,13 @@ const admin = await readFile(new URL("../src/routes/dashboard/admin.tsx", import
 const driver = await readFile(new URL("../src/routes/dashboard/driver.tsx", import.meta.url), "utf8");
 const shell = await readFile(new URL("../src/components/DashboardShell.tsx", import.meta.url), "utf8");
 const joinWorkspace = await readFile(new URL("../src/components/JoinWorkspacePanel.tsx", import.meta.url), "utf8");
+const leaveWorkspace = await readFile(new URL("../src/components/LeaveWorkspacePanel.tsx", import.meta.url), "utf8");
 const auth = await readFile(new URL("../src/routes/auth.tsx", import.meta.url), "utf8");
+const authFunctions = await readFile(new URL("../src/lib/auth.functions.ts", import.meta.url), "utf8");
+const emailInvites = await readFile(new URL("../src/auth/email-invites.server.ts", import.meta.url), "utf8");
+const inviteFunctions = await readFile(new URL("../src/lib/invites.functions.ts", import.meta.url), "utf8");
+const driverFunctions = await readFile(new URL("../src/lib/driver.functions.ts", import.meta.url), "utf8");
+const googleAuth = await readFile(new URL("../src/auth/google.server.ts", import.meta.url), "utf8");
 const dashboardRouter = await readFile(new URL("../src/routes/dashboard/index.tsx", import.meta.url), "utf8");
 const platformFunctions = await readFile(new URL("../src/lib/platform.functions.ts", import.meta.url), "utf8");
 const companyCodesMigration = await readFile(new URL("../migrations/006_company_join_codes.sql", import.meta.url), "utf8");
@@ -63,6 +69,22 @@ test("shared codes require approval while email invitations are restricted", () 
   assert.match(joinWorkspace, /Request sent\. A company admin must approve you/);
   assert.match(companyCodesMigration, /companies_join_code_unique/);
   assert.match(companyCodesMigration, /join_requests_company_user_unique/);
+  assert.match(emailInvites, /email IS NOT NULL/);
+  assert.match(emailInvites, /LOWER\(email\)/);
+  assert.match(emailInvites, /ON CONFLICT DO NOTHING/);
+  assert.match(authFunctions, /acceptPendingEmailInvites\(user\.id, data\.email\)/);
+  assert.match(googleAuth, /acceptPendingEmailInvites\(userId, googleEmail\)/);
+  assert.match(driverFunctions, /acceptPendingEmailInvites\(userId, account\.email\)/);
+});
+
+test("employees can leave a workspace through an inline confirmation", () => {
+  assert.match(driver, /<LeaveWorkspacePanel/);
+  assert.match(leaveWorkspace, /Are you sure you want to leave/);
+  assert.match(leaveWorkspace, /Yes, leave workspace/);
+  assert.match(inviteFunctions, /export const leaveDriverWorkspace/);
+  assert.match(inviteFunctions, /UPDATE drivers SET user_id = NULL/);
+  assert.match(inviteFunctions, /DELETE FROM user_roles/);
+  assert.doesNotMatch(leaveWorkspace, /window\.(?:alert|prompt|confirm)\s*\(/);
 });
 
 test("platform user administration exposes memberships and filters", () => {

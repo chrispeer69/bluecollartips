@@ -7,6 +7,7 @@ import { createSession, destroySession, getSessionUser, hashPassword, verifyPass
 import { randomBytes, createHash } from "node:crypto";
 import { sendEmail } from "@/lib/email/send.server";
 import { provisionConfiguredSuperAdmin } from "@/auth/superadmin.server";
+import { acceptPendingEmailInvites } from "@/auth/email-invites.server";
 
 export const getCurrentUser = createServerFn({ method: "GET" }).handler(async () => {
   const user = await getSessionUser();
@@ -20,6 +21,7 @@ export const signIn = createServerFn({ method: "POST" })
     const user = rows[0];
     if (!user || !(await verifyPassword(data.password, user.password_hash))) throw new Error("Invalid email or password");
     await provisionConfiguredSuperAdmin(user.id, data.email);
+    await acceptPendingEmailInvites(user.id, data.email);
     await createSession(user.id);
     return { ok: true };
   });
@@ -31,6 +33,7 @@ export const signUp = createServerFn({ method: "POST" })
     try {
       const rows = await sql()`insert into users (email, password_hash, full_name) values (${data.email.toLowerCase().trim()}, ${passwordHash}, ${data.fullName}) returning id`;
       await provisionConfiguredSuperAdmin(rows[0].id, data.email);
+      await acceptPendingEmailInvites(rows[0].id, data.email);
       await createSession(rows[0].id);
       return { ok: true };
     } catch (error: any) {
@@ -80,6 +83,8 @@ export const getMyRoleContext = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { userId } = context;
     const { db } = await import("@/db/client.server");
+    const { data: account } = await db.from("users").select("email").eq("id", userId).maybeSingle();
+    if (account?.email) await acceptPendingEmailInvites(userId, account.email);
     const { data: roles } = await db
       .from("user_roles")
       .select("role, company_id")

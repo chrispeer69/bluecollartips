@@ -95,8 +95,12 @@ export const getDriverDashboard = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const { userId } = context;
     const { db } = await import("@/db/client.server");
-    const { driver, roles, accessibleDrivers } = await resolveAccessibleDriver(userId, data?.driverId);
     const { data: account } = await db.from("users").select("email").eq("id", userId).maybeSingle();
+    if (account?.email) {
+      const { acceptPendingEmailInvites } = await import("@/auth/email-invites.server");
+      await acceptPendingEmailInvites(userId, account.email);
+    }
+    const { driver, roles, accessibleDrivers } = await resolveAccessibleDriver(userId, data?.driverId);
     if (!driver) return { driver: null, ratings: [], tips: [], flags: [], accessibleDrivers, viewingAsAdmin: false, accountEmail: account?.email ?? null };
     const [{ data: ratings }, { data: tips }, { data: flags }] = await Promise.all([
       db

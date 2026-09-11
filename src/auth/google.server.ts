@@ -3,6 +3,7 @@ import { sql } from "@/db/client.server";
 import { createSessionCookieHeader } from "./session.server";
 import { slugify } from "@/lib/constants";
 import { provisionConfiguredSuperAdmin } from "./superadmin.server";
+import { acceptPendingEmailInvites } from "./email-invites.server";
 
 const COOKIE = "bct_google_oauth";
 const MAX_AGE = 10 * 60;
@@ -129,6 +130,7 @@ export async function googleCallback(request: Request) {
     if (!userId) throw new Error("Google account could not be linked");
     await provisionConfiguredSuperAdmin(userId, googleEmail);
     await applyOnboarding(userId, googleEmail, intent);
+    await acceptPendingEmailInvites(userId, googleEmail);
     const sessionCookie = await createSessionCookieHeader(userId);
     return new Response(null, { status: 302, headers: { Location: "/dashboard", "Set-Cookie": sessionCookie } });
   } catch (error) {

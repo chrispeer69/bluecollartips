@@ -68,7 +68,7 @@ export const getAdminDashboard = createServerFn({ method: "POST" })
         .limit(200),
       db
         .from("tips")
-        .select("id, amount_cents, source, customer_name, driver_id, company_amount_cents, platform_amount_cents, verified, disputed, refunded_at, stripe_payment_intent_id, stripe_status, assigned_by, assigned_at, created_at")
+        .select("id, amount_cents, source, customer_name, driver_id, driver_amount_cents, company_amount_cents, platform_amount_cents, verified, disputed, refunded_at, stripe_payment_intent_id, stripe_status, assigned_by, assigned_at, created_at")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
         .limit(200),
@@ -251,6 +251,26 @@ export const updateCompanyBranding = createServerFn({ method: "POST" })
       .eq("id", data.companyId);
     if (error) throw error;
     return { ok: true };
+  });
+
+export const updateCompanyTipShare = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({
+    companyId: z.string().uuid(),
+    companyPercent: z.number().int().min(0).max(10),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertCompanyAdmin(context.userId, data.companyId);
+    const platformPercent = 10;
+    const driverPercent = 100 - platformPercent - data.companyPercent;
+    const { db } = await import("@/db/client.server");
+    const { error } = await db.from("companies").update({
+      company_pct: data.companyPercent,
+      driver_pct: driverPercent,
+      platform_pct: platformPercent,
+    }).eq("id", data.companyId);
+    if (error) throw new Error(error.message);
+    return { ok: true, companyPercent: data.companyPercent, driverPercent, platformPercent };
   });
 
 export const resolveFlag = createServerFn({ method: "POST" })

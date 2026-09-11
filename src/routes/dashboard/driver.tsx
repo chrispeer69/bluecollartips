@@ -5,7 +5,7 @@ import { auth } from "@/auth/client";
 import { getDriverDashboard, logManualTip, updateDriverProfile, updateNotifyPrefs } from "@/lib/driver.functions";
 import { getPayoutStatement } from "@/lib/payouts.functions";
 import { getDriverWallet, requestWalletPayout } from "@/lib/wallet.functions";
-import { PRESET_TIPS, SPLIT, TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib/constants";
+import { PRESET_TIPS, TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib/constants";
 import { sendTipLinkSms } from "@/lib/sms.functions";
 import { confirmCashTip, disputeCashTip, listUnverifiedTips } from "@/lib/reconciliation.functions";
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
@@ -285,7 +285,7 @@ function LogTipPanel({ driverId, onLogged }: { driverId: string; onLogged: () =>
     }
     setBusy(true);
     try {
-      await logTip({
+      const result = await logTip({
         data: {
           amountCents: cents,
           source,
@@ -297,7 +297,7 @@ function LogTipPanel({ driverId, onLogged }: { driverId: string; onLogged: () =>
       setAmount("");
       setCustomerName("");
       setNote("");
-      setMsg("Logged. You owe " + dollars(Math.round((cents * (SPLIT.company + SPLIT.platform)) / 100)) + " to the company/platform on this tip.");
+      setMsg("Logged. You owe " + dollars(result.companyAmountCents + result.platformAmountCents) + " to the company/platform on this tip.");
       onLogged();
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : "Could not log");
@@ -397,7 +397,7 @@ function TipsTable({ tips }: { tips: DashData["tips"] }) {
             <th>Customer</th>
             <th>Method</th>
             <th className="text-right">Amount</th>
-            <th className="text-right">Your 80%</th>
+            <th className="text-right">Your net</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -671,7 +671,7 @@ function EarningsPanel({ driverId, driverName }: { driverId: string; driverName:
 
   function downloadCsv() {
     if (!data) return;
-    const header = ["date","source","customer","gross","employee_80","company_10","platform_10","verified","note"];
+    const header = ["date","source","customer","gross","employee_net","company_share","platform_fee","verified","note"];
     const rows = data.tips.map((t) => [
       new Date(t.created_at).toISOString(),
       t.source,
@@ -710,9 +710,9 @@ function EarningsPanel({ driverId, driverName }: { driverId: string; driverName:
       {data && (
         <div className="mt-4 grid gap-2 sm:grid-cols-4">
           <Stat label="Gross" value={dollars(data.totals.gross)} />
-          <Stat label="Your 80%" value={dollars(data.totals.driver)} />
-          <Stat label="Company 10%" value={dollars(data.totals.company)} />
-          <Stat label="Platform 10%" value={dollars(data.totals.platform)} />
+          <Stat label="Your net" value={dollars(data.totals.driver)} />
+          <Stat label="Company share" value={dollars(data.totals.company)} />
+          <Stat label="Platform fee" value={dollars(data.totals.platform)} />
         </div>
       )}
       {data && data.tips.length === 0 && <div className="mt-3 text-xs text-muted-foreground">No tips in this range.</div>}

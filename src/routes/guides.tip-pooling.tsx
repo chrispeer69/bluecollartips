@@ -7,13 +7,13 @@ export const Route = createFileRoute("/guides/tip-pooling")({
       {
         name: "description",
         content:
-          "How automated tip pooling works for towing and field service teams: the 80/10/10 split, legal guardrails, and why automation beats spreadsheets.",
+          "How automated tip pooling works for towing and field service teams: configurable company shares, legal guardrails, and why automation beats spreadsheets.",
       },
       { property: "og:title", content: "Tip Pooling for Field Service Teams" },
       {
         property: "og:description",
         content:
-          "A practical guide to automated tip pooling and the 80/10/10 split for towing and field service companies.",
+          "A practical guide to automated tip pooling and flexible employee/company splits for towing and field service companies.",
       },
       { property: "og:type", content: "article" },
       { property: "og:url", content: "https://bluecollartips.app/guides/tip-pooling" },
@@ -29,7 +29,7 @@ export const Route = createFileRoute("/guides/tip-pooling")({
           "@type": "Article",
           headline: "Tip Pooling for Field Service Teams",
           description:
-            "How automated tip pooling and the 80/10/10 split work for towing and field service companies.",
+            "How automated tip pooling and flexible employee/company splits work for towing and field service companies.",
           author: { "@type": "Organization", name: "Blue Collar Tips" },
           publisher: { "@type": "Organization", name: "Blue Collar Tips" },
           mainEntityOfPage: "https://bluecollartips.app/guides/tip-pooling",
@@ -108,19 +108,19 @@ function TipPoolingGuide() {
         </section>
 
         <section className="mt-10 space-y-4">
-          <h2 className="text-2xl font-semibold">The 80/10/10 split</h2>
+          <h2 className="text-2xl font-semibold">A flexible employee/company split</h2>
           <p>
-            Blue Collar Tips uses an 80/10/10 split as the default for towing companies, and
-            it's the model we recommend for most field service crews:
+            Blue Collar Tips uses 80/10/10 as the default. A company may reduce its own share
+            from 10% down to 0%, automatically increasing the employee share from 80% up to 90%:
           </p>
           <div className="rounded-lg border border-border bg-card p-6">
             <ul className="space-y-2 text-sm">
               <li>
-                <strong className="text-secondary">80% to the driver</strong> who did the job.
+                <strong className="text-secondary">80–90% to the driver</strong> who did the job.
                 The person the customer interacted with gets the majority share, every time.
               </li>
               <li>
-                <strong className="text-secondary">10% to the company</strong> to offset
+                <strong className="text-secondary">0–10% to the company</strong> to offset
                 processing fees, dispatch overhead, and the cost of running the tip
                 program.
               </li>

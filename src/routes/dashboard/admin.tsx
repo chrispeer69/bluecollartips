@@ -10,6 +10,7 @@ import {
   resolveFlag,
   setDriverStatus,
   updateCompanyBranding,
+  updateCompanyTipShare,
   getThankYouTemplates,
   updateThankYouTemplates,
 } from "@/lib/admin.functions";
@@ -261,9 +262,10 @@ function AdminDashboard() {
           </Section>
         )}
 
-        {page === "overview" && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Stat label="Tips (all-time)" value={dollars(totals.gross)} />
-          <Stat label="Company 10%" value={dollars(totals.company)} />
+        {page === "overview" && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <Stat label="Gross tips" value={dollars(totals.gross)} />
+          <Stat label="After platform fee" value={dollars(totals.afterPlatform)} />
+          <Stat label={`Company share (${data.company.company_pct}%)`} value={dollars(totals.company)} />
           <Stat label="Employees" value={String(data.drivers.length)} />
           <Stat label="Avg rating" value={ratingStats.avg ? ratingStats.avg.toFixed(2) + " ★" : "—"} />
         </div>}
@@ -307,6 +309,10 @@ function AdminDashboard() {
               await load(companyId);
             }}
           />
+        </Section>}
+
+        {page === "settings" && <Section title="Tip distribution">
+          <TipShareSettings company={data.company} onSaved={() => load(companyId)} />
         </Section>}
 
         {page === "employees" && <Section title="Locations / crews">
@@ -406,13 +412,15 @@ function Center({ children }: { children: React.ReactNode }) {
 function sumTips(tips: Data["tips"]) {
   let gross = 0;
   let company = 0;
+  let platform = 0;
   const byDriver = new Map<string, number>();
   for (const t of tips) {
     gross += t.amount_cents;
     company += t.company_amount_cents;
-    byDriver.set(t.driver_id, (byDriver.get(t.driver_id) ?? 0) + t.amount_cents);
+    platform += t.platform_amount_cents;
+    if (t.driver_id) byDriver.set(t.driver_id, (byDriver.get(t.driver_id) ?? 0) + t.driver_amount_cents);
   }
-  return { gross, company, byDriver };
+  return { gross, company, platform, afterPlatform: gross - platform, byDriver };
 }
 function ratingAgg(ratings: Data["ratings"], drivers: Data["drivers"]) {
   const byDriver = new Map<string, { sum: number; n: number }>();
@@ -545,7 +553,7 @@ function DriverRoster({
                 <th className="hidden sm:table-cell">Location</th>
                 <th className="hidden md:table-cell">Tip link</th>
                 <th className="hidden sm:table-cell text-right">Avg ★</th>
-                <th className="text-right">Gross tips</th>
+                <th className="text-right">Employee net</th>
                 <th></th>
               </tr>
             </thead>
@@ -1275,6 +1283,44 @@ function UnassignedTipsPanel({ tips, drivers, onChanged }: {
   </div>;
 }
 
+function TipShareSettings({ company, onSaved }: { company: Data["company"]; onSaved: () => void | Promise<void> }) {
+  const save = useServerFn(updateCompanyTipShare);
+  const [companyPercent, setCompanyPercent] = useState(String(company.company_pct ?? 10));
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const parsed = Number(companyPercent);
+  const employeePercent = Number.isInteger(parsed) && parsed >= 0 && parsed <= 10 ? 90 - parsed : null;
+
+  return <form onSubmit={async (event) => {
+    event.preventDefault();
+    if (employeePercent == null) {
+      setMessage("Company share must be a whole percentage from 0% to 10%.");
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      await save({ data: { companyId: company.id, companyPercent: parsed } });
+      setMessage("Tip distribution saved. It will apply to future tips.");
+      await onSaved();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not save tip distribution");
+    } finally {
+      setBusy(false);
+    }
+  }} className="space-y-4">
+    <p className="text-sm text-muted-foreground">Blue Collar Tips keeps a fixed 10% platform fee. Choose whether the company keeps 0–10%; the employee automatically receives the remainder.</p>
+    <div className="grid gap-3 sm:grid-cols-3">
+      <Stat label="Platform fee" value="10%" />
+      <label className="text-sm">Company share (0–10%)<input type="number" min="0" max="10" step="1" required value={companyPercent} onChange={(event) => setCompanyPercent(event.target.value)} className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2" /></label>
+      <Stat label="Employee receives" value={employeePercent == null ? "—" : `${employeePercent}%`} />
+    </div>
+    <p className="text-xs text-muted-foreground">Changes apply to future tips. Historical tips retain their recorded distribution.</p>
+    <button disabled={busy || employeePercent == null} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">Save distribution</button>
+    {message && <p className="text-sm text-muted-foreground">{message}</p>}
+  </form>;
+}
+
 function ReconciliationPanel({ companyId, drivers }: { companyId: string; drivers: Data["drivers"] }) {
   const fetchOverview = useServerFn(reconciliationOverview);
   const [rows, setRows] = useState<Awaited<ReturnType<typeof reconciliationOverview>>["rows"]>([]);
@@ -1392,8 +1438,8 @@ function PlatformPanel({ view }: { view: PlatformPage }) {
       {view === "platformPayments" && <div className="rounded-lg border border-border p-4">
         <h3 className="font-semibold">Employee earnings breakdown</h3>
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Employee</th><th>Email</th><th>Company</th><th>Tips</th><th>Gross</th><th>Platform share</th></tr></thead><tbody className="divide-y divide-border">
-            {data.employees.map((employee) => <tr key={employee.id}><td className="py-2 font-medium">{employee.display_name}</td><td>{employee.email || "—"}</td><td>{Array.isArray(employee.companies) ? employee.companies[0]?.name : employee.companies?.name}</td><td>{employee.count}</td><td>{dollars(employee.gross)}</td><td>{dollars(employee.platformShare)}</td></tr>)}
+          <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Employee</th><th>Email</th><th>Company</th><th>Tips</th><th>Gross</th><th>Employee net</th><th>Platform fee</th></tr></thead><tbody className="divide-y divide-border">
+            {data.employees.map((employee) => <tr key={employee.id}><td className="py-2 font-medium">{employee.display_name}</td><td>{employee.email || "—"}</td><td>{Array.isArray(employee.companies) ? employee.companies[0]?.name : employee.companies?.name}</td><td>{employee.count}</td><td>{dollars(employee.gross)}</td><td>{dollars(employee.net)}</td><td>{dollars(employee.platformShare)}</td></tr>)}
           </tbody></table>
         </div>
       </div>}

@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 const migration = await readFile(new URL("../migrations/012_driver_wallet_payouts.sql", import.meta.url), "utf8");
 const platformMigration = await readFile(new URL("../migrations/013_platform_payout_settings.sql", import.meta.url), "utf8");
 const assignmentMigration = await readFile(new URL("../migrations/014_tip_driver_assignment_audit.sql", import.meta.url), "utf8");
+const splitMigration = await readFile(new URL("../migrations/015_configurable_company_tip_share.sql", import.meta.url), "utf8");
 const adminFunctions = await readFile(new URL("../src/lib/admin.functions.ts", import.meta.url), "utf8");
 const wallet = await readFile(new URL("../src/lib/wallet.functions.ts", import.meta.url), "utf8");
 const ledger = await readFile(new URL("../src/lib/stripe-tip-ledger.server.ts", import.meta.url), "utf8");
@@ -53,6 +54,17 @@ test("company admins can assign verified company tips without cross-company acce
   assert.match(adminFunctions, /Only verified, undisputed tips can be assigned/);
   assert.match(adminDashboard, /Unassigned company tips/);
   assert.match(adminDashboard, /Tip assigned successfully/);
+});
+
+test("company share is configurable from zero to ten while platform remains ten", () => {
+  assert.match(splitMigration, /company_pct BETWEEN 0 AND 10/);
+  assert.match(splitMigration, /platform_pct = 10/);
+  assert.match(splitMigration, /90 - c_pct/);
+  assert.match(adminFunctions, /export const updateCompanyTipShare/);
+  assert.match(adminFunctions, /companyPercent: z\.number\(\)\.int\(\)\.min\(0\)\.max\(10\)/);
+  assert.match(adminDashboard, /Company share \(0–10%\)/);
+  assert.match(adminDashboard, /Employee receives/);
+  assert.match(adminDashboard, /After platform fee/);
 });
 
 test("only platform admins configure and process manual wallet payouts", () => {

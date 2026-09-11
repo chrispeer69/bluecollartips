@@ -28,7 +28,7 @@ Own Stripe Connect account hierarchy (see Section 4)
 
 Roadside Towing is tenant #1, built and seeded as the first live company — but treat it as a normal tenant, not a hardcoded special case. The codebase must support onboarding additional towing companies without custom dev work.
 
-Revenue split is fixed platform-wide at 80% driver / 10% towing company / 10% Blue Collar AI — not configurable per tenant in this version. Build the split logic as a single constant/config value so it's trivial to change later if needed, but do not expose it as an admin setting.
+The Blue Collar Tips platform fee is fixed at 10%. Each company chooses a 0–10% company share, and the employee receives the remaining 80–90%. The selected split is recorded on each tip so historical earnings do not change when settings change later.
 
 2. User Roles
 
@@ -82,9 +82,9 @@ Driver has a clearly visible "Log a Cash Tip" (and "Log a P2P Tip") action in th
 
 Required fields: customer name (or description), amount, date/time, job reference if available, payment method (cash / Venmo / CashApp / Zelle / other).
 
-On submission, the system automatically calculates and records the same 80/10/10 split for that logged tip, and adds it to the driver's tip ledger exactly like a Stripe-processed tip.
+On submission, the system automatically calculates and records that company’s current split and adds it to the driver's tip ledger exactly like a Stripe-processed tip.
 
-Important distinction: for cash/P2P tips, the driver owes the company+platform's 20% themselves, since Blue Collar AI never touched that money. This obligation is tracked separately for company reconciliation and is not treated as platform-collected wallet cash. Build this as a clear running balance: "Owed to company/platform from cash tips: $X."
+Important distinction: for cash/P2P tips, the driver owes the recorded company share plus the 10% platform fee themselves, since Blue Collar Tips never touched that money. This obligation is tracked separately for company reconciliation and is not treated as platform-collected wallet cash.
 
 Policy & verification workflow:
 
@@ -220,7 +220,7 @@ Use Twilio (or the implementation team's recommended equivalent) for SMS deliver
 
 Design the data model multi-tenant from day one: Company → Drivers → Tips, with a platform-level (Blue Collar AI) layer above all companies.
 
-Build the 80/10/10 split as a single configurable constant in the backend logic (even though not exposed in UI), so it can be changed centrally later.
+Enforce the fixed 10% platform fee and each company’s selected 0–10% share in the backend/database, not only in the UI.
 
 Automated bank transfers can be added later. The current payout workflow uses the wallet ledger, employee payout requests, and admin-recorded payments.
 

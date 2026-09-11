@@ -4,7 +4,7 @@ import { z } from "zod";
 
 /**
  * Payout statement: returns every tip for a driver in a date range,
- * with the 80/10/10 split, day-level subtotals, and grand totals.
+ * with the recorded employee/company/platform split, day-level subtotals, and grand totals.
  * Access: driver themself, super_admin, or company_admin of the driver's company.
  */
 export const getPayoutStatement = createServerFn({ method: "POST" })

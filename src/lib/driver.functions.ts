@@ -172,7 +172,7 @@ export const logManualTip = createServerFn({ method: "POST" })
     if (!driver) throw new Error("No driver profile");
     if (driver.status !== "active") throw new Error("Driver account not active");
     const { db } = await import("@/db/client.server");
-    const { error } = await db.from("tips").insert({
+    const { data: tip, error } = await db.from("tips").insert({
       company_id: driver.company_id,
       driver_id: driver.id,
       amount_cents: data.amountCents,
@@ -183,9 +183,14 @@ export const logManualTip = createServerFn({ method: "POST" })
       driver_amount_cents: 0,
       company_amount_cents: 0,
       platform_amount_cents: 0,
-    });
+    }).select("driver_amount_cents, company_amount_cents, platform_amount_cents").single();
     if (error) throw error;
-    return { ok: true };
+    return {
+      ok: true,
+      driverAmountCents: Number(tip.driver_amount_cents),
+      companyAmountCents: Number(tip.company_amount_cents),
+      platformAmountCents: Number(tip.platform_amount_cents),
+    };
   });
 
 export const updateNotifyPrefs = createServerFn({ method: "POST" })

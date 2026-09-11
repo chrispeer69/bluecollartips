@@ -98,7 +98,7 @@ function Index() {
             },
             {
               t: "3. Split & track",
-              d: "Every tip splits 80/10/10 automatically. Employees and admins see live earnings.",
+              d: "Every tip splits automatically: 10% platform, 0–10% company, and the remaining 80–90% to the employee.",
             },
           ].map((s) => (
             <div key={s.t} className="rounded-lg border border-border bg-card p-6">

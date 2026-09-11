@@ -5,10 +5,27 @@ import { z } from "zod";
 const OPEN_PAYOUT_STATUSES = ["pending", "approved", "processing"] as const;
 const RESERVED_PAYOUT_STATUSES = [...OPEN_PAYOUT_STATUSES, "paid"] as const;
 const payoutMethodSchema = z.enum(["bank_transfer", "cash_app", "venmo", "zelle", "paypal", "check", "other"]);
+const usBankDetailsSchema = z.object({
+  type: z.literal("us_bank"),
+  bankName: z.string().trim().min(1).max(120),
+  accountType: z.enum(["checking", "savings"]),
+  routingNumber: z.string().regex(/^\d{9}$/),
+  accountNumber: z.string().regex(/^\d{4,17}$/),
+});
 const payoutDestinationSchema = z.object({
   method: payoutMethodSchema,
   accountName: z.string().trim().min(1).max(120),
   details: z.string().trim().min(3).max(1000),
+}).superRefine((value, ctx) => {
+  if (value.method !== "bank_transfer") return;
+  try {
+    const bank = usBankDetailsSchema.parse(JSON.parse(value.details));
+    const digits = bank.routingNumber.split("").map(Number);
+    const checksum = digits.reduce((sum, digit, index) => sum + digit * [3, 7, 1][index % 3], 0);
+    if (checksum % 10 !== 0) ctx.addIssue({ code: "custom", path: ["details"], message: "Enter a valid U.S. routing number" });
+  } catch {
+    ctx.addIssue({ code: "custom", path: ["details"], message: "Complete the U.S. bank account details" });
+  }
 });
 
 async function rolesFor(userId: string) {

@@ -31,7 +31,7 @@ import {
   updatePlatformWalletSettings,
 } from "@/lib/wallet.functions";
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
-import { PayoutDestinationForm, payoutMethodLabel } from "@/components/PayoutDestinationForm";
+import { PayoutDestinationForm, formatPayoutDetails, payoutMethodLabel } from "@/components/PayoutDestinationForm";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, CreditCard, LayoutDashboard, MessageSquareText, Settings, ShieldCheck, Users } from "lucide-react";
 
@@ -1427,7 +1427,7 @@ function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requ
                     {request.payout_destination_method ? <div className="mt-1 max-w-72 text-xs text-muted-foreground">
                       <span className="font-medium text-foreground">{payoutMethodLabel(request.payout_destination_method)}</span>
                       {request.payout_destination_account_name ? ` · ${request.payout_destination_account_name}` : ""}
-                      {request.payout_destination_details ? <div className="mt-0.5 whitespace-pre-wrap break-words">{request.payout_destination_details}</div> : null}
+                      {request.payout_destination_details ? <div className="mt-0.5 whitespace-pre-wrap break-words">{formatPayoutDetails(request.payout_destination_method, request.payout_destination_details)}</div> : null}
                     </div> : <div className="mt-1 text-xs text-secondary">No payout details</div>}
                   </td>
                   <td className="capitalize">{request.request_type}</td>

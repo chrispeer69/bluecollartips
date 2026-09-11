@@ -144,8 +144,16 @@ test("manual payout destinations are encrypted and snapshotted onto requests", (
   assert.match(wallet, /saveCompanyPayoutDestination/);
   assert.match(wallet, /Add your payout details before requesting a payout/);
   assert.match(adminDashboard, /ID \{d\.id\.slice\(0, 8\)\}/);
-  assert.match(driverDashboard, /Tip wallet & payout account/);
+  assert.match(driverDashboard, /Tip wallet & withdrawals/);
+  assert.match(driverDashboard, /id: "payoutAccount", label: "Payout account"/);
   assert.match(driverDashboard, /My payout account/);
   assert.match(payoutDestinationForm, /Bank account holder name/);
-  assert.match(payoutDestinationForm, /routing number, account number/);
+  assert.match(payoutDestinationForm, /U\.S\. bank account \(ACH\)/);
+  assert.match(payoutDestinationForm, /Routing number/);
+  assert.match(payoutDestinationForm, /Account number/);
+  assert.match(payoutDestinationForm, /ending in/);
+  assert.match(payoutDestinationForm, /setEditing\(!initial\)/);
+  assert.match(adminDashboard, /formatPayoutDetails/);
+  assert.match(wallet, /routingNumber: z\.string\(\)\.regex\(\/\^\\d\{9\}\$\//);
+  assert.match(wallet, /checksum % 10 !== 0/);
 });

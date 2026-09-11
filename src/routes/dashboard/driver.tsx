@@ -10,17 +10,18 @@ import { sendTipLinkSms } from "@/lib/sms.functions";
 import { confirmCashTip, disputeCashTip, listUnverifiedTips } from "@/lib/reconciliation.functions";
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
 import { JoinWorkspacePanel } from "@/components/JoinWorkspacePanel";
-import { PayoutDestinationForm } from "@/components/PayoutDestinationForm";
+import { PayoutDestinationForm, payoutMethodLabel } from "@/components/PayoutDestinationForm";
 import { LeaveWorkspacePanel } from "@/components/LeaveWorkspacePanel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Banknote, Building2, LayoutDashboard, QrCode, Settings, WalletCards } from "lucide-react";
+import { Banknote, Building2, Landmark, LayoutDashboard, QrCode, Settings, WalletCards } from "lucide-react";
 
-type DriverPage = "overview" | "share" | "tips" | "earnings" | "settings";
+type DriverPage = "overview" | "share" | "tips" | "earnings" | "payoutAccount" | "settings";
 const driverNav: DashboardNavItem<DriverPage>[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, group: "Workspace" },
   { id: "share", label: "QR & share", icon: QrCode, group: "Customer tools" },
   { id: "tips", label: "Tips & activity", icon: Banknote, group: "Money" },
-  { id: "earnings", label: "Earnings & payouts", icon: WalletCards },
+  { id: "earnings", label: "Earnings & withdrawals", icon: WalletCards },
+  { id: "payoutAccount", label: "Payout account", icon: Landmark },
   { id: "settings", label: "Settings", icon: Settings, group: "Account" },
 ];
 
@@ -190,9 +191,11 @@ function DriverDashboard() {
 
         {page === "tips" && <LogTipPanel driverId={data.driver.id} onLogged={() => load(data.driver.id)} />}
 
-        {page === "earnings" && <WalletPanel driverId={data.driver.id} viewingAsAdmin={!!data.viewingAsAdmin} />}
+        {page === "earnings" && <WalletPanel driverId={data.driver.id} viewingAsAdmin={!!data.viewingAsAdmin} onManageAccount={() => setPage("payoutAccount")} />}
 
         {page === "earnings" && <EarningsPanel driverId={data.driver.id} driverName={data.driver.display_name} />}
+
+        {page === "payoutAccount" && <PayoutAccountPanel driverId={data.driver.id} viewingAsAdmin={!!data.viewingAsAdmin} />}
 
         {page === "settings" && <ProfileSettingsPanel driver={data.driver} accountEmail={data.accountEmail} onSaved={() => load(data.driver.id)} />}
 
@@ -503,10 +506,9 @@ export function Stat({ label, value, hint }: { label: string; value: string; hin
   );
 }
 
-function WalletPanel({ driverId, viewingAsAdmin }: { driverId: string; viewingAsAdmin: boolean }) {
+function WalletPanel({ driverId, viewingAsAdmin, onManageAccount }: { driverId: string; viewingAsAdmin: boolean; onManageAccount: () => void }) {
   const getWallet = useServerFn(getDriverWallet);
   const requestPayout = useServerFn(requestWalletPayout);
-  const saveDestination = useServerFn(saveDriverPayoutDestination);
   const [wallet, setWallet] = useState<Awaited<ReturnType<typeof getDriverWallet>> | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -530,7 +532,7 @@ function WalletPanel({ driverId, viewingAsAdmin }: { driverId: string; viewingAs
     && withdrawalCents <= wallet.availableCents;
 
   return (
-    <Section title="Tip wallet & payout account">
+    <Section title="Tip wallet & withdrawals">
       {!wallet ? <p className="text-sm text-muted-foreground">Loading wallet…</p> : (
         <>
           <div className="grid gap-3 sm:grid-cols-3">
@@ -538,15 +540,18 @@ function WalletPanel({ driverId, viewingAsAdmin }: { driverId: string; viewingAs
             <Stat label="Paid out" value={dollars(wallet.paidCents)} />
             <Stat label="Minimum withdrawal" value={dollars(wallet.minimumCents)} />
           </div>
-          <div className="mt-4">
-            <PayoutDestinationForm
-              initial={wallet.payoutDestination}
-              title={viewingAsAdmin ? "Employee payout account" : "My payout account"}
-              onSave={async (destination) => {
-                await saveDestination({ data: { driverId, ...destination } });
-                await reload();
-              }}
-            />
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-4 text-sm">
+            <div>
+              <div className="font-medium">Payout account</div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {wallet.payoutDestination
+                  ? `${payoutMethodLabel(wallet.payoutDestination.method)} · ${wallet.payoutDestination.accountName}`
+                  : "No payout account configured yet."}
+              </p>
+            </div>
+            <button type="button" onClick={onManageAccount} className="rounded-md border border-border bg-card px-3 py-2 text-sm">
+              {wallet.payoutDestination ? "Manage payout account" : "Set up payout account"}
+            </button>
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-4 text-sm">
             <div>
@@ -576,7 +581,7 @@ function WalletPanel({ driverId, viewingAsAdmin }: { driverId: string; viewingAs
                 </p>
               )}
               {viewingAsAdmin && <p className="mt-2 text-xs text-muted-foreground">The employee must sign in to request their own payout.</p>}
-              {!wallet.payoutDestination && !viewingAsAdmin && <p className="mt-2 text-xs font-medium text-secondary">Save payout details above before requesting a payout.</p>}
+              {!wallet.payoutDestination && !viewingAsAdmin && <p className="mt-2 text-xs font-medium text-secondary">Set up your payout account before requesting a withdrawal.</p>}
             </div>
           <button
             disabled={busy || !wallet.canRequest || !validWithdrawal}
@@ -601,6 +606,43 @@ function WalletPanel({ driverId, viewingAsAdmin }: { driverId: string; viewingAs
         </>
       )}
       {msg && <p className="mt-2 text-xs text-muted-foreground">{msg}</p>}
+    </Section>
+  );
+}
+
+function PayoutAccountPanel({ driverId, viewingAsAdmin }: { driverId: string; viewingAsAdmin: boolean }) {
+  const getWallet = useServerFn(getDriverWallet);
+  const saveDestination = useServerFn(saveDriverPayoutDestination);
+  const [wallet, setWallet] = useState<Awaited<ReturnType<typeof getDriverWallet>> | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function reload() {
+    setWallet(await getWallet({ data: { driverId } }));
+  }
+
+  useEffect(() => {
+    setWallet(null);
+    setMessage(null);
+    reload().catch((error) => setMessage(error instanceof Error ? error.message : "Could not load payout account"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [driverId]);
+
+  return (
+    <Section title={viewingAsAdmin ? "Employee payout account" : "My payout account"}>
+      <p className="mb-4 text-sm text-muted-foreground">
+        This is where approved withdrawals will be sent. Your details are encrypted and are never shown on your public rating or tip page.
+      </p>
+      {!wallet ? <p className="text-sm text-muted-foreground">Loading payout account…</p> : (
+        <PayoutDestinationForm
+          initial={wallet.payoutDestination}
+          title="Payment destination"
+          onSave={async (destination) => {
+            await saveDestination({ data: { driverId, ...destination } });
+            await reload();
+          }}
+        />
+      )}
+      {message && <p className="mt-3 text-sm text-destructive">{message}</p>}
     </Section>
   );
 }

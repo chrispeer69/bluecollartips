@@ -31,7 +31,7 @@ test("admin dashboard exposes task-based sidebar pages", () => {
 });
 
 test("employee dashboard exposes workspace switcher and focused pages", () => {
-  for (const label of ["Overview", "QR & share", "Tips & activity", "Earnings & payouts", "Settings"]) {
+  for (const label of ["Overview", "QR & share", "Tips & activity", "Earnings & withdrawals", "Payout account", "Settings"]) {
     assert.match(driver, new RegExp(`label: "${label.replace(/[&]/g, "\\&")}"`));
   }
   assert.match(driver, /employeeWorkspaceId/);
@@ -40,6 +40,8 @@ test("employee dashboard exposes workspace switcher and focused pages", () => {
   assert.match(driver, /Profile & identity/);
   assert.match(driver, /unique account identifier/);
   assert.match(driver, /does not change when you edit your display name/);
+  assert.match(driver, /page === "payoutAccount" && <PayoutAccountPanel/);
+  assert.match(driver, /Set up your payout account before requesting a withdrawal/);
 });
 
 test("customer tips use Stripe while external tips are employee-recorded", () => {

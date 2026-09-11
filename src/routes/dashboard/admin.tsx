@@ -6,6 +6,7 @@ import {
   createCompany,
   createDriver,
   assignCompanyTipToDriver,
+  assignReviewToDriver,
   getAdminDashboard,
   resolveFlag,
   setDriverStatus,
@@ -75,6 +76,7 @@ function AdminDashboard() {
   const updateCo = useServerFn(updateCompanyBranding);
   const newCo = useServerFn(createCompany);
   const fixFlag = useServerFn(resolveFlag);
+  const assignReview = useServerFn(assignReviewToDriver);
 
   const [data, setData] = useState<Data | null>(null);
   const [companyId, setCompanyId] = useState<string | undefined>();
@@ -340,7 +342,16 @@ function AdminDashboard() {
         </Section>}
 
         {(page === "overview" || page === "feedback") && <Section title="Recent ratings & feedback">
-          <FeedbackList ratings={data.ratings} drivers={data.drivers} />
+          <FeedbackList
+            ratings={data.ratings}
+            drivers={data.drivers}
+            companyName={data.company?.name ?? "Company"}
+            editable={page === "feedback"}
+            onAssign={async (ratingId, driverId) => {
+              await assignReview({ data: { ratingId, driverId } });
+              await load(companyId);
+            }}
+          />
         </Section>}
 
         {page === "feedback" && <Section title="Discrepancy flags">
@@ -737,9 +748,25 @@ function BrandingForm({
   );
 }
 
-function FeedbackList({ ratings, drivers }: { ratings: Data["ratings"]; drivers: Data["drivers"] }) {
+const COMPANY_OPTION = "__company__";
+
+function FeedbackList({
+  ratings,
+  drivers,
+  companyName = "Company",
+  editable = false,
+  onAssign,
+}: {
+  ratings: Data["ratings"];
+  drivers: Data["drivers"];
+  companyName?: string;
+  editable?: boolean;
+  onAssign?: (ratingId: string, driverId: string | null) => Promise<void>;
+}) {
+  const [pendingId, setPendingId] = useState<string | null>(null);
   if (!ratings.length) return <div className="text-sm text-muted-foreground">No ratings yet.</div>;
   const byId = new Map(drivers.map((d) => [d.id, d.display_name]));
+  const assignable = [...drivers].sort((a, b) => a.display_name.localeCompare(b.display_name));
   return (
     <ul className="divide-y divide-border">
       {ratings.slice(0, 30).map((r) => (
@@ -748,7 +775,7 @@ function FeedbackList({ ratings, drivers }: { ratings: Data["ratings"]; drivers:
             <div>
               <span className="text-secondary">{"★".repeat(r.stars)}</span>
               <span className="text-muted-foreground">{"★".repeat(5 - r.stars)}</span>
-              <span className="ml-2 text-xs text-muted-foreground">{String(byId.get(r.driver_id) ?? "Company")}</span>
+              <span className="ml-2 text-xs text-muted-foreground">{String(byId.get(r.driver_id) ?? companyName)}</span>
               {r.flagged && (
                 <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-xs text-destructive">low rating</span>
               )}
@@ -757,6 +784,31 @@ function FeedbackList({ ratings, drivers }: { ratings: Data["ratings"]; drivers:
           </div>
           {r.feedback && <p className="mt-1">{r.feedback}</p>}
           {r.customer_name && <p className="text-xs text-muted-foreground">— {r.customer_name}</p>}
+          {editable && onAssign && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Employee</span>
+              <Select
+                value={r.driver_id ?? COMPANY_OPTION}
+                onValueChange={(value) => {
+                  const driverId = value === COMPANY_OPTION ? null : value;
+                  if (driverId === (r.driver_id ?? null)) return;
+                  setPendingId(r.id);
+                  Promise.resolve(onAssign(r.id, driverId)).finally(() => setPendingId(null));
+                }}
+                disabled={pendingId === r.id}
+              >
+                <SelectTrigger className="h-8 max-w-52 text-xs" aria-label="Assign this review to an employee"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={COMPANY_OPTION}>{companyName} (no employee)</SelectItem>
+                  {assignable.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.display_name}{d.status !== "active" ? ` (${d.status})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </li>
       ))}
     </ul>

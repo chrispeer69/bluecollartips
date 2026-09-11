@@ -222,6 +222,28 @@ export const assignCompanyTipToDriver = createServerFn({ method: "POST" })
     });
   });
 
+// Attribute (or re-attribute) a review to an employee, or clear it back to the
+// company. Lets an admin correct reviews that arrived without a matched driver.
+export const assignReviewToDriver = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({
+    ratingId: z.string().uuid(),
+    driverId: z.string().uuid().nullable(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { sql } = await import("@/db/client.server");
+    const database = sql();
+    const [rating] = await database`SELECT company_id FROM ratings WHERE id = ${data.ratingId}`;
+    if (!rating) throw new Error("Review not found");
+    await assertCompanyAdmin(context.userId, rating.company_id);
+    if (data.driverId) {
+      const [driver] = await database`SELECT id, company_id FROM drivers WHERE id = ${data.driverId}`;
+      if (!driver || driver.company_id !== rating.company_id) throw new Error("Employee does not belong to this company");
+    }
+    await database`UPDATE ratings SET driver_id = ${data.driverId} WHERE id = ${data.ratingId}`;
+    return { ok: true, assignedTo: data.driverId ? "employee" : "company" };
+  });
+
 export const updateCompanyBranding = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator((d) =>

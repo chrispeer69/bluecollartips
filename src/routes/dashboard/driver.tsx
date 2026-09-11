@@ -134,9 +134,9 @@ function DriverDashboard() {
           <Stat label="Tips this month (net)" value={dollars(totals.monthNet)} />
           <Stat label="All-time (net)" value={dollars(totals.allNet)} />
           <Stat
-            label="Owed to company/platform"
-            value={dollars(totals.owedToCo)}
-            hint="From manually recorded tips"
+            label="Manual tips logged"
+            value={dollars(totals.manualGross)}
+            hint="Bookkeeping only · not withdrawable"
           />
         </div>}
 
@@ -295,7 +295,7 @@ function LogTipPanel({ driverId, onLogged }: { driverId: string; onLogged: () =>
     }
     setBusy(true);
     try {
-      const result = await logTip({
+      await logTip({
         data: {
           amountCents: cents,
           source,
@@ -307,7 +307,7 @@ function LogTipPanel({ driverId, onLogged }: { driverId: string; onLogged: () =>
       setAmount("");
       setCustomerName("");
       setNote("");
-      setMsg("Logged. You owe " + dollars(result.companyAmountCents + result.platformAmountCents) + " to the company/platform on this tip.");
+      setMsg("Manual tip recorded for bookkeeping. No company or platform fee was applied.");
       onLogged();
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : "Could not log");
@@ -469,17 +469,17 @@ function computeTotals(tips: DashData["tips"]) {
   let weekNet = 0;
   let monthNet = 0;
   let allNet = 0;
-  let owedToCo = 0;
+  let manualGross = 0;
   for (const t of tips) {
     const ts = new Date(t.created_at).getTime();
     allNet += t.driver_amount_cents;
     if (ts >= weekAgo) weekNet += t.driver_amount_cents;
     if (ts >= monthStart.getTime()) monthNet += t.driver_amount_cents;
     if (t.source !== "stripe") {
-      owedToCo += t.company_amount_cents + t.platform_amount_cents;
+      manualGross += t.amount_cents;
     }
   }
-  return { weekNet, monthNet, allNet, owedToCo };
+  return { weekNet, monthNet, allNet, manualGross };
 }
 
 function computeRatingStats(ratings: DashData["ratings"]) {

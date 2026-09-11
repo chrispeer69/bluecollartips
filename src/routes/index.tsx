@@ -98,7 +98,7 @@ function Index() {
             },
             {
               t: "3. Split & track",
-              d: "Every tip splits automatically: 10% platform, 0–10% company, and the remaining 80–90% to the employee.",
+              d: "Every Stripe tip splits automatically: 10% platform, 0–10% company, and the remaining 80–90% to the employee. Manual tips are bookkeeping-only.",
             },
           ].map((s) => (
             <div key={s.t} className="rounded-lg border border-border bg-card p-6">

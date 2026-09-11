@@ -8,6 +8,7 @@ const assignmentMigration = await readFile(new URL("../migrations/014_tip_driver
 const splitMigration = await readFile(new URL("../migrations/015_configurable_company_tip_share.sql", import.meta.url), "utf8");
 const companyWalletMigration = await readFile(new URL("../migrations/016_company_wallet_payouts.sql", import.meta.url), "utf8");
 const destinationMigration = await readFile(new URL("../migrations/017_payout_destinations.sql", import.meta.url), "utf8");
+const manualTipsMigration = await readFile(new URL("../migrations/018_manual_tips_bookkeeping_only.sql", import.meta.url), "utf8");
 const destinationCrypto = await readFile(new URL("../src/lib/payout-destination.server.ts", import.meta.url), "utf8");
 const adminFunctions = await readFile(new URL("../src/lib/admin.functions.ts", import.meta.url), "utf8");
 const wallet = await readFile(new URL("../src/lib/wallet.functions.ts", import.meta.url), "utf8");
@@ -65,6 +66,16 @@ test("successful Stripe tips have webhook and browser-confirmed idempotent ledge
   assert.match(ledger, /webhook retries must never undo that/);
   assert.match(wallet, /export const syncStripeTipHistory/);
   assert.match(wallet, /scanned < 1000/);
+});
+
+test("manual tips are fee-free bookkeeping and cannot fund withdrawals", () => {
+  assert.match(manualTipsMigration, /IF NEW\.source <> 'stripe'/);
+  assert.match(manualTipsMigration, /NEW\.driver_amount_cents := NEW\.amount_cents/);
+  assert.match(manualTipsMigration, /NEW\.platform_amount_cents := 0/);
+  assert.match(manualTipsMigration, /WHERE source <> 'stripe'/);
+  assert.match(wallet, /AND source = 'stripe'/);
+  assert.match(driverDashboard, /No company or platform fee was applied/);
+  assert.match(driverDashboard, /Bookkeeping only · not withdrawable/);
 });
 
 test("company admins can assign verified company tips without cross-company access", () => {

@@ -166,11 +166,12 @@ function TipPoolingGuide() {
         <section className="mt-10 space-y-4">
           <h2 className="text-2xl font-semibold">Cash tips and reconciliation</h2>
           <p>
-            Card tips through Stripe split automatically. Cash and P2P tips (Venmo, Cash
-            App, Zelle, PayPal) are logged manually by the driver and reconciled against the
-            customer's rating activity. We flag any driver whose unverified-tip ratio
-            crosses 20% so admins can spot reporting drift early — without burying the
-            driver in paperwork.
+            Card tips through Stripe split automatically. Cash and external tips are logged
+            manually by the driver for bookkeeping only; no company or platform fee is
+            applied because the platform did not collect the money. They can still be
+            reconciled against the customer's rating activity. We flag any driver whose
+            unverified-tip ratio crosses 20% so admins can spot reporting drift early —
+            without burying the driver in paperwork.
           </p>
         </section>
 

@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { TIP_MAX_CENTS, TIP_MIN_CENTS } from "./constants";
 import { createHash } from "crypto";
 import { getRequestHeader } from "@tanstack/react-start/server";
 import { deliverReviewWebhook, hashReviewToken } from "./review-webhooks.server";
@@ -97,7 +96,7 @@ export const getPublicDriver = createServerFn({ method: "GET" })
     if (!company) return { company: null, driver: null };
     const { data: driver } = await db
       .from("drivers")
-      .select("id, display_name, slug, photo_url, status, venmo_handle, cashapp_handle, zelle_handle, paypal_handle")
+      .select("id, display_name, slug, photo_url, status")
       .eq("company_id", company.id)
       .eq("slug", data.driverSlug)
       .eq("status", "active")
@@ -121,17 +120,6 @@ export const submitRating = createServerFn({ method: "POST" })
         customerName: z.string().trim().max(120).optional().nullable(),
         customerPhone: z.string().trim().max(40).optional().nullable(),
         customerEmail: z.string().trim().max(200).optional().nullable(),
-        tipCents: z
-          .number()
-          .int()
-          .min(TIP_MIN_CENTS)
-          .max(TIP_MAX_CENTS)
-          .optional()
-          .nullable(),
-        tipSource: z
-          .enum(["stripe", "venmo", "cashapp", "zelle", "paypal", "cash", "other"])
-          .optional()
-          .nullable(),
         reviewToken: z.string().trim().min(20).max(200).optional().nullable(),
       })
       .parse(data),
@@ -178,34 +166,15 @@ export const submitRating = createServerFn({ method: "POST" })
     if (rErr) throw rErr;
     if (reviewContext) await db.from("review_contexts").update({ consumed_at: new Date().toISOString(), rating_id: rating.id }).eq("id", reviewContext.id);
 
-    // Phase 1: in-app tip payment is deferred (no Stripe). If the customer
-    // indicated a P2P/cash tip, we log it as an unverified manual tip so the
-    // driver's books reflect it; the driver and admin will reconcile.
-    if (data.tipCents && data.tipSource && data.tipSource !== "stripe") {
-      const { error: tErr } = await db.from("tips").insert({
-        company_id: company.id,
-        driver_id: driver.id,
-        rating_id: rating.id,
-        amount_cents: data.tipCents,
-        source: data.tipSource,
-        customer_name: data.customerName ?? null,
-        // split columns are NOT NULL; trigger will overwrite. Pass 0 placeholders.
-        driver_amount_cents: 0,
-        company_amount_cents: 0,
-        platform_amount_cents: 0,
-        note: "Customer-reported P2P tip (awaiting driver confirmation)",
-      });
-      if (tErr) throw tErr;
-    }
-
-    // Notify the employee (SMS) about the new rating/tip.
+    // Stripe records online tips independently. This public endpoint records
+    // only the rating; cash and external tips must be logged by an employee.
     try {
       const { notifyEmployee } = await import("@/lib/notify.server");
       await notifyEmployee(db, {
         companyId: company.id,
         driverId: driver.id,
-        kind: data.tipCents && data.tipCents > 0 ? "tip" : "rating",
-        amountCents: data.tipCents ?? null,
+        kind: "rating",
+        amountCents: null,
         stars: data.stars,
         customerName: data.customerName ?? null,
       });

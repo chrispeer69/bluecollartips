@@ -10,10 +10,10 @@ export const Route = createFileRoute("/$companySlug/d/$driverSlug")({
   head: ({ params }) => ({
     meta: [
       { title: "Rate your service — Blue Collar Tips" },
-      { name: "description", content: "Rate your service, leave feedback, and tip your service pro securely by card or P2P — powered by Blue Collar Tips." },
+      { name: "description", content: "Rate your service, leave feedback, and tip your service pro securely through Stripe — powered by Blue Collar Tips." },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { property: "og:title", content: "Rate your service — Blue Collar Tips" },
-      { property: "og:description", content: "Rate your service, leave feedback, and tip securely by card or P2P." },
+      { property: "og:description", content: "Rate your service, leave feedback, and tip securely through Stripe." },
       { property: "og:url", content: `https://bluecollartips.app/${params.companySlug}/d/${params.driverSlug}` },
     ],
     links: [{ rel: "canonical", href: `https://bluecollartips.app/${params.companySlug}/d/${params.driverSlug}` }],
@@ -183,8 +183,6 @@ function TipPage() {
           customerName: customerName.trim() || null,
           customerPhone: customerPhone.trim() || null,
           customerEmail: customerEmail.trim() || null,
-          tipCents: null,
-          tipSource: null,
           reviewToken,
         },
       });
@@ -385,8 +383,6 @@ function TipPage() {
                             customerName: customerName.trim() || null,
                             customerPhone: customerPhone.trim() || null,
                             customerEmail: customerEmail.trim() || null,
-                            tipCents: null,
-                            tipSource: null,
                             reviewToken,
                           },
                         });

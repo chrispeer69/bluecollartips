@@ -94,7 +94,7 @@ function Index() {
             },
             {
               t: "2. Rate & tip",
-              d: "Customer rates 1–5 stars, leaves optional feedback, and can tip via card or P2P.",
+              d: "Customer rates 1–5 stars, leaves optional feedback, and can tip securely through Stripe.",
             },
             {
               t: "3. Split & track",

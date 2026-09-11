@@ -28,10 +28,10 @@ export const Route = createFileRoute("/dashboard/driver")({
   head: () => ({
     meta: [
       { title: "My dashboard — Blue Collar Tips" },
-      { name: "description", content: "View your ratings, track tips, share your QR code, and log cash or P2P tips from your Blue Collar Tips employee dashboard." },
+      { name: "description", content: "View your ratings, track tips, share your Stripe payment QR code, and record tips received outside the platform." },
       { name: "robots", content: "noindex" },
       { property: "og:title", content: "Employee dashboard — Blue Collar Tips" },
-      { property: "og:description", content: "Track your ratings and tips, share your QR code, and log cash or P2P tips." },
+      { property: "og:description", content: "Track ratings and tips, share your Stripe payment QR code, and record tips received outside the platform." },
       { property: "og:url", content: "/dashboard/driver" },
     ],
   }),
@@ -136,7 +136,7 @@ function DriverDashboard() {
           <Stat
             label="Owed to company/platform"
             value={dollars(totals.owedToCo)}
-            hint="From cash & P2P tips"
+            hint="From manually recorded tips"
           />
         </div>}
 
@@ -317,7 +317,10 @@ function LogTipPanel({ driverId, onLogged }: { driverId: string; onLogged: () =>
   }
 
   return (
-    <Section title="Log a cash / P2P tip">
+    <Section title="Record a manual tip">
+      <p className="mb-4 text-sm text-muted-foreground">
+        Use this only after a cash or external payment was actually received. Customer payments from your Blue Collar Tips link or QR code are processed and recorded automatically through Stripe.
+      </p>
       <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm">
           Amount ($)
@@ -661,7 +664,7 @@ function UnverifiedPanel({ driverId, onChange }: { driverId: string; onChange: (
   }, []);
   if (!items.length) return null;
   return (
-    <Section title="Cash / P2P tips to verify">
+    <Section title="Manual tips to verify">
       <p className="mb-2 text-xs text-muted-foreground">
         Confirm tips you actually received so your earnings reconcile. Disputed tips notify your admin.
       </p>
@@ -802,10 +805,6 @@ function ProfileSettingsPanel({ driver, accountEmail, onSaved }: { driver: any; 
   const [displayName, setDisplayName] = useState(driver.display_name ?? "");
   const [phone, setPhone] = useState(driver.phone ?? "");
   const [photoUrl, setPhotoUrl] = useState(driver.photo_url ?? "");
-  const [venmo, setVenmo] = useState(driver.venmo_handle ?? "");
-  const [cashapp, setCashapp] = useState(driver.cashapp_handle ?? "");
-  const [zelle, setZelle] = useState(driver.zelle_handle ?? "");
-  const [paypal, setPaypal] = useState(driver.paypal_handle ?? "");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const company = Array.isArray(driver.companies) ? driver.companies[0] : driver.companies;
@@ -819,8 +818,6 @@ function ProfileSettingsPanel({ driver, accountEmail, onSaved }: { driver: any; 
         try {
           await save({ data: {
             driverId: driver.id, displayName, phone: phone || null, photoUrl: photoUrl || null,
-            venmoHandle: venmo || null, cashappHandle: cashapp || null,
-            zelleHandle: zelle || null, paypalHandle: paypal || null,
           } });
           setMessage("Profile saved. Your QR code and link remain unchanged.");
           onSaved();
@@ -839,10 +836,6 @@ function ProfileSettingsPanel({ driver, accountEmail, onSaved }: { driver: any; 
           <div className="text-xs text-muted-foreground">Organization · controlled by company admin</div>
           <div className="mt-1 font-medium">{company?.name ?? "Company"}</div>
         </div>
-        <label className="text-sm">Venmo handle<input className={fieldClass} value={venmo} onChange={(e) => setVenmo(e.target.value)} placeholder="@name" /></label>
-        <label className="text-sm">Cash App handle<input className={fieldClass} value={cashapp} onChange={(e) => setCashapp(e.target.value)} placeholder="$cashtag" /></label>
-        <label className="text-sm">Zelle email or phone<input className={fieldClass} value={zelle} onChange={(e) => setZelle(e.target.value)} /></label>
-        <label className="text-sm">PayPal handle<input className={fieldClass} value={paypal} onChange={(e) => setPaypal(e.target.value)} /></label>
         <div className="sm:col-span-2 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
           Public path: /{company?.slug}/d/{driver.slug} · This stable identifier does not change when you edit your display name.
         </div>

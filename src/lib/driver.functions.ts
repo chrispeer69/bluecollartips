@@ -3,7 +3,7 @@ import { requireAuth } from "@/auth/middleware";
 import { z } from "zod";
 import { TIP_MAX_CENTS, TIP_MIN_CENTS } from "./constants";
 
-const DRIVER_DASHBOARD_FIELDS = "id, company_id, user_id, location_id, display_name, slug, employee_id, email, phone, photo_url, status, venmo_handle, cashapp_handle, zelle_handle, paypal_handle, stripe_account_id, stripe_onboarded, stripe_charges_enabled, stripe_payouts_enabled, notify_sms, payout_method, payout_account_name, created_at, companies(name, slug, primary_color, secondary_color, logo_url)";
+const DRIVER_DASHBOARD_FIELDS = "id, company_id, user_id, location_id, display_name, slug, employee_id, email, phone, photo_url, status, stripe_account_id, stripe_onboarded, stripe_charges_enabled, stripe_payouts_enabled, notify_sms, payout_method, payout_account_name, created_at, companies(name, slug, primary_color, secondary_color, logo_url)";
 
 async function getUserRoles(userId: string) {
   const { db } = await import("@/db/client.server");
@@ -134,10 +134,6 @@ export const updateDriverProfile = createServerFn({ method: "POST" })
     displayName: z.string().trim().min(1).max(80),
     phone: z.string().trim().max(40).optional().nullable(),
     photoUrl: z.union([z.string().trim().url().max(1000), z.literal("")]).optional().nullable(),
-    venmoHandle: z.string().trim().max(100).optional().nullable(),
-    cashappHandle: z.string().trim().max(100).optional().nullable(),
-    zelleHandle: z.string().trim().max(150).optional().nullable(),
-    paypalHandle: z.string().trim().max(150).optional().nullable(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { driver } = await resolveAccessibleDriver(context.userId, data.driverId);
@@ -147,10 +143,6 @@ export const updateDriverProfile = createServerFn({ method: "POST" })
       display_name: data.displayName,
       phone: data.phone || null,
       photo_url: data.photoUrl || null,
-      venmo_handle: data.venmoHandle || null,
-      cashapp_handle: data.cashappHandle || null,
-      zelle_handle: data.zelleHandle || null,
-      paypal_handle: data.paypalHandle || null,
     }).eq("id", driver.id);
     if (error) throw new Error(error.message);
     if (driver.user_id === context.userId) {

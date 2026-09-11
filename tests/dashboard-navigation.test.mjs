@@ -12,6 +12,7 @@ const authFunctions = await readFile(new URL("../src/lib/auth.functions.ts", imp
 const emailInvites = await readFile(new URL("../src/auth/email-invites.server.ts", import.meta.url), "utf8");
 const inviteFunctions = await readFile(new URL("../src/lib/invites.functions.ts", import.meta.url), "utf8");
 const driverFunctions = await readFile(new URL("../src/lib/driver.functions.ts", import.meta.url), "utf8");
+const publicFunctions = await readFile(new URL("../src/lib/public.functions.ts", import.meta.url), "utf8");
 const googleAuth = await readFile(new URL("../src/auth/google.server.ts", import.meta.url), "utf8");
 const dashboardRouter = await readFile(new URL("../src/routes/dashboard/index.tsx", import.meta.url), "utf8");
 const platformFunctions = await readFile(new URL("../src/lib/platform.functions.ts", import.meta.url), "utf8");
@@ -39,6 +40,15 @@ test("employee dashboard exposes workspace switcher and focused pages", () => {
   assert.match(driver, /Profile & identity/);
   assert.match(driver, /unique account identifier/);
   assert.match(driver, /does not change when you edit your display name/);
+});
+
+test("customer tips use Stripe while external tips are employee-recorded", () => {
+  assert.match(driver, /Customer payments from your Blue Collar Tips link or QR code are processed and recorded automatically through Stripe/);
+  assert.match(driver, /Record a manual tip/);
+  assert.doesNotMatch(driver, /Venmo handle|Cash App handle|Zelle email|PayPal handle/);
+  assert.doesNotMatch(driverFunctions, /venmoHandle|cashappHandle|zelleHandle|paypalHandle/);
+  assert.doesNotMatch(publicFunctions, /tipSource:/);
+  assert.doesNotMatch(publicFunctions, /venmo_handle|cashapp_handle|zelle_handle|paypal_handle/);
 });
 
 test("dashboard shell supports desktop, mobile, and independently scrolling content", () => {

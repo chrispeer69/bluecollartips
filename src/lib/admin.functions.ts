@@ -6,7 +6,7 @@ import { randomBytes } from "crypto";
 
 const APP_BASE_URL =
   process.env.APP_BASE_URL ?? "https://bluecollartips.app";
-const ADMIN_DRIVER_FIELDS = "id, company_id, user_id, location_id, display_name, slug, employee_id, email, phone, photo_url, status, venmo_handle, cashapp_handle, zelle_handle, paypal_handle, stripe_account_id, stripe_onboarded, stripe_charges_enabled, stripe_payouts_enabled, notify_sms, payout_method, payout_account_name, created_at";
+const ADMIN_DRIVER_FIELDS = "id, company_id, user_id, location_id, display_name, slug, employee_id, email, phone, photo_url, status, stripe_account_id, stripe_onboarded, stripe_charges_enabled, stripe_payouts_enabled, notify_sms, payout_method, payout_account_name, created_at";
 
 function generateInviteCode() {
   return randomBytes(6).toString("hex").toUpperCase();

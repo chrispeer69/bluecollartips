@@ -47,7 +47,7 @@ function PrivacyPage() {
               </li>
               <li>
                 <span className="text-foreground">Employees:</span> name, work email, phone, photo,
-                assigned company and location, optional peer-to-peer payment handles, and payout
+                assigned company and location, optional payout instructions, and payout
                 status from Stripe.
               </li>
               <li>

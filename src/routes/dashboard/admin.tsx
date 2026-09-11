@@ -15,7 +15,6 @@ import {
 import { dollars } from "@/lib/constants";
 import { Section, Stat, TopBar } from "./driver";
 import { createInvite, listInvites, revokeInvite, listJoinRequests, reviewJoinRequest } from "@/lib/invites.functions";
-import { reconciliationOverview } from "@/lib/reconciliation.functions";
 import { platformOverview, suspendTenant } from "@/lib/platform.functions";
 import { sendTipLinkSms } from "@/lib/sms.functions";
 import { listTipDisputes, flagTipDispute, clearTipDispute, refundTip } from "@/lib/disputes.functions";
@@ -57,7 +56,7 @@ const adminNav: DashboardNavItem<AdminPage>[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, group: "Workspace" },
   { id: "employees", label: "Employees", icon: Users, group: "Manage" },
   { id: "feedback", label: "Ratings & feedback", icon: MessageSquareText },
-  { id: "payments", label: "Tips & reconciliation", icon: CreditCard, group: "Money" },
+  { id: "payments", label: "Tips & payments", icon: CreditCard, group: "Money" },
   { id: "settings", label: "Company settings", icon: Settings, group: "Configure" },
 ];
 const platformNav: DashboardNavItem<AdminPage>[] = [
@@ -376,16 +375,16 @@ function AdminDashboard() {
           <CompanyWalletPanel key={`${data.company.id}-${data.tips.filter((tip: any) => tip.assigned_at).length}`} companyId={data.company.id} />
         </Section>}
 
+        {page === "payments" && <Section title="Recent customer payments">
+          <CompanyPaymentLedger tips={data.tips} drivers={data.drivers} />
+        </Section>}
+
         {page === "payments" && <Section title="Unassigned company tips">
           <UnassignedTipsPanel
             tips={data.tips}
             drivers={data.drivers}
             onChanged={() => load(companyId)}
           />
-        </Section>}
-
-        {page === "payments" && <Section title="Employee tips & payouts">
-          <ReconciliationPanel companyId={data.company.id} drivers={data.drivers} />
         </Section>}
 
         {page === "employees" && <Section title="SMS a tip link to a customer">
@@ -1503,6 +1502,45 @@ function UnassignedTipsPanel({ tips, drivers, onChanged }: {
   </div>;
 }
 
+function CompanyPaymentLedger({ tips, drivers }: { tips: Data["tips"]; drivers: Data["drivers"] }) {
+  const payments = tips.filter((tip: any) => tip.source === "stripe" && tip.stripe_status === "succeeded" && tip.verified);
+  const driverNames = new Map(drivers.map((driver: any) => [driver.id, driver.display_name]));
+
+  if (!payments.length) {
+    return <p className="text-sm text-muted-foreground">No Stripe customer payments have been recorded yet.</p>;
+  }
+
+  return <div>
+    <p className="mb-3 text-sm text-muted-foreground">Newest first. This ledger shows who paid, who received credit, and how each payment was divided.</p>
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead className="text-xs uppercase text-muted-foreground">
+          <tr><th className="py-2">Paid</th><th>Customer</th><th>Employee</th><th>Gross</th><th>Employee net</th><th>Company share</th><th>Platform fee</th><th>Status</th><th>Stripe ID</th></tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {payments.map((tip: any, index: number) => <tr key={tip.id}>
+            <td className="whitespace-nowrap py-3">
+              <div>{new Date(tip.created_at).toLocaleString()}</div>
+              {index === 0 && <span className="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Latest payment</span>}
+            </td>
+            <td>
+              <div>{tip.customer_name || "Customer details not provided"}</div>
+              {tip.customer_contact && <div className="text-xs text-muted-foreground">{tip.customer_contact}</div>}
+            </td>
+            <td>{tip.driver_id ? driverNames.get(tip.driver_id) || "Unknown employee" : "Company / unassigned"}</td>
+            <td>{dollars(Number(tip.amount_cents))}</td>
+            <td>{dollars(Number(tip.driver_amount_cents))}</td>
+            <td>{dollars(Number(tip.company_amount_cents))}</td>
+            <td>{dollars(Number(tip.platform_amount_cents))}</td>
+            <td>{tip.refunded_at ? "Refunded" : tip.disputed ? "Disputed" : "Paid"}</td>
+            <td className="font-mono text-xs">{tip.stripe_payment_intent_id || "—"}</td>
+          </tr>)}
+        </tbody>
+      </table>
+    </div>
+  </div>;
+}
+
 function TipShareSettings({ company, onSaved }: { company: Data["company"]; onSaved: () => void | Promise<void> }) {
   const save = useServerFn(updateCompanyTipShare);
   const [companyPercent, setCompanyPercent] = useState(String(company.company_pct ?? 10));
@@ -1545,53 +1583,6 @@ function TipShareSettings({ company, onSaved }: { company: Data["company"]; onSa
     <button disabled={busy || employeePercent == null} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">Save distribution</button>
     {message && <p className="text-sm text-muted-foreground">{message}</p>}
   </form>;
-}
-
-function ReconciliationPanel({ companyId, drivers }: { companyId: string; drivers: Data["drivers"] }) {
-  const fetchOverview = useServerFn(reconciliationOverview);
-  const [rows, setRows] = useState<Awaited<ReturnType<typeof reconciliationOverview>>["rows"] | null>(null);
-  useEffect(() => {
-    setRows(null);
-    fetchOverview({ data: { companyId } }).then((r) => setRows(r.rows));
-  }, [companyId, fetchOverview]);
-  if (!drivers.length) return <div className="text-sm text-muted-foreground">No employees have been added yet.</div>;
-  if (!rows) return <div className="text-sm text-muted-foreground">Loading employee tip balances…</div>;
-  const totalNet = rows.reduce((sum, row) => sum + row.employeeNetCents, 0);
-  const totalAvailable = rows.reduce((sum, row) => sum + row.availableCents, 0);
-  const totalPending = rows.reduce((sum, row) => sum + row.pendingPayoutCents, 0);
-  const totalPaid = rows.reduce((sum, row) => sum + row.paidOutCents, 0);
-  return (
-    <div>
-      <div className="mb-4 grid gap-3 sm:grid-cols-4">
-        <Stat label="Employee net earned" value={dollars(totalNet)} />
-        <Stat label="Available to request" value={dollars(totalAvailable)} />
-        <Stat label="Payouts in progress" value={dollars(totalPending)} />
-        <Stat label="Paid to employees" value={dollars(totalPaid)} />
-      </div>
-      <div className="overflow-x-auto"><table className="w-full text-sm">
-        <thead className="text-left text-xs uppercase text-muted-foreground">
-          <tr><th className="py-2">Employee</th><th>Tips</th><th>Gross</th><th>Employee net</th><th>Available</th><th>Pending payout</th><th>Paid out</th><th>Unverified (30d)</th><th>Last tip</th></tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {rows.map((r) => (
-            <tr key={r.driverId} className={r.unverifiedPct > 20 ? "bg-destructive/5" : undefined}>
-              <td className="py-2 font-medium"><div>{r.displayName}</div>{r.status !== "active" && <span className="text-xs capitalize text-muted-foreground">{r.status}</span>}</td>
-              <td>{r.total}</td>
-              <td>{dollars(r.grossCents)}</td>
-              <td>{dollars(r.employeeNetCents)}</td>
-              <td className="font-medium">{dollars(r.availableCents)}</td>
-              <td>{dollars(r.pendingPayoutCents)}</td>
-              <td>{dollars(r.paidOutCents)}</td>
-              <td className={r.unverifiedPct > 20 ? "font-semibold text-destructive" : ""}>{r.unverified} · {dollars(r.amountUnverified)}</td>
-              <td className="whitespace-nowrap text-xs text-muted-foreground">{r.lastTipAt ? new Date(r.lastTipAt).toLocaleDateString() : "—"}</td>
-            </tr>
-          ))}
-        </tbody></table></div>
-      <p className="mt-2 text-xs text-muted-foreground">
-        Available balance includes only successful Stripe tips collected by the platform, less open and completed payout requests. Gross and employee net also include verified tips recorded through other payment methods.
-      </p>
-    </div>
-  );
 }
 
 function AdminSmsPanel({ drivers }: { drivers: Data["drivers"] }) {
@@ -1684,11 +1675,11 @@ function PlatformPanel({ view }: { view: PlatformPage }) {
       {view === "platformPayments" && <div className="rounded-lg border border-border p-4">
         <h3 className="font-semibold">Recent Stripe tips</h3>
         {paymentTips.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No Stripe tips are recorded for this company.</p> : <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Paid</th><th>Stripe ID</th><th>Company</th><th>Employee</th><th>Gross</th><th>After platform fee</th><th>Employee net</th><th>Company share</th></tr></thead><tbody className="divide-y divide-border">
+          <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Paid</th><th>Customer</th><th>Stripe ID</th><th>Company</th><th>Employee</th><th>Gross</th><th>After platform fee</th><th>Employee net</th><th>Company share</th></tr></thead><tbody className="divide-y divide-border">
             {paymentTips.slice(0, 100).map((tip) => {
               const company = data.tenants.find((tenant) => tenant.id === tip.company_id);
               const employee = data.employees.find((item) => item.id === tip.driver_id);
-              return <tr key={tip.id}><td className="py-2">{new Date(tip.created_at).toLocaleString()}</td><td className="font-mono text-xs">{tip.stripe_payment_intent_id || "—"}</td><td>{company?.name || "—"}</td><td>{employee?.display_name || "Company / unassigned"}</td><td>{dollars(tip.amount_cents)}</td><td>{dollars(tip.amount_cents - tip.platform_amount_cents)}</td><td>{dollars(tip.driver_amount_cents)}</td><td>{dollars(tip.company_amount_cents)}</td></tr>;
+              return <tr key={tip.id}><td className="py-2">{new Date(tip.created_at).toLocaleString()}</td><td>{tip.customer_name || "Customer details not provided"}</td><td className="font-mono text-xs">{tip.stripe_payment_intent_id || "—"}</td><td>{company?.name || "—"}</td><td>{employee?.display_name || "Company / unassigned"}</td><td>{dollars(tip.amount_cents)}</td><td>{dollars(tip.amount_cents - tip.platform_amount_cents)}</td><td>{dollars(tip.driver_amount_cents)}</td><td>{dollars(tip.company_amount_cents)}</td></tr>;
             })}
           </tbody></table>
         </div>}

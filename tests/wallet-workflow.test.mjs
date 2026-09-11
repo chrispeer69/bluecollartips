@@ -123,16 +123,16 @@ test("only platform admins configure and process manual wallet payouts", () => {
   assert.doesNotMatch(wallet, /updateWalletSettings|reviewWalletPayout/);
 });
 
-test("company owners can reconcile every employee's tips and payout balance", () => {
+test("employee payout accounting remains available while owners see paid-customer details", () => {
   assert.match(reconciliation, /FROM drivers d/);
   assert.match(reconciliation, /LEFT JOIN tip_totals/);
   assert.match(reconciliation, /pending_payout_cents/);
   assert.match(reconciliation, /paid_out_cents/);
   assert.match(reconciliation, /stripe_status = 'succeeded'/);
-  assert.match(adminDashboard, /Employee tips & payouts/);
-  assert.match(adminDashboard, /Available to request/);
-  assert.match(adminDashboard, /Paid to employees/);
-  assert.match(adminDashboard, /Available balance includes only successful Stripe tips/);
+  assert.match(adminDashboard, /Recent customer payments/);
+  assert.match(adminDashboard, /customer_contact/);
+  assert.match(adminDashboard, /tip\.stripe_status === "succeeded"/);
+  assert.doesNotMatch(adminDashboard, /Employee tips & payouts/);
 });
 
 test("manual payout destinations are encrypted and snapshotted onto requests", () => {

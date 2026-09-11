@@ -19,7 +19,7 @@ const platformFunctions = await readFile(new URL("../src/lib/platform.functions.
 const companyCodesMigration = await readFile(new URL("../migrations/006_company_join_codes.sql", import.meta.url), "utf8");
 
 test("admin dashboard exposes task-based sidebar pages", () => {
-  for (const label of ["Overview", "Employees", "Ratings & feedback", "Tips & reconciliation", "Company settings"]) {
+  for (const label of ["Overview", "Employees", "Ratings & feedback", "Tips & payments", "Company settings"]) {
     assert.match(admin, new RegExp(`label: "${label.replace(/[&]/g, "\\&")}"`));
   }
   for (const label of ["Platform overview", "Organizations", "Registered users", "Platform earnings"]) {
@@ -109,7 +109,17 @@ test("platform user administration exposes memberships and filters", () => {
   assert.match(platformFunctions, /id, driver_id, amount_cents/);
   assert.match(admin, /Platform fees earned/);
   assert.match(admin, /Organization fee breakdown/);
+  assert.match(admin, /Recent customer payments/);
+  assert.match(admin, /Latest payment/);
+  assert.match(admin, /Customer details not provided/);
+  assert.doesNotMatch(admin, /Employee tips & payouts/);
+  assert.doesNotMatch(admin, /Unverified \(30d\)/);
   assert.match(admin, /\{d\.email \|\| "—"\}/);
+});
+
+test("unique review links carry saved customer identity into payments", () => {
+  assert.match(publicFunctions, /external_contact_id, customer_name, customer_phone, customer_email, expires_at/);
+  assert.match(publicFunctions, /name: context\.customer_name \?\? null/);
 });
 
 test("dashboard actions use the shared UI instead of browser-native prompts and dropdowns", () => {

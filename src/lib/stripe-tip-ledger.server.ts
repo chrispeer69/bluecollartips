@@ -30,6 +30,7 @@ export async function recordSuccessfulStripeTip(
     verified: true,
     verified_at: new Date().toISOString(),
     customer_name: pi.metadata?.customer_name || null,
+    customer_contact: pi.metadata?.customer_email || pi.metadata?.customer_phone || null,
     driver_amount_cents: 0,
     company_amount_cents: 0,
     platform_amount_cents: 0,

@@ -69,7 +69,7 @@ export const getAdminDashboard = createServerFn({ method: "POST" })
         .limit(200),
       db
         .from("tips")
-        .select("id, amount_cents, source, customer_name, driver_id, driver_amount_cents, company_amount_cents, platform_amount_cents, verified, disputed, refunded_at, stripe_payment_intent_id, stripe_status, assigned_by, assigned_at, created_at")
+        .select("id, amount_cents, source, customer_name, customer_contact, driver_id, driver_amount_cents, company_amount_cents, platform_amount_cents, verified, disputed, refunded_at, stripe_payment_intent_id, stripe_status, assigned_by, assigned_at, created_at")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
         .limit(200),

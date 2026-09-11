@@ -56,7 +56,7 @@ const PUBLIC_COMPANY_FIELDS = "id, name, slug, logo_url, primary_color, secondar
 async function resolveReviewContext(db: any, token: string | null | undefined, companyId: string, driverId?: string | null) {
   if (!token) return null;
   const { data: context } = await db.from("review_contexts")
-    .select("id, driver_id, external_job_id, external_contact_id, expires_at, consumed_at")
+    .select("id, driver_id, external_job_id, external_contact_id, customer_name, customer_phone, customer_email, expires_at, consumed_at")
     .eq("token_hash", hashReviewToken(token)).eq("company_id", companyId).maybeSingle();
   if (!context || context.consumed_at || new Date(context.expires_at).getTime() <= Date.now()) {
     throw new Error("This review link is invalid, expired, or has already been used.");

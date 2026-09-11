@@ -25,7 +25,7 @@ export const platformOverview = createServerFn({ method: "GET" })
         .order("created_at", { ascending: false }),
       db
         .from("tips")
-        .select("id, driver_id, amount_cents, driver_amount_cents, company_amount_cents, platform_amount_cents, company_id, source, verified, stripe_payment_intent_id, stripe_status, customer_name, created_at")
+        .select("id, driver_id, amount_cents, driver_amount_cents, company_amount_cents, platform_amount_cents, company_id, source, verified, stripe_payment_intent_id, stripe_status, customer_name, customer_contact, created_at")
         .order("created_at", { ascending: false }),
       db.from("drivers").select("*", { count: "exact", head: true }),
       db.from("users").select("id, email, full_name, created_at").order("created_at", { ascending: false }),

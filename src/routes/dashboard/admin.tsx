@@ -384,7 +384,7 @@ function AdminDashboard() {
           />
         </Section>}
 
-        {page === "payments" && <Section title="Reconciliation (last 30 days)">
+        {page === "payments" && <Section title="Employee tips & payouts">
           <ReconciliationPanel companyId={data.company.id} drivers={data.drivers} />
         </Section>}
 
@@ -1195,6 +1195,10 @@ function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requ
   const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
   const [paymentReference, setPaymentReference] = useState("");
   const [payoutNote, setPayoutNote] = useState("");
+  const [requestSearch, setRequestSearch] = useState("");
+  const [requestCompany, setRequestCompany] = useState("all");
+  const [requestStatus, setRequestStatus] = useState("open");
+  const [requestType, setRequestType] = useState("all");
 
   async function reload() {
     const result = await getWallet();
@@ -1231,6 +1235,22 @@ function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requ
       setBusy(false);
     }
   }
+
+  const requests = wallet?.requests ?? [];
+  const companyOptions = Array.from(new Map(requests.map((request: any) => [request.company_id, request.company_name])).entries());
+  const normalizedRequestSearch = requestSearch.trim().toLowerCase();
+  const filteredRequests = requests.filter((request: any) => {
+    const matchesSearch = !normalizedRequestSearch || [request.recipient_name, request.company_name, request.payment_reference]
+      .some((value) => value?.toLowerCase().includes(normalizedRequestSearch));
+    const matchesCompany = requestCompany === "all" || request.company_id === requestCompany;
+    const matchesStatus = requestStatus === "all"
+      || (requestStatus === "open" && ["pending", "approved", "processing"].includes(request.status))
+      || request.status === requestStatus;
+    const matchesType = requestType === "all" || request.request_type === requestType;
+    return matchesSearch && matchesCompany && matchesStatus && matchesType;
+  });
+  const openRequests = requests.filter((request: any) => ["pending", "approved", "processing"].includes(request.status));
+  const paidRequests = requests.filter((request: any) => request.status === "paid");
 
   return (
     <div>
@@ -1342,8 +1362,34 @@ function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requ
           <button disabled={busy} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">Recover payment</button>
         </form>
       </div>}
+      {mode === "requests" && wallet && <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <Stat label="Open payouts" value={`${openRequests.length} · ${dollars(openRequests.reduce((sum: number, request: any) => sum + Number(request.amount_cents), 0))}`} />
+        <Stat label="Paid out" value={dollars(paidRequests.reduce((sum: number, request: any) => sum + Number(request.amount_cents), 0))} />
+        <Stat label="Showing" value={`${filteredRequests.length} of ${requests.length}`} />
+      </div>}
+      {mode === "requests" && wallet && requests.length > 0 && <div className="mt-4 grid gap-2 rounded-lg border border-border bg-muted/20 p-3 md:grid-cols-4">
+        <input value={requestSearch} onChange={(event) => setRequestSearch(event.target.value)} placeholder="Search recipient or company" className="rounded-md border border-input bg-background px-3 py-2 text-sm" />
+        <Select value={requestCompany} onValueChange={setRequestCompany}>
+          <SelectTrigger><SelectValue placeholder="All companies" /></SelectTrigger>
+          <SelectContent><SelectItem value="all">All companies</SelectItem>{companyOptions.map(([id, name]) => <SelectItem key={String(id)} value={String(id)}>{String(name)}</SelectItem>)}</SelectContent>
+        </Select>
+        <Select value={requestStatus} onValueChange={setRequestStatus}>
+          <SelectTrigger><SelectValue placeholder="Open payouts" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="open">Open payouts</SelectItem><SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem><SelectItem value="approved">Approved</SelectItem><SelectItem value="processing">Processing</SelectItem>
+            <SelectItem value="paid">Paid</SelectItem><SelectItem value="rejected">Rejected</SelectItem><SelectItem value="cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={requestType} onValueChange={setRequestType}>
+          <SelectTrigger><SelectValue placeholder="All recipients" /></SelectTrigger>
+          <SelectContent><SelectItem value="all">All recipients</SelectItem><SelectItem value="employee">Employees</SelectItem><SelectItem value="company">Companies</SelectItem></SelectContent>
+        </Select>
+      </div>}
       {mode === "requests" && (!wallet ? <p className="mt-4 text-sm text-muted-foreground">Loading payout requests…</p> : wallet.requests.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">No payout requests yet.</p>
+      ) : filteredRequests.length === 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">No payout requests match these filters.</p>
       ) : (
         <div className="mt-4 overflow-x-auto rounded-lg border border-border p-4">
           <h3 className="mb-3 font-semibold">Payout requests</h3>
@@ -1352,7 +1398,7 @@ function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requ
               <tr><th className="py-2">Recipient</th><th>Type</th><th>Company</th><th>Amount</th><th>Status</th><th>Requested</th><th className="text-right">Actions</th></tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {wallet.requests.map((request: any) => (
+              {filteredRequests.map((request: any) => (
                 <tr key={request.id}>
                   <td className="py-3">
                     <div className="font-medium">{request.recipient_name}</div>
@@ -1481,33 +1527,46 @@ function TipShareSettings({ company, onSaved }: { company: Data["company"]; onSa
 
 function ReconciliationPanel({ companyId, drivers }: { companyId: string; drivers: Data["drivers"] }) {
   const fetchOverview = useServerFn(reconciliationOverview);
-  const [rows, setRows] = useState<Awaited<ReturnType<typeof reconciliationOverview>>["rows"]>([]);
-  const byId = new Map(drivers.map((d) => [d.id, d.display_name]));
+  const [rows, setRows] = useState<Awaited<ReturnType<typeof reconciliationOverview>>["rows"] | null>(null);
   useEffect(() => {
+    setRows(null);
     fetchOverview({ data: { companyId } }).then((r) => setRows(r.rows));
   }, [companyId, fetchOverview]);
-  if (!rows.length) return <div className="text-sm text-muted-foreground">No tip activity in last 30 days.</div>;
+  if (!drivers.length) return <div className="text-sm text-muted-foreground">No employees have been added yet.</div>;
+  if (!rows) return <div className="text-sm text-muted-foreground">Loading employee tip balances…</div>;
+  const totalNet = rows.reduce((sum, row) => sum + row.employeeNetCents, 0);
+  const totalAvailable = rows.reduce((sum, row) => sum + row.availableCents, 0);
+  const totalPending = rows.reduce((sum, row) => sum + row.pendingPayoutCents, 0);
+  const totalPaid = rows.reduce((sum, row) => sum + row.paidOutCents, 0);
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+    <div>
+      <div className="mb-4 grid gap-3 sm:grid-cols-4">
+        <Stat label="Employee net earned" value={dollars(totalNet)} />
+        <Stat label="Available to request" value={dollars(totalAvailable)} />
+        <Stat label="Payouts in progress" value={dollars(totalPending)} />
+        <Stat label="Paid to employees" value={dollars(totalPaid)} />
+      </div>
+      <div className="overflow-x-auto"><table className="w-full text-sm">
         <thead className="text-left text-xs uppercase text-muted-foreground">
-          <tr><th className="py-2">Employee</th><th>Total tips</th><th className="hidden sm:table-cell">Manual</th><th>Unverified</th><th className="hidden sm:table-cell">Unverified $</th><th>Unverified %</th></tr>
+          <tr><th className="py-2">Employee</th><th>Tips</th><th>Gross</th><th>Employee net</th><th>Available</th><th>Pending payout</th><th>Paid out</th><th>Unverified (30d)</th><th>Last tip</th></tr>
         </thead>
         <tbody className="divide-y divide-border">
           {rows.map((r) => (
             <tr key={r.driverId} className={r.unverifiedPct > 20 ? "bg-destructive/5" : undefined}>
-              <td className="py-2 font-medium">{String(byId.get(r.driverId) ?? "—")}</td>
+              <td className="py-2 font-medium"><div>{r.displayName}</div>{r.status !== "active" && <span className="text-xs capitalize text-muted-foreground">{r.status}</span>}</td>
               <td>{r.total}</td>
-              <td className="hidden sm:table-cell">{r.manual}</td>
-              <td>{r.unverified}</td>
-              <td className="hidden sm:table-cell">{dollars(r.amountUnverified)}</td>
-              <td className={r.unverifiedPct > 20 ? "font-semibold text-destructive" : ""}>{r.unverifiedPct}%</td>
+              <td>{dollars(r.grossCents)}</td>
+              <td>{dollars(r.employeeNetCents)}</td>
+              <td className="font-medium">{dollars(r.availableCents)}</td>
+              <td>{dollars(r.pendingPayoutCents)}</td>
+              <td>{dollars(r.paidOutCents)}</td>
+              <td className={r.unverifiedPct > 20 ? "font-semibold text-destructive" : ""}>{r.unverified} · {dollars(r.amountUnverified)}</td>
+              <td className="whitespace-nowrap text-xs text-muted-foreground">{r.lastTipAt ? new Date(r.lastTipAt).toLocaleDateString() : "—"}</td>
             </tr>
           ))}
-        </tbody>
-      </table>
+        </tbody></table></div>
       <p className="mt-2 text-xs text-muted-foreground">
-        Employees above 20% unverified are highlighted; consider following up.
+        Available balance includes only successful Stripe tips collected by the platform, less open and completed payout requests. Gross and employee net also include verified tips recorded through other payment methods.
       </p>
     </div>
   );
@@ -1556,6 +1615,7 @@ function PlatformPanel({ view }: { view: PlatformPage }) {
   const [userSearch, setUserSearch] = useState("");
   const [userCompany, setUserCompany] = useState("all");
   const [userRole, setUserRole] = useState("all");
+  const [paymentCompany, setPaymentCompany] = useState("all");
   const reload = async () => setData(await get());
   useEffect(() => {
     reload();
@@ -1570,6 +1630,11 @@ function PlatformPanel({ view }: { view: PlatformPage }) {
     const matchesRole = userRole === "all" || user.memberships.some((item) => item.role === userRole);
     return matchesSearch && matchesCompany && matchesRole;
   });
+  const paymentTips = data.tips.filter((tip) => tip.source === "stripe" && (paymentCompany === "all" || tip.company_id === paymentCompany));
+  const paymentTenants = paymentCompany === "all" ? data.tenants : data.tenants.filter((tenant) => tenant.id === paymentCompany);
+  const paymentEmployees = paymentCompany === "all" ? data.employees : data.employees.filter((employee) => employee.company_id === paymentCompany);
+  const paymentGross = paymentTips.reduce((sum, tip) => sum + Number(tip.amount_cents), 0);
+  const paymentPlatformFees = paymentTips.reduce((sum, tip) => sum + Number(tip.platform_amount_cents), 0);
   return (
     <div className="space-y-4">
       {view === "platformPayments" && <PlatformWalletPanel mode="requests" onTipsChanged={reload} />}
@@ -1581,16 +1646,24 @@ function PlatformPanel({ view }: { view: PlatformPage }) {
         <Stat label="Employees" value={String(data.driverCount)} />
         <Stat label="Registered users" value={String(data.userCount)} />
       </div>}
+      {view === "platformPayments" && <div className="rounded-lg border border-border bg-muted/20 p-3">
+        <label className="block max-w-md text-sm">View payment reporting by company
+          <Select value={paymentCompany} onValueChange={setPaymentCompany}>
+            <SelectTrigger className="mt-1"><SelectValue placeholder="All companies" /></SelectTrigger>
+            <SelectContent><SelectItem value="all">All companies</SelectItem>{data.tenants.map((tenant) => <SelectItem key={tenant.id} value={tenant.id}>{tenant.name}</SelectItem>)}</SelectContent>
+          </Select>
+        </label>
+      </div>}
       {view === "platformPayments" && <div className="grid gap-3 sm:grid-cols-3">
-        <Stat label="Gross tips" value={dollars(data.grossTotal)} />
-        <Stat label="Platform fees earned" value={dollars(data.platformTotal)} />
-        <Stat label="Tips processed" value={String(data.tips.length)} />
+        <Stat label="Gross Stripe tips" value={dollars(paymentGross)} />
+        <Stat label="Platform fees earned" value={dollars(paymentPlatformFees)} />
+        <Stat label="Stripe tips processed" value={String(paymentTips.length)} />
       </div>}
       {view === "platformPayments" && <div className="rounded-lg border border-border p-4">
         <h3 className="font-semibold">Recent Stripe tips</h3>
-        {data.tips.filter((tip) => tip.source === "stripe").length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No Stripe tips are recorded yet.</p> : <div className="mt-3 overflow-x-auto">
+        {paymentTips.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No Stripe tips are recorded for this company.</p> : <div className="mt-3 overflow-x-auto">
           <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Paid</th><th>Stripe ID</th><th>Company</th><th>Employee</th><th>Gross</th><th>After platform fee</th><th>Employee net</th><th>Company share</th></tr></thead><tbody className="divide-y divide-border">
-            {data.tips.filter((tip) => tip.source === "stripe").slice(0, 100).map((tip) => {
+            {paymentTips.slice(0, 100).map((tip) => {
               const company = data.tenants.find((tenant) => tenant.id === tip.company_id);
               const employee = data.employees.find((item) => item.id === tip.driver_id);
               return <tr key={tip.id}><td className="py-2">{new Date(tip.created_at).toLocaleString()}</td><td className="font-mono text-xs">{tip.stripe_payment_intent_id || "—"}</td><td>{company?.name || "—"}</td><td>{employee?.display_name || "Company / unassigned"}</td><td>{dollars(tip.amount_cents)}</td><td>{dollars(tip.amount_cents - tip.platform_amount_cents)}</td><td>{dollars(tip.driver_amount_cents)}</td><td>{dollars(tip.company_amount_cents)}</td></tr>;
@@ -1602,7 +1675,7 @@ function PlatformPanel({ view }: { view: PlatformPage }) {
         <h3 className="font-semibold">Organization fee breakdown</h3>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Organization</th><th>Tips</th><th>Gross</th><th>Company share</th><th>Platform fees</th></tr></thead><tbody className="divide-y divide-border">
-            {data.tenants.map((tenant) => <tr key={tenant.id}><td className="py-2 font-medium">{tenant.name}</td><td>{tenant.count}</td><td>{dollars(tenant.gross)}</td><td>{dollars(tenant.companyShare)}</td><td>{dollars(tenant.platformShare)}</td></tr>)}
+            {paymentTenants.map((tenant) => <tr key={tenant.id}><td className="py-2 font-medium">{tenant.name}</td><td>{tenant.count}</td><td>{dollars(tenant.gross)}</td><td>{dollars(tenant.companyShare)}</td><td>{dollars(tenant.platformShare)}</td></tr>)}
           </tbody></table>
         </div>
       </div>}
@@ -1610,7 +1683,7 @@ function PlatformPanel({ view }: { view: PlatformPage }) {
         <h3 className="font-semibold">Employee earnings breakdown</h3>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Employee</th><th>Email</th><th>Company</th><th>Tips</th><th>Gross</th><th>Employee net</th><th>Platform fee</th></tr></thead><tbody className="divide-y divide-border">
-            {data.employees.map((employee) => <tr key={employee.id}><td className="py-2 font-medium">{employee.display_name}</td><td>{employee.email || "—"}</td><td>{Array.isArray(employee.companies) ? employee.companies[0]?.name : employee.companies?.name}</td><td>{employee.count}</td><td>{dollars(employee.gross)}</td><td>{dollars(employee.net)}</td><td>{dollars(employee.platformShare)}</td></tr>)}
+            {paymentEmployees.map((employee) => <tr key={employee.id}><td className="py-2 font-medium">{employee.display_name}</td><td>{employee.email || "—"}</td><td>{Array.isArray(employee.companies) ? employee.companies[0]?.name : employee.companies?.name}</td><td>{employee.count}</td><td>{dollars(employee.gross)}</td><td>{dollars(employee.net)}</td><td>{dollars(employee.platformShare)}</td></tr>)}
           </tbody></table>
         </div>
       </div>}

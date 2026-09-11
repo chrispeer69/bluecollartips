@@ -11,6 +11,7 @@ const destinationMigration = await readFile(new URL("../migrations/017_payout_de
 const destinationCrypto = await readFile(new URL("../src/lib/payout-destination.server.ts", import.meta.url), "utf8");
 const adminFunctions = await readFile(new URL("../src/lib/admin.functions.ts", import.meta.url), "utf8");
 const wallet = await readFile(new URL("../src/lib/wallet.functions.ts", import.meta.url), "utf8");
+const reconciliation = await readFile(new URL("../src/lib/reconciliation.functions.ts", import.meta.url), "utf8");
 const ledger = await readFile(new URL("../src/lib/stripe-tip-ledger.server.ts", import.meta.url), "utf8");
 const stripeFunctions = await readFile(new URL("../src/lib/stripe.functions.ts", import.meta.url), "utf8");
 const stripePanel = await readFile(new URL("../src/components/StripeCardPanel.tsx", import.meta.url), "utf8");
@@ -99,8 +100,23 @@ test("only platform admins configure and process manual wallet payouts", () => {
   assert.match(adminDashboard, /Recent Stripe tips/);
   assert.match(adminDashboard, /stripe_payment_intent_id/);
   assert.match(adminDashboard, /onTipsChanged/);
+  assert.match(adminDashboard, /View payment reporting by company/);
+  assert.match(adminDashboard, /All companies/);
+  assert.match(adminDashboard, /Open payouts/);
   assert.match(wallet, /action: z\.enum\(\["approve", "reject", "mark_paid"\]\)/);
   assert.doesNotMatch(wallet, /updateWalletSettings|reviewWalletPayout/);
+});
+
+test("company owners can reconcile every employee's tips and payout balance", () => {
+  assert.match(reconciliation, /FROM drivers d/);
+  assert.match(reconciliation, /LEFT JOIN tip_totals/);
+  assert.match(reconciliation, /pending_payout_cents/);
+  assert.match(reconciliation, /paid_out_cents/);
+  assert.match(reconciliation, /stripe_status = 'succeeded'/);
+  assert.match(adminDashboard, /Employee tips & payouts/);
+  assert.match(adminDashboard, /Available to request/);
+  assert.match(adminDashboard, /Paid to employees/);
+  assert.match(adminDashboard, /Available balance includes only successful Stripe tips/);
 });
 
 test("manual payout destinations are encrypted and snapshotted onto requests", () => {

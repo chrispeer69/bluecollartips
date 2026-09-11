@@ -105,7 +105,7 @@ export const disputeCashTip = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/** Admin view: drivers with > 20% unverified share in last 30 days, plus per-driver counts. */
+/** Company-owner view of employee earnings, wallet balances and reconciliation. */
 export const reconciliationOverview = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
@@ -120,34 +120,91 @@ export const reconciliationOverview = createServerFn({ method: "POST" })
     );
     if (!ok) throw new Error("Forbidden");
 
-    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: tips } = await db
-      .from("tips")
-      .select("driver_id, source, verified, amount_cents, created_at")
-      .eq("company_id", data.companyId)
-      .gte("created_at", since);
-
-    const map = new Map<
-      string,
-      { total: number; manual: number; unverified: number; amountUnverified: number }
-    >();
-    for (const t of tips ?? []) {
-      const m = map.get(t.driver_id) ?? { total: 0, manual: 0, unverified: 0, amountUnverified: 0 };
-      m.total += 1;
-      if (t.source !== "stripe") {
-        m.manual += 1;
-        if (!t.verified) {
-          m.unverified += 1;
-          m.amountUnverified += t.amount_cents;
-        }
-      }
-      map.set(t.driver_id, m);
-    }
-
-    const rows = Array.from(map.entries()).map(([driverId, m]) => ({
-      driverId,
-      ...m,
-      unverifiedPct: m.total ? Math.round((m.unverified / m.total) * 100) : 0,
+    const { sql } = await import("@/db/client.server");
+    const database = sql();
+    const result = await database`
+      WITH tip_totals AS (
+        SELECT
+          driver_id,
+          COUNT(*) FILTER (
+            WHERE verified = true AND disputed = false AND refunded_at IS NULL
+          )::integer AS total,
+          COALESCE(SUM(amount_cents) FILTER (
+            WHERE verified = true AND disputed = false AND refunded_at IS NULL
+          ), 0)::integer AS gross_cents,
+          COALESCE(SUM(driver_amount_cents) FILTER (
+            WHERE verified = true AND disputed = false AND refunded_at IS NULL
+          ), 0)::integer AS employee_net_cents,
+          COALESCE(SUM(driver_amount_cents) FILTER (
+            WHERE source = 'stripe' AND verified = true AND stripe_status = 'succeeded'
+              AND disputed = false AND refunded_at IS NULL
+          ), 0)::integer AS stripe_earned_cents,
+          COUNT(*) FILTER (
+            WHERE source <> 'stripe' AND created_at >= NOW() - INTERVAL '30 days'
+          )::integer AS manual,
+          COUNT(*) FILTER (
+            WHERE source <> 'stripe' AND verified = false
+              AND disputed = false AND created_at >= NOW() - INTERVAL '30 days'
+          )::integer AS unverified,
+          COALESCE(SUM(amount_cents) FILTER (
+            WHERE source <> 'stripe' AND verified = false
+              AND disputed = false AND created_at >= NOW() - INTERVAL '30 days'
+          ), 0)::integer AS amount_unverified,
+          MAX(created_at) AS last_tip_at
+        FROM tips
+        WHERE company_id = ${data.companyId} AND driver_id IS NOT NULL
+        GROUP BY driver_id
+      ), payout_totals AS (
+        SELECT
+          driver_id,
+          COALESCE(SUM(amount_cents) FILTER (
+            WHERE status IN ('pending', 'approved', 'processing')
+          ), 0)::integer AS pending_payout_cents,
+          COALESCE(SUM(amount_cents) FILTER (
+            WHERE status = 'paid'
+          ), 0)::integer AS paid_out_cents,
+          COALESCE(SUM(amount_cents) FILTER (
+            WHERE status IN ('pending', 'approved', 'processing', 'paid')
+          ), 0)::integer AS reserved_cents
+        FROM payout_requests
+        WHERE company_id = ${data.companyId}
+        GROUP BY driver_id
+      )
+      SELECT
+        d.id AS driver_id,
+        d.display_name,
+        d.status,
+        COALESCE(tt.total, 0)::integer AS total,
+        COALESCE(tt.gross_cents, 0)::integer AS gross_cents,
+        COALESCE(tt.employee_net_cents, 0)::integer AS employee_net_cents,
+        GREATEST(COALESCE(tt.stripe_earned_cents, 0) - COALESCE(pt.reserved_cents, 0), 0)::integer AS available_cents,
+        COALESCE(pt.pending_payout_cents, 0)::integer AS pending_payout_cents,
+        COALESCE(pt.paid_out_cents, 0)::integer AS paid_out_cents,
+        COALESCE(tt.manual, 0)::integer AS manual,
+        COALESCE(tt.unverified, 0)::integer AS unverified,
+        COALESCE(tt.amount_unverified, 0)::integer AS amount_unverified,
+        tt.last_tip_at
+      FROM drivers d
+      LEFT JOIN tip_totals tt ON tt.driver_id = d.id
+      LEFT JOIN payout_totals pt ON pt.driver_id = d.id
+      WHERE d.company_id = ${data.companyId}
+      ORDER BY d.status = 'active' DESC, d.display_name ASC
+    `;
+    const rows = result.map((row: any) => ({
+      driverId: row.driver_id,
+      displayName: row.display_name,
+      status: row.status,
+      total: Number(row.total),
+      grossCents: Number(row.gross_cents),
+      employeeNetCents: Number(row.employee_net_cents),
+      availableCents: Number(row.available_cents),
+      pendingPayoutCents: Number(row.pending_payout_cents),
+      paidOutCents: Number(row.paid_out_cents),
+      manual: Number(row.manual),
+      unverified: Number(row.unverified),
+      amountUnverified: Number(row.amount_unverified),
+      unverifiedPct: Number(row.manual) ? Math.round((Number(row.unverified) / Number(row.manual)) * 100) : 0,
+      lastTipAt: row.last_tip_at ? String(row.last_tip_at) : null,
     }));
     return { rows };
   });

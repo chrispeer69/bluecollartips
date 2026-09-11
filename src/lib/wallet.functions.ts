@@ -359,7 +359,7 @@ export const getPlatformWallet = createServerFn({ method: "GET" })
       FROM platform_settings WHERE singleton = true
     `;
     const requests = await database`
-      SELECT pr.id, 'employee'::text AS request_type, pr.driver_id,
+      SELECT pr.id, 'employee'::text AS request_type, pr.company_id, pr.driver_id,
              d.display_name AS recipient_name, c.name AS company_name,
              pr.amount_cents, pr.status, pr.payment_method,
              pr.payment_reference, pr.admin_note, pr.requested_at,
@@ -371,7 +371,7 @@ export const getPlatformWallet = createServerFn({ method: "GET" })
       JOIN drivers d ON d.id = pr.driver_id
       JOIN companies c ON c.id = pr.company_id
       UNION ALL
-      SELECT cpr.id, 'company'::text AS request_type, NULL::uuid AS driver_id,
+      SELECT cpr.id, 'company'::text AS request_type, cpr.company_id, NULL::uuid AS driver_id,
              c.name AS recipient_name, c.name AS company_name,
              cpr.amount_cents, cpr.status, cpr.payment_method,
              cpr.payment_reference, cpr.admin_note, cpr.requested_at,

@@ -504,15 +504,24 @@ function WalletPanel({ driverId, viewingAsAdmin }: { driverId: string; viewingAs
   const [wallet, setWallet] = useState<Awaited<ReturnType<typeof getDriverWallet>> | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [withdrawalAmount, setWithdrawalAmount] = useState("");
 
   async function reload() {
-    setWallet(await getWallet({ data: { driverId } }));
+    const result = await getWallet({ data: { driverId } });
+    setWallet(result);
+    setWithdrawalAmount((result.availableCents / 100).toFixed(2));
   }
 
   useEffect(() => {
     reload().catch((error) => setMsg(error instanceof Error ? error.message : "Could not load wallet"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [driverId]);
+
+  const withdrawalCents = Math.round(Number(withdrawalAmount) * 100);
+  const validWithdrawal = wallet != null
+    && Number.isFinite(withdrawalCents)
+    && withdrawalCents >= wallet.minimumCents
+    && withdrawalCents <= wallet.availableCents;
 
   return (
     <Section title="Tip wallet & payout account">
@@ -535,7 +544,23 @@ function WalletPanel({ driverId, viewingAsAdmin }: { driverId: string; viewingAs
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-4 text-sm">
             <div>
-              <p>Successful online tips are available immediately.</p>
+              <label className="font-medium">Withdrawal amount
+                <span className="mt-1 flex max-w-56 items-center rounded-md border border-input bg-background px-3">
+                  <span className="text-muted-foreground">$</span>
+                  <input
+                    type="number"
+                    min={(wallet.minimumCents / 100).toFixed(2)}
+                    max={(wallet.availableCents / 100).toFixed(2)}
+                    step="0.01"
+                    value={withdrawalAmount}
+                    onChange={(event) => setWithdrawalAmount(event.target.value)}
+                    disabled={Boolean(wallet.openRequest)}
+                    className="min-w-0 flex-1 bg-transparent px-2 py-2 outline-none disabled:opacity-50"
+                  />
+                </span>
+              </label>
+              <p className="mt-2 text-xs text-muted-foreground">Choose any amount from {dollars(wallet.minimumCents)} to {dollars(wallet.availableCents)}.</p>
+              <p className="mt-2">Successful online tips are available immediately.</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 After you request a payout, the Blue Collar Tips platform team will complete it within {wallet.processingDays === 0 ? "the same day" : `0–${wallet.processingDays} days`}.
               </p>
@@ -548,13 +573,13 @@ function WalletPanel({ driverId, viewingAsAdmin }: { driverId: string; viewingAs
               {!wallet.payoutDestination && !viewingAsAdmin && <p className="mt-2 text-xs font-medium text-secondary">Save payout details above before requesting a payout.</p>}
             </div>
           <button
-            disabled={busy || !wallet.canRequest || wallet.availableCents < wallet.minimumCents}
+            disabled={busy || !wallet.canRequest || !validWithdrawal}
             onClick={async () => {
               setBusy(true);
               setMsg(null);
               try {
-                await requestPayout({ data: { driverId } });
-                setMsg("Payout requested.");
+                await requestPayout({ data: { driverId, amountCents: withdrawalCents } });
+                setMsg(`Payout requested for ${dollars(withdrawalCents)}.`);
                 await reload();
               } catch (e) {
                 setMsg(e instanceof Error ? e.message : "Could not request payout");
@@ -564,7 +589,7 @@ function WalletPanel({ driverId, viewingAsAdmin }: { driverId: string; viewingAs
             }}
             className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
           >
-            {busy ? "Requesting…" : "Request full payout"}
+            {busy ? "Requesting…" : validWithdrawal ? `Request ${dollars(withdrawalCents)}` : "Enter withdrawal amount"}
           </button>
           </div>
         </>

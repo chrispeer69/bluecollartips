@@ -1119,9 +1119,12 @@ function CompanyWalletPanel({ companyId }: { companyId: string }) {
   const [wallet, setWallet] = useState<Awaited<ReturnType<typeof getCompanyWallet>> | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [withdrawalAmount, setWithdrawalAmount] = useState("");
 
   async function reload() {
-    setWallet(await getWallet({ data: { companyId } }));
+    const result = await getWallet({ data: { companyId } });
+    setWallet(result);
+    setWithdrawalAmount((result.availableCents / 100).toFixed(2));
   }
   useEffect(() => {
     reload().catch((error) => setMessage(error instanceof Error ? error.message : "Could not load company wallet"));
@@ -1130,6 +1133,10 @@ function CompanyWalletPanel({ companyId }: { companyId: string }) {
 
   if (!wallet) return <p className="text-sm text-muted-foreground">Loading company wallet…</p>;
   const belowMinimum = wallet.availableCents < wallet.minimumCents;
+  const withdrawalCents = Math.round(Number(withdrawalAmount) * 100);
+  const validWithdrawal = Number.isFinite(withdrawalCents)
+    && withdrawalCents >= wallet.minimumCents
+    && withdrawalCents <= wallet.availableCents;
   return <div className="space-y-4">
     <div className="grid gap-3 sm:grid-cols-3">
       <Stat label="Available to withdraw" value={dollars(wallet.availableCents)} />
@@ -1146,22 +1153,37 @@ function CompanyWalletPanel({ companyId }: { companyId: string }) {
     />
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-4">
       <div>
-        <div className="font-medium">Request the full available balance</div>
+        <label className="font-medium">Withdrawal amount
+          <span className="mt-1 flex max-w-56 items-center rounded-md border border-input bg-background px-3">
+            <span className="text-muted-foreground">$</span>
+            <input
+              type="number"
+              min={(wallet.minimumCents / 100).toFixed(2)}
+              max={(wallet.availableCents / 100).toFixed(2)}
+              step="0.01"
+              value={withdrawalAmount}
+              onChange={(event) => setWithdrawalAmount(event.target.value)}
+              disabled={Boolean(wallet.openRequest)}
+              className="min-w-0 flex-1 bg-transparent px-2 py-2 outline-none disabled:opacity-50"
+            />
+          </span>
+        </label>
+        <p className="mt-2 text-xs text-muted-foreground">Choose any amount from {dollars(wallet.minimumCents)} to {dollars(wallet.availableCents)}.</p>
         <p className="mt-1 text-xs text-muted-foreground">Only successful Stripe tips finalized for the company, plus the company share from employee tips, are available. Payment is completed by the platform within 0–{wallet.processingDays} days.</p>
         {!wallet.payoutDestination && <p className="mt-2 text-xs font-medium text-secondary">Save company payout details above before requesting a payout.</p>}
       </div>
-      <button type="button" disabled={busy || !wallet.canRequest || belowMinimum} onClick={async () => {
+      <button type="button" disabled={busy || !wallet.canRequest || belowMinimum || !validWithdrawal} onClick={async () => {
         setBusy(true);
         setMessage(null);
         try {
-          const result = await requestPayout({ data: { companyId } });
+          const result = await requestPayout({ data: { companyId, amountCents: withdrawalCents } });
           setMessage(`Payout request submitted for ${dollars(Number(result.request.amount_cents))}.`);
           await reload();
         } catch (error) {
           setMessage(error instanceof Error ? error.message : "Could not request company payout");
         } finally { setBusy(false); }
       }} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-        {busy ? "Submitting…" : wallet.openRequest ? "Payout request pending" : belowMinimum ? `Reach ${dollars(wallet.minimumCents)} to withdraw` : `Request ${dollars(wallet.availableCents)}`}
+        {busy ? "Submitting…" : wallet.openRequest ? "Payout request pending" : belowMinimum ? `Reach ${dollars(wallet.minimumCents)} to withdraw` : validWithdrawal ? `Request ${dollars(withdrawalCents)}` : "Enter withdrawal amount"}
       </button>
     </div>
     {message && <p className="text-sm text-muted-foreground">{message}</p>}

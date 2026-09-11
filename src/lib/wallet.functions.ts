@@ -147,7 +147,10 @@ export const getDriverWallet = createServerFn({ method: "POST" })
 
 export const requestWalletPayout = createServerFn({ method: "POST" })
   .middleware([requireAuth])
-  .inputValidator((d) => z.object({ driverId: z.string().uuid() }).parse(d))
+  .inputValidator((d) => z.object({
+    driverId: z.string().uuid(),
+    amountCents: z.number().int().positive().max(100_000_000),
+  }).parse(d))
   .handler(async ({ data, context }) => {
     await requireDriverAccess(context.userId, data.driverId, true);
     const { sql } = await import("@/db/client.server");
@@ -199,8 +202,12 @@ export const requestWalletPayout = createServerFn({ method: "POST" })
           AND status IN ${tx(RESERVED_PAYOUT_STATUSES)}
       `;
       const available = Math.max(0, Number(earnings.earned_cents) - Number(reserved.amount_cents));
-      if (available < Number(settings.payout_minimum_cents)) {
-        throw new Error(`A minimum balance of $${(Number(settings.payout_minimum_cents) / 100).toFixed(2)} is required`);
+      const minimum = Number(settings.payout_minimum_cents);
+      if (data.amountCents < minimum) {
+        throw new Error(`The minimum withdrawal is $${(minimum / 100).toFixed(2)}`);
+      }
+      if (data.amountCents > available) {
+        throw new Error("Withdrawal amount exceeds the available balance");
       }
 
       const [request] = await tx`
@@ -208,7 +215,7 @@ export const requestWalletPayout = createServerFn({ method: "POST" })
           company_id, driver_id, amount_cents, requested_by,
           requested_payout_method, requested_payout_account_name, requested_payout_details_encrypted
         ) VALUES (
-          ${driver.company_id}, ${driver.id}, ${available}, ${context.userId},
+          ${driver.company_id}, ${driver.id}, ${data.amountCents}, ${context.userId},
           ${driver.payout_method}, ${driver.payout_account_name}, ${driver.payout_details_encrypted}
         )
         RETURNING id, amount_cents, status, requested_at
@@ -284,7 +291,10 @@ export const getCompanyWallet = createServerFn({ method: "POST" })
 
 export const requestCompanyWalletPayout = createServerFn({ method: "POST" })
   .middleware([requireAuth])
-  .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
+  .inputValidator((d) => z.object({
+    companyId: z.string().uuid(),
+    amountCents: z.number().int().positive().max(100_000_000),
+  }).parse(d))
   .handler(async ({ data, context }) => {
     await requireCompanyAdminAccess(context.userId, data.companyId);
     const { sql } = await import("@/db/client.server");
@@ -331,15 +341,19 @@ export const requestCompanyWalletPayout = createServerFn({ method: "POST" })
           AND status IN ${tx(RESERVED_PAYOUT_STATUSES)}
       `;
       const available = Math.max(0, Number(earnings.earned_cents) - Number(reserved.amount_cents));
-      if (available < Number(settings.payout_minimum_cents)) {
-        throw new Error(`A minimum balance of $${(Number(settings.payout_minimum_cents) / 100).toFixed(2)} is required`);
+      const minimum = Number(settings.payout_minimum_cents);
+      if (data.amountCents < minimum) {
+        throw new Error(`The minimum withdrawal is $${(minimum / 100).toFixed(2)}`);
+      }
+      if (data.amountCents > available) {
+        throw new Error("Withdrawal amount exceeds the available balance");
       }
       const [request] = await tx`
         INSERT INTO company_payout_requests (
           company_id, amount_cents, requested_by,
           requested_payout_method, requested_payout_account_name, requested_payout_details_encrypted
         ) VALUES (
-          ${company.id}, ${available}, ${context.userId},
+          ${company.id}, ${data.amountCents}, ${context.userId},
           ${company.payout_method}, ${company.payout_account_name}, ${company.payout_details_encrypted}
         )
         RETURNING id, amount_cents, status, requested_at

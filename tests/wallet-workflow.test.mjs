@@ -37,6 +37,10 @@ test("only one open payout can reserve a driver's available balance", () => {
   assert.match(wallet, /Only the employee can request this payout/);
   assert.match(wallet, /A payout request is already open/);
   assert.match(wallet, /Math\.max\(0, earnedCents - reservedCents\)/);
+  assert.match(wallet, /amountCents: z\.number\(\)\.int\(\)\.positive\(\)/);
+  assert.match(wallet, /Withdrawal amount exceeds the available balance/);
+  assert.match(driverDashboard, /Withdrawal amount/);
+  assert.match(driverDashboard, /amountCents: withdrawalCents/);
 });
 
 test("company wallets reserve only finalized Stripe earnings", () => {
@@ -48,7 +52,7 @@ test("company wallets reserve only finalized Stripe earnings", () => {
   assert.match(wallet, /A company payout request is already open/);
   assert.match(adminDashboard, /Section title="Company wallet"/);
   assert.match(adminDashboard, /Available to withdraw/);
-  assert.match(adminDashboard, /Request the full available balance/);
+  assert.match(adminDashboard, /Choose any amount from/);
 });
 
 test("successful Stripe tips have webhook and browser-confirmed idempotent ledger paths", () => {

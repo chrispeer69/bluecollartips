@@ -46,6 +46,9 @@ export function PayoutDestinationForm({
     setDetails(initial?.details ?? "");
   }, [initial?.method, initial?.accountName, initial?.details]);
 
+  const accountNameLabel = method === "bank_transfer" ? "Bank account holder name" : "Account or payee name";
+  const detailsLabel = method === "bank_transfer" ? "Routing and account details" : "Payment account details";
+
   return (
     <form
       className="rounded-lg border border-border bg-muted/30 p-4"
@@ -65,8 +68,8 @@ export function PayoutDestinationForm({
     >
       <div className="font-medium">{title}</div>
       <p className="mt-1 text-xs text-muted-foreground">
-        These instructions are encrypted and shared only with authorized admins processing the
-        payout.
+        Add or update the account where you want to receive payouts. These details are encrypted
+        and shared only with authorized platform admins processing the payout.
       </p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <label className="text-sm">
@@ -85,7 +88,7 @@ export function PayoutDestinationForm({
           </Select>
         </label>
         <label className="text-sm">
-          Account or payee name
+          {accountNameLabel}
           <input
             required
             maxLength={120}
@@ -95,7 +98,7 @@ export function PayoutDestinationForm({
           />
         </label>
         <label className="text-sm sm:col-span-2">
-          Payment instructions
+          {detailsLabel}
           <textarea
             required
             minLength={3}
@@ -105,7 +108,7 @@ export function PayoutDestinationForm({
             onChange={(event) => setDetails(event.target.value)}
             placeholder={
               method === "bank_transfer"
-                ? "Bank name, routing number, account number and account type"
+                ? "Bank name, routing number, account number, and checking or savings"
                 : method === "check"
                   ? "Mailing address and check payee"
                   : "Handle, email, phone number or other payout instructions"

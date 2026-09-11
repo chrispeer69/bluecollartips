@@ -515,7 +515,7 @@ function WalletPanel({ driverId, viewingAsAdmin }: { driverId: string; viewingAs
   }, [driverId]);
 
   return (
-    <Section title="Tip wallet">
+    <Section title="Tip wallet & payout account">
       {!wallet ? <p className="text-sm text-muted-foreground">Loading wallet…</p> : (
         <>
           <div className="grid gap-3 sm:grid-cols-3">
@@ -526,7 +526,7 @@ function WalletPanel({ driverId, viewingAsAdmin }: { driverId: string; viewingAs
           <div className="mt-4">
             <PayoutDestinationForm
               initial={wallet.payoutDestination}
-              title={viewingAsAdmin ? "Employee payout details" : "Where should we send your payout?"}
+              title={viewingAsAdmin ? "Employee payout account" : "My payout account"}
               onSave={async (destination) => {
                 await saveDestination({ data: { driverId, ...destination } });
                 await reload();

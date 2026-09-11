@@ -17,6 +17,7 @@ const stripeFunctions = await readFile(new URL("../src/lib/stripe.functions.ts",
 const stripePanel = await readFile(new URL("../src/components/StripeCardPanel.tsx", import.meta.url), "utf8");
 const driverDashboard = await readFile(new URL("../src/routes/dashboard/driver.tsx", import.meta.url), "utf8");
 const adminDashboard = await readFile(new URL("../src/routes/dashboard/admin.tsx", import.meta.url), "utf8");
+const payoutDestinationForm = await readFile(new URL("../src/components/PayoutDestinationForm.tsx", import.meta.url), "utf8");
 
 test("wallet funds are immediate and the five days are only a processing window", () => {
   assert.match(migration, /Successful platform-collected Stripe tips are available immediately/);
@@ -128,4 +129,8 @@ test("manual payout destinations are encrypted and snapshotted onto requests", (
   assert.match(wallet, /saveCompanyPayoutDestination/);
   assert.match(wallet, /Add your payout details before requesting a payout/);
   assert.match(adminDashboard, /ID \{d\.id\.slice\(0, 8\)\}/);
+  assert.match(driverDashboard, /Tip wallet & payout account/);
+  assert.match(driverDashboard, /My payout account/);
+  assert.match(payoutDestinationForm, /Bank account holder name/);
+  assert.match(payoutDestinationForm, /routing number, account number/);
 });

@@ -35,6 +35,7 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
           const pi = event.data.object as {
             id: string;
             amount: number;
+            created: number;
             metadata?: Record<string, string>;
             status: string;
           };

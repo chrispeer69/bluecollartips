@@ -172,6 +172,7 @@ export const finalizeTipPayment = createServerFn({ method: "POST" })
     await recordSuccessfulStripeTip(db, {
       id: pi.id,
       amount: pi.amount,
+      created: pi.created,
       metadata: pi.metadata,
       status: pi.status,
     });

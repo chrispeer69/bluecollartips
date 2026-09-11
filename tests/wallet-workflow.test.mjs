@@ -4,6 +4,8 @@ import { readFile } from "node:fs/promises";
 
 const migration = await readFile(new URL("../migrations/012_driver_wallet_payouts.sql", import.meta.url), "utf8");
 const platformMigration = await readFile(new URL("../migrations/013_platform_payout_settings.sql", import.meta.url), "utf8");
+const assignmentMigration = await readFile(new URL("../migrations/014_tip_driver_assignment_audit.sql", import.meta.url), "utf8");
+const adminFunctions = await readFile(new URL("../src/lib/admin.functions.ts", import.meta.url), "utf8");
 const wallet = await readFile(new URL("../src/lib/wallet.functions.ts", import.meta.url), "utf8");
 const ledger = await readFile(new URL("../src/lib/stripe-tip-ledger.server.ts", import.meta.url), "utf8");
 const stripeFunctions = await readFile(new URL("../src/lib/stripe.functions.ts", import.meta.url), "utf8");
@@ -38,6 +40,19 @@ test("successful Stripe tips have webhook and browser-confirmed idempotent ledge
   assert.match(stripeFunctions, /pi\.client_secret !== data\.clientSecret/);
   assert.match(stripePanel, /finalizePayment/);
   assert.match(stripePanel, /paymentIntent\?\.status === "succeeded"/);
+  assert.match(ledger, /webhook retries must never undo that/);
+  assert.match(wallet, /export const syncStripeTipHistory/);
+  assert.match(wallet, /scanned < 1000/);
+});
+
+test("company admins can assign verified company tips without cross-company access", () => {
+  assert.match(assignmentMigration, /assigned_by/);
+  assert.match(assignmentMigration, /assigned_at/);
+  assert.match(adminFunctions, /export const assignCompanyTipToDriver/);
+  assert.match(adminFunctions, /Employee does not belong to this company/);
+  assert.match(adminFunctions, /Only verified, undisputed tips can be assigned/);
+  assert.match(adminDashboard, /Unassigned company tips/);
+  assert.match(adminDashboard, /Tip assigned successfully/);
 });
 
 test("only platform admins configure and process manual wallet payouts", () => {
@@ -50,7 +65,7 @@ test("only platform admins configure and process manual wallet payouts", () => {
   assert.match(wallet, /requireSuperAdmin/);
   assert.match(wallet, /export const recoverStripeTip/);
   assert.match(wallet, /paymentIntents\.retrieve/);
-  assert.match(adminDashboard, /Recover a successful Stripe tip/);
+  assert.match(adminDashboard, /Stripe tip recovery/);
   assert.match(adminDashboard, /recoverPayment/);
   assert.match(wallet, /action: z\.enum\(\["approve", "reject", "mark_paid"\]\)/);
   assert.doesNotMatch(wallet, /updateWalletSettings|getCompanyWallet|reviewWalletPayout/);

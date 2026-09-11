@@ -68,7 +68,7 @@ export const getAdminDashboard = createServerFn({ method: "POST" })
         .limit(200),
       db
         .from("tips")
-        .select("id, amount_cents, source, customer_name, driver_id, company_amount_cents, platform_amount_cents, created_at")
+        .select("id, amount_cents, source, customer_name, driver_id, company_amount_cents, platform_amount_cents, verified, disputed, refunded_at, stripe_payment_intent_id, stripe_status, assigned_by, assigned_at, created_at")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
         .limit(200),
@@ -184,6 +184,40 @@ export const setDriverStatus = createServerFn({ method: "POST" })
       .eq("id", data.driverId);
     if (error) throw error;
     return { ok: true };
+  });
+
+export const assignCompanyTipToDriver = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({
+    tipId: z.string().uuid(),
+    driverId: z.string().uuid(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { sql } = await import("@/db/client.server");
+    const database = sql();
+    const [tipCompany] = await database`SELECT company_id FROM tips WHERE id = ${data.tipId}`;
+    if (!tipCompany) throw new Error("Tip not found");
+    await assertCompanyAdmin(context.userId, tipCompany.company_id);
+
+    return database.begin(async (tx) => {
+      const [tip] = await tx`
+        SELECT id, company_id, driver_id, verified, disputed, refunded_at
+        FROM tips WHERE id = ${data.tipId} FOR UPDATE
+      `;
+      if (!tip) throw new Error("Tip not found");
+      if (tip.driver_id) throw new Error("This tip is already assigned to an employee");
+      if (!tip.verified || tip.disputed || tip.refunded_at) throw new Error("Only verified, undisputed tips can be assigned");
+      const [driver] = await tx`
+        SELECT id, company_id, status FROM drivers WHERE id = ${data.driverId}
+      `;
+      if (!driver || driver.company_id !== tip.company_id) throw new Error("Employee does not belong to this company");
+      if (driver.status !== "active") throw new Error("Employee must be active");
+      await tx`
+        UPDATE tips SET driver_id = ${driver.id}, assigned_by = ${context.userId}, assigned_at = NOW()
+        WHERE id = ${tip.id}
+      `;
+      return { ok: true };
+    });
   });
 
 export const updateCompanyBranding = createServerFn({ method: "POST" })

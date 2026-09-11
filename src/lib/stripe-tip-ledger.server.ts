@@ -1,6 +1,7 @@
 type PaymentIntentForTip = {
   id: string;
   amount: number;
+  created?: number;
   metadata?: Record<string, string> | null;
   status: string;
 };
@@ -32,6 +33,7 @@ export async function recordSuccessfulStripeTip(
     driver_amount_cents: 0,
     company_amount_cents: 0,
     platform_amount_cents: 0,
+    ...(pi.created ? { created_at: new Date(pi.created * 1000).toISOString() } : {}),
   };
 
   // INSERT ... ON CONFLICT DO NOTHING makes the browser confirmation and
@@ -42,14 +44,21 @@ export async function recordSuccessfulStripeTip(
   if (error) throw new Error(error.message ?? "Could not record tip");
   const recorded = Boolean(inserted?.length);
 
-  // Repair a pre-existing incomplete ledger row without treating a retry as a
-  // new tip. The database trigger recomputes the split if amount/company move.
+  // Repair only an incomplete row. A completed row may have been assigned to a
+  // driver later by the company, and webhook retries must never undo that.
   if (!recorded) {
-    const { error: updateError } = await db
+    const { data: existing, error: readError } = await db
       .from("tips")
-      .update({ ...values })
+      .select("stripe_status")
       .eq("stripe_payment_intent_id", pi.id);
-    if (updateError) throw new Error(updateError.message ?? "Could not update tip");
+    if (readError) throw new Error(readError.message ?? "Could not inspect tip");
+    if (existing?.[0]?.stripe_status !== "succeeded") {
+      const { error: updateError } = await db
+        .from("tips")
+        .update({ ...values })
+        .eq("stripe_payment_intent_id", pi.id);
+      if (updateError) throw new Error(updateError.message ?? "Could not update tip");
+    }
   }
 
   return { recorded, companyId, driverId };

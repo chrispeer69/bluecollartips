@@ -224,10 +224,59 @@ export const recoverStripeTip = createServerFn({ method: "POST" })
     const result = await recordSuccessfulStripeTip(db, {
       id: intent.id,
       amount: intent.amount,
+      created: intent.created,
       metadata: intent.metadata,
       status: intent.status,
     });
     return { ok: true, alreadyRecorded: !result.recorded, amountCents: intent.amount };
+  });
+
+/** Imports successful Blue Collar Tips PaymentIntents from Stripe in bounded
+ * batches. Unrelated Stripe payments without company attribution are skipped.
+ */
+export const syncStripeTipHistory = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .handler(async ({ context }) => {
+    await requireSuperAdmin(context.userId);
+    const { getStripe } = await import("./stripe.server");
+    const stripe = getStripe();
+    if (!stripe) throw new Error("Stripe is not configured");
+    const { db } = await import("@/db/client.server");
+    const { recordSuccessfulStripeTip } = await import("./stripe-tip-ledger.server");
+
+    let scanned = 0;
+    let recorded = 0;
+    let alreadyRecorded = 0;
+    let skipped = 0;
+    let failed = 0;
+    let startingAfter: string | undefined;
+    do {
+      const page = await stripe.paymentIntents.list({ limit: 100, ...(startingAfter ? { starting_after: startingAfter } : {}) });
+      for (const intent of page.data) {
+        scanned += 1;
+        if (intent.status !== "succeeded" || !intent.metadata?.company_id) {
+          skipped += 1;
+          continue;
+        }
+        try {
+          const result = await recordSuccessfulStripeTip(db, {
+            id: intent.id,
+            amount: intent.amount,
+            created: intent.created,
+            metadata: intent.metadata,
+            status: intent.status,
+          });
+          if (result.recorded) recorded += 1;
+          else alreadyRecorded += 1;
+        } catch (error) {
+          failed += 1;
+          console.error(`Stripe history sync failed for ${intent.id}`, error);
+        }
+      }
+      startingAfter = page.has_more ? page.data.at(-1)?.id : undefined;
+    } while (startingAfter && scanned < 1000);
+
+    return { ok: true, scanned, recorded, alreadyRecorded, skipped, failed, capped: scanned >= 1000 };
   });
 
 export const reviewPlatformWalletPayout = createServerFn({ method: "POST" })

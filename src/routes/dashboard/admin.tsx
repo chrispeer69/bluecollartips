@@ -5,6 +5,7 @@ import { auth } from "@/auth/client";
 import {
   createCompany,
   createDriver,
+  assignCompanyTipToDriver,
   getAdminDashboard,
   resolveFlag,
   setDriverStatus,
@@ -24,6 +25,7 @@ import {
   getPlatformWallet,
   recoverStripeTip,
   reviewPlatformWalletPayout,
+  syncStripeTipHistory,
   updatePlatformWalletSettings,
 } from "@/lib/wallet.functions";
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
@@ -360,6 +362,14 @@ function AdminDashboard() {
         {page === "payments" && <Section title="Tip disputes & refunds">
           <DisputesPanel
             companyId={data.company.id}
+            tips={data.tips}
+            drivers={data.drivers}
+            onChanged={() => load(companyId)}
+          />
+        </Section>}
+
+        {page === "payments" && <Section title="Unassigned company tips">
+          <UnassignedTipsPanel
             tips={data.tips}
             drivers={data.drivers}
             onChanged={() => load(companyId)}
@@ -1064,6 +1074,7 @@ function PlatformWalletPanel({ mode }: { mode: "settings" | "requests" }) {
   const saveSettings = useServerFn(updatePlatformWalletSettings);
   const reviewPayout = useServerFn(reviewPlatformWalletPayout);
   const recoverPayment = useServerFn(recoverStripeTip);
+  const syncHistory = useServerFn(syncStripeTipHistory);
   const [wallet, setWallet] = useState<Awaited<ReturnType<typeof getPlatformWallet>> | null>(null);
   const [minimum, setMinimum] = useState("25.00");
   const [processingDays, setProcessingDays] = useState("5");
@@ -1144,8 +1155,25 @@ function PlatformWalletPanel({ mode }: { mode: "settings" | "requests" }) {
       </p>}
       {message && <p className="mt-3 text-sm text-muted-foreground">{message}</p>}
       {mode === "requests" && <div className="rounded-lg border border-border p-4">
-        <h3 className="font-semibold">Recover a successful Stripe tip</h3>
-        <p className="mt-1 text-xs text-muted-foreground">Use this only when Stripe shows a successful payment but it is missing from Blue Collar Tips.</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-semibold">Stripe tip recovery</h3>
+            <p className="mt-1 text-xs text-muted-foreground">Sync historical Blue Collar Tips payments, or recover one successful payment by its Stripe ID.</p>
+          </div>
+          <button type="button" disabled={busy} onClick={async () => {
+            setBusy(true);
+            setMessage(null);
+            try {
+              const result = await syncHistory();
+              setMessage(`Stripe sync complete: ${result.recorded} added, ${result.alreadyRecorded} already recorded, ${result.skipped} unrelated or incomplete, ${result.failed} failed${result.capped ? "; stopped at 1,000 payments" : ""}.`);
+              await reload();
+            } catch (error) {
+              setMessage(error instanceof Error ? error.message : "Could not sync Stripe history");
+            } finally {
+              setBusy(false);
+            }
+          }} className="rounded-md border border-border px-4 py-2 text-sm disabled:opacity-50">Sync Stripe history</button>
+        </div>
         <form className="mt-3 flex flex-wrap gap-2" onSubmit={async (event) => {
           event.preventDefault();
           setBusy(true);
@@ -1196,6 +1224,55 @@ function PlatformWalletPanel({ mode }: { mode: "settings" | "requests" }) {
       ))}
     </div>
   );
+}
+
+function UnassignedTipsPanel({ tips, drivers, onChanged }: {
+  tips: Data["tips"];
+  drivers: Data["drivers"];
+  onChanged: () => void | Promise<void>;
+}) {
+  const assignTip = useServerFn(assignCompanyTipToDriver);
+  const activeDrivers = drivers.filter((driver: any) => driver.status === "active");
+  const unassigned = tips.filter((tip: any) => !tip.driver_id && tip.verified && !tip.disputed && !tip.refunded_at);
+  const [selections, setSelections] = useState<Record<string, string>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  if (!unassigned.length) return <p className="text-sm text-muted-foreground">No verified company tips are waiting for employee assignment.</p>;
+  return <div>
+    <p className="mb-3 text-xs text-muted-foreground">Assign a company-level tip when you later identify the employee. The configured split moves the employee share into that employee’s wallet.</p>
+    {message && <p className="mb-3 text-sm text-muted-foreground">{message}</p>}
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead className="text-xs uppercase text-muted-foreground"><tr><th className="py-2">Customer</th><th>Amount</th><th>Date</th><th>Employee</th><th></th></tr></thead>
+        <tbody className="divide-y divide-border">{unassigned.map((tip: any) => {
+          const selected = selections[tip.id] ?? activeDrivers[0]?.id ?? "";
+          return <tr key={tip.id}>
+            <td className="py-3">{tip.customer_name || "Customer"}</td>
+            <td>{dollars(Number(tip.amount_cents))}</td>
+            <td>{new Date(tip.created_at).toLocaleString()}</td>
+            <td><select value={selected} onChange={(event) => setSelections((current) => ({ ...current, [tip.id]: event.target.value }))} className="rounded-md border border-input bg-background px-3 py-2 text-sm">
+              {!activeDrivers.length && <option value="">No active employees</option>}
+              {activeDrivers.map((driver: any) => <option key={driver.id} value={driver.id}>{driver.display_name}</option>)}
+            </select></td>
+            <td className="text-right"><button disabled={!selected || busyId === tip.id} onClick={async () => {
+              setBusyId(tip.id);
+              setMessage(null);
+              try {
+                await assignTip({ data: { tipId: tip.id, driverId: selected } });
+                setMessage("Tip assigned successfully.");
+                await onChanged();
+              } catch (error) {
+                setMessage(error instanceof Error ? error.message : "Could not assign tip");
+              } finally {
+                setBusyId(null);
+              }
+            }} className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50">Assign</button></td>
+          </tr>;
+        })}</tbody>
+      </table>
+    </div>
+  </div>;
 }
 
 function ReconciliationPanel({ companyId, drivers }: { companyId: string; drivers: Data["drivers"] }) {

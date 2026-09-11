@@ -143,7 +143,7 @@ test("manual payout destinations are encrypted and snapshotted onto requests", (
   assert.match(wallet, /saveDriverPayoutDestination/);
   assert.match(wallet, /saveCompanyPayoutDestination/);
   assert.match(wallet, /Add your payout details before requesting a payout/);
-  assert.match(adminDashboard, /ID \{d\.id\.slice\(0, 8\)\}/);
+  assert.match(adminDashboard, /navigator\.clipboard\.writeText\(d\.id\)/);
   assert.match(driverDashboard, /Tip wallet & withdrawals/);
   assert.match(driverDashboard, /id: "payoutAccount", label: "Payout account"/);
   assert.match(driverDashboard, /My payout account/);

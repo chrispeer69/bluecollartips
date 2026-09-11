@@ -116,7 +116,7 @@ test("platform user administration exposes memberships and filters", () => {
   assert.match(admin, /Customer details not provided/);
   assert.doesNotMatch(admin, /Employee tips & payouts/);
   assert.doesNotMatch(admin, /Unverified \(30d\)/);
-  assert.match(admin, /\{d\.email \|\| "—"\}/);
+  assert.match(admin, /\{d\.email \|\| "No email added"\}/);
 });
 
 test("unique review links carry saved customer identity into payments", () => {

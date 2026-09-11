@@ -465,6 +465,15 @@ function DriverRoster({
   const [empId, setEmpId] = useState("");
   const [qrFor, setQrFor] = useState<{ name: string; url: string } | null>(null);
   const [qrDriverId, setQrDriverId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [employeeMessage, setEmployeeMessage] = useState<string | null>(null);
+  async function runEmployeeAction(action: () => void | Promise<void>) {
+    setEmployeeMessage(null);
+    try { await action(); } catch (error) {
+      setEmployeeMessage(error instanceof Error ? error.message : "Could not update employee.");
+    }
+  }
   const listLocs = useServerFn(listLocations);
   const setLoc = useServerFn(setDriverLocation);
   const [locations, setLocations] = useState<Awaited<ReturnType<typeof listLocations>>>([]);
@@ -475,9 +484,9 @@ function DriverRoster({
     <>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="font-medium">Employee QR codes</div>
+          <div className="font-medium">Employee directory</div>
           <p className="text-xs text-muted-foreground">
-            Each code opens that employee's public rating and tip page.
+            Manage profiles, tip pages, and payouts in one place.
           </p>
         </div>
         <button onClick={() => setOpen((v) => !v)} className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground">
@@ -515,143 +524,69 @@ function DriverRoster({
         <div className="text-sm text-muted-foreground">No employees yet. Add one to get started.</div>
       ) : (
         <>
-          <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {drivers.map((d) => {
+          <div className="mb-4">
+            <input aria-label="Search employees" placeholder="Search employees by name or email" value={search} onChange={(e) => setSearch(e.target.value)} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm sm:max-w-sm" />
+          </div>
+          <div className="space-y-3">
+            {drivers.filter((d) => [d.display_name, d.email].some((value) => value?.toLowerCase().includes(search.trim().toLowerCase()))).map((d) => {
+              const r = ratingsByDriver.get(d.id);
+              const avg = r && r.n ? (r.sum / r.n).toFixed(1) : "—";
+              const expanded = expandedId === d.id;
               const path = `/${companySlug}/d/${d.slug}`;
-              const url = typeof window !== "undefined" ? `${window.location.origin}${path}` : path;
               return (
-                <button
-                  key={`qr-${d.id}`}
-                  type="button"
-                  onClick={() => {
-                    setQrDriverId(d.id);
-                    setQrFor({ name: d.display_name, url });
-                  }}
-                  className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/60 hover:bg-muted/40"
-                  aria-label={`Open QR code for ${d.display_name}`}
-                >
-                  <span className="shrink-0 rounded-md bg-white p-1.5">
-                    <BrandedQRCode value={url} size={76} logoUrl={companyLogo} includeMargin={false} />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block font-medium">{d.display_name}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{path}</span>
-                    <span className="mt-1 block text-xs font-medium text-primary">
-                      View, download or print QR →
-                    </span>
-                  </span>
-                </button>
+                <div key={d.id} className="overflow-hidden rounded-xl border border-border bg-card">
+                  <div className="flex flex-wrap items-center gap-4 p-4 sm:p-5">
+                    <div className="min-w-0 flex-1 basis-44">
+                      <div className="font-semibold">{d.display_name}</div>
+                      <div className="mt-1 break-all text-xs text-muted-foreground">{d.email || "No email added"}</div>
+                    </div>
+                    <span className="rounded-full bg-muted px-2.5 py-1 text-xs capitalize">{d.status}</span>
+                    <div className="min-w-16 text-right">
+                      <div className="text-[11px] text-muted-foreground">Rating</div>
+                      <div className="mt-1 text-sm tabular-nums">{avg}{avg !== "—" ? " ★" : ""}</div>
+                    </div>
+                    <div className="min-w-24 text-right">
+                      <div className="text-[11px] text-muted-foreground">Net tips</div>
+                      <div className="mt-1 font-semibold tabular-nums">{dollars(tipsByDriver.get(d.id) ?? 0)}</div>
+                    </div>
+                    <button type="button" aria-expanded={expanded} aria-controls={`employee-details-${d.id}`} aria-label={`Manage ${d.display_name}`} onClick={() => { setEmployeeMessage(null); setExpandedId(expanded ? null : d.id); }} className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted">
+                      {expanded ? "Close" : "Manage"}
+                    </button>
+                  </div>
+                  {expanded && <div id={`employee-details-${d.id}`} className="space-y-5 border-t border-border bg-muted/20 p-4 sm:p-5">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="space-y-2 text-xs font-medium">Status
+                        <Select value={d.status} onValueChange={(value) => runEmployeeAction(() => onStatus(d.id, value as "pending" | "active" | "deactivated"))}>
+                          <SelectTrigger className="mt-2" aria-label={`Status for ${d.display_name}`}><SelectValue /></SelectTrigger>
+                          <SelectContent><SelectItem value="pending">Pending</SelectItem><SelectItem value="active">Active</SelectItem><SelectItem value="deactivated">Deactivated</SelectItem></SelectContent>
+                        </Select>
+                      </label>
+                      <label className="space-y-2 text-xs font-medium">Location
+                        <Select value={d.location_id ?? "unassigned"} onValueChange={(value) => runEmployeeAction(async () => {
+                          await setLoc({ data: { driverId: d.id, locationId: value === "unassigned" ? null : value } });
+                          onLocationChanged();
+                        })}>
+                          <SelectTrigger className="mt-2" aria-label={`Location for ${d.display_name}`}><SelectValue /></SelectTrigger>
+                          <SelectContent><SelectItem value="unassigned">Not assigned</SelectItem>{locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </label>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => { setQrDriverId(d.id); setQrFor({ name: d.display_name, url: `${window.location.origin}${path}` }); }} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">View QR code</button>
+                      <a href={path} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-border bg-card px-4 py-2 text-sm">Open tip page</a>
+                      <button type="button" onClick={() => {
+                        localStorage.setItem("employeeWorkspaceId", d.id);
+                        sessionStorage.setItem("employeeDashboardPage", "earnings");
+                        window.location.assign("/dashboard/driver");
+                      }} className="rounded-lg border border-border bg-card px-4 py-2 text-sm">Payout details</button>
+                      <button type="button" onClick={() => runEmployeeAction(async () => { await navigator.clipboard.writeText(d.id); setEmployeeMessage("Employee ID copied."); })} className="rounded-lg border border-border bg-card px-4 py-2 text-sm">Copy employee ID</button>
+                    </div>
+                    {employeeMessage && <p role="status" className="text-sm text-muted-foreground">{employeeMessage}</p>}
+                  </div>}
+                </div>
               );
             })}
-          </div>
-          <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase text-muted-foreground">
-              <tr>
-                <th className="py-2">Name</th>
-                <th className="hidden lg:table-cell">Email</th>
-                <th>Status</th>
-                <th className="hidden sm:table-cell">Location</th>
-                <th className="hidden md:table-cell">Tip link</th>
-                <th className="hidden sm:table-cell text-right">Avg ★</th>
-                <th className="text-right">Employee net</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {drivers.map((d) => {
-                const r = ratingsByDriver.get(d.id);
-                const avg = r && r.n ? (r.sum / r.n).toFixed(2) : "—";
-                return (
-                  <tr key={d.id}>
-                    <td className="py-2">
-                      <div className="font-medium">{d.display_name}</div>
-                      <button
-                        type="button"
-                        title={d.id}
-                        onClick={() => navigator.clipboard.writeText(d.id)}
-                        className="mt-0.5 font-mono text-[11px] text-muted-foreground hover:text-primary"
-                      >
-                        ID {d.id.slice(0, 8)}… · Copy
-                      </button>
-                    </td>
-                    <td className="hidden lg:table-cell text-muted-foreground">{d.email || "—"}</td>
-                    <td>
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize">{d.status}</span>
-                    </td>
-                    <td className="hidden sm:table-cell">
-                      {locations.length ? (
-                        <Select
-                          value={d.location_id ?? "unassigned"}
-                          onValueChange={async (value) => {
-                            const v = value === "unassigned" ? null : value;
-                            await setLoc({ data: { driverId: d.id, locationId: v } });
-                            onLocationChanged();
-                          }}
-                        >
-                          <SelectTrigger className="h-8 max-w-40 text-xs" aria-label={`Location for ${d.display_name}`}><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="unassigned">Not assigned</SelectItem>
-                            {locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Not assigned</span>
-                      )}
-                    </td>
-                    <td className="hidden md:table-cell">
-                      <a
-                        className="text-xs text-secondary underline"
-                        href={`/${companySlug}/d/${d.slug}`}
-                        target="_blank"
-                      >
-                        /{companySlug}/d/{d.slug}
-                      </a>
-                    </td>
-                    <td className="hidden sm:table-cell text-right">{avg}</td>
-                    <td className="text-right">{dollars(tipsByDriver.get(d.id) ?? 0)}</td>
-                    <td className="text-right">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          localStorage.setItem("employeeWorkspaceId", d.id);
-                          sessionStorage.setItem("employeeDashboardPage", "earnings");
-                          window.location.assign("/dashboard/driver");
-                        }}
-                        className="mr-2 rounded-md border border-border px-2 py-1 text-xs"
-                      >
-                        Payout
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setQrDriverId(d.id);
-                          setQrFor({
-                            name: d.display_name,
-                            url: `${window.location.origin}/${companySlug}/d/${d.slug}`,
-                          });
-                        }}
-                        className="mr-2 rounded-md border border-border px-2 py-1 text-xs"
-                      >
-                        QR / Link
-                      </button>
-                      <Select
-                        value={d.status}
-                        onValueChange={(value) => onStatus(d.id, value as "pending" | "active" | "deactivated")}
-                      >
-                        <SelectTrigger className="ml-auto h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="deactivated">Deactivated</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+            {!drivers.some((d) => [d.display_name, d.email].some((value) => value?.toLowerCase().includes(search.trim().toLowerCase()))) && <p className="py-6 text-center text-sm text-muted-foreground">No employees match your search.</p>}
           </div>
         </>
       )}

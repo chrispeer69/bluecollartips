@@ -3,6 +3,8 @@ import { requireAuth } from "@/auth/middleware";
 import { z } from "zod";
 import { TIP_MAX_CENTS, TIP_MIN_CENTS } from "./constants";
 
+const DRIVER_DASHBOARD_FIELDS = "id, company_id, user_id, location_id, display_name, slug, employee_id, email, phone, photo_url, status, venmo_handle, cashapp_handle, zelle_handle, paypal_handle, stripe_account_id, stripe_onboarded, stripe_charges_enabled, stripe_payouts_enabled, notify_sms, payout_method, payout_account_name, created_at, companies(name, slug, primary_color, secondary_color, logo_url)";
+
 async function getUserRoles(userId: string) {
   const { db } = await import("@/db/client.server");
   const { data } = await db
@@ -28,7 +30,7 @@ async function resolveAccessibleDriver(userId: string, requestedDriverId?: strin
   if (requestedDriverId) {
     const { data: driver } = await db
       .from("drivers")
-      .select("*, companies(name, slug, primary_color, secondary_color, logo_url)")
+      .select(DRIVER_DASHBOARD_FIELDS)
       .eq("id", requestedDriverId)
       .maybeSingle();
     if (!driver || !canAccess(driver)) return { driver: null, roles, accessibleDrivers };
@@ -39,7 +41,7 @@ async function resolveAccessibleDriver(userId: string, requestedDriverId?: strin
   if (firstOwn) {
     const { data: ownDriver } = await db
       .from("drivers")
-      .select("*, companies(name, slug, primary_color, secondary_color, logo_url)")
+      .select(DRIVER_DASHBOARD_FIELDS)
       .eq("id", firstOwn.id)
       .maybeSingle();
     return { driver: ownDriver, roles, accessibleDrivers };
@@ -48,7 +50,7 @@ async function resolveAccessibleDriver(userId: string, requestedDriverId?: strin
   if (isSuper || adminCompanyIds.length) {
     let query = db
       .from("drivers")
-      .select("*, companies(name, slug, primary_color, secondary_color, logo_url)")
+      .select(DRIVER_DASHBOARD_FIELDS)
       .order("created_at", { ascending: false })
       .limit(1);
     if (!isSuper) query = query.in("company_id", adminCompanyIds);

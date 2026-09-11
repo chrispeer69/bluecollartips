@@ -6,6 +6,7 @@ import { randomBytes } from "crypto";
 
 const APP_BASE_URL =
   process.env.APP_BASE_URL ?? "https://bluecollartips.app";
+const ADMIN_DRIVER_FIELDS = "id, company_id, user_id, location_id, display_name, slug, employee_id, email, phone, photo_url, status, venmo_handle, cashapp_handle, zelle_handle, paypal_handle, stripe_account_id, stripe_onboarded, stripe_charges_enabled, stripe_payouts_enabled, notify_sms, payout_method, payout_account_name, created_at";
 
 function generateInviteCode() {
   return randomBytes(6).toString("hex").toUpperCase();
@@ -57,7 +58,7 @@ export const getAdminDashboard = createServerFn({ method: "POST" })
       db.from("companies").select("*").eq("id", companyId).maybeSingle(),
       db
         .from("drivers")
-        .select("*")
+        .select(ADMIN_DRIVER_FIELDS)
         .eq("company_id", companyId)
         .order("created_at", { ascending: false }),
       db
@@ -83,6 +84,7 @@ export const getAdminDashboard = createServerFn({ method: "POST" })
       ...company,
       has_review_webhook_secret: Boolean(company.review_webhook_secret_encrypted),
       review_webhook_secret_encrypted: undefined,
+      payout_details_encrypted: undefined,
     } : null;
     return { isSuper, company: safeCompany, drivers: drivers ?? [], ratings: ratings ?? [], tips: tips ?? [], flags: flags ?? [], companies: companies ?? null };
   });

@@ -7,6 +7,8 @@ const platformMigration = await readFile(new URL("../migrations/013_platform_pay
 const assignmentMigration = await readFile(new URL("../migrations/014_tip_driver_assignment_audit.sql", import.meta.url), "utf8");
 const splitMigration = await readFile(new URL("../migrations/015_configurable_company_tip_share.sql", import.meta.url), "utf8");
 const companyWalletMigration = await readFile(new URL("../migrations/016_company_wallet_payouts.sql", import.meta.url), "utf8");
+const destinationMigration = await readFile(new URL("../migrations/017_payout_destinations.sql", import.meta.url), "utf8");
+const destinationCrypto = await readFile(new URL("../src/lib/payout-destination.server.ts", import.meta.url), "utf8");
 const adminFunctions = await readFile(new URL("../src/lib/admin.functions.ts", import.meta.url), "utf8");
 const wallet = await readFile(new URL("../src/lib/wallet.functions.ts", import.meta.url), "utf8");
 const ledger = await readFile(new URL("../src/lib/stripe-tip-ledger.server.ts", import.meta.url), "utf8");
@@ -99,4 +101,15 @@ test("only platform admins configure and process manual wallet payouts", () => {
   assert.match(adminDashboard, /onTipsChanged/);
   assert.match(wallet, /action: z\.enum\(\["approve", "reject", "mark_paid"\]\)/);
   assert.doesNotMatch(wallet, /updateWalletSettings|reviewWalletPayout/);
+});
+
+test("manual payout destinations are encrypted and snapshotted onto requests", () => {
+  assert.match(destinationMigration, /payout_details_encrypted/);
+  assert.match(destinationMigration, /requested_payout_details_encrypted/);
+  assert.match(destinationCrypto, /aes-256-gcm/);
+  assert.match(destinationCrypto, /PAYOUT_DETAILS_ENCRYPTION_KEY/);
+  assert.match(wallet, /saveDriverPayoutDestination/);
+  assert.match(wallet, /saveCompanyPayoutDestination/);
+  assert.match(wallet, /Add your payout details before requesting a payout/);
+  assert.match(adminDashboard, /ID \{d\.id\.slice\(0, 8\)\}/);
 });

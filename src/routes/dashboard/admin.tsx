@@ -28,10 +28,12 @@ import {
   recoverStripeTip,
   requestCompanyWalletPayout,
   reviewPlatformWalletPayout,
+  saveCompanyPayoutDestination,
   syncStripeTipHistory,
   updatePlatformWalletSettings,
 } from "@/lib/wallet.functions";
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
+import { PayoutDestinationForm, payoutMethodLabel } from "@/components/PayoutDestinationForm";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, CreditCard, LayoutDashboard, MessageSquareText, Settings, ShieldCheck, Users } from "lucide-react";
 
@@ -569,7 +571,17 @@ function DriverRoster({
                 const avg = r && r.n ? (r.sum / r.n).toFixed(2) : "—";
                 return (
                   <tr key={d.id}>
-                    <td className="py-2 font-medium">{d.display_name}</td>
+                    <td className="py-2">
+                      <div className="font-medium">{d.display_name}</div>
+                      <button
+                        type="button"
+                        title={d.id}
+                        onClick={() => navigator.clipboard.writeText(d.id)}
+                        className="mt-0.5 font-mono text-[11px] text-muted-foreground hover:text-primary"
+                      >
+                        ID {d.id.slice(0, 8)}… · Copy
+                      </button>
+                    </td>
                     <td className="hidden lg:table-cell text-muted-foreground">{d.email || "—"}</td>
                     <td>
                       <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize">{d.status}</span>
@@ -606,6 +618,17 @@ function DriverRoster({
                     <td className="hidden sm:table-cell text-right">{avg}</td>
                     <td className="text-right">{dollars(tipsByDriver.get(d.id) ?? 0)}</td>
                     <td className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          localStorage.setItem("employeeWorkspaceId", d.id);
+                          sessionStorage.setItem("employeeDashboardPage", "earnings");
+                          window.location.assign("/dashboard/driver");
+                        }}
+                        className="mr-2 rounded-md border border-border px-2 py-1 text-xs"
+                      >
+                        Payout
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
@@ -1098,6 +1121,7 @@ function JoinRequestsPanel({ companyId, onApproved }: { companyId: string; onApp
 function CompanyWalletPanel({ companyId }: { companyId: string }) {
   const getWallet = useServerFn(getCompanyWallet);
   const requestPayout = useServerFn(requestCompanyWalletPayout);
+  const saveDestination = useServerFn(saveCompanyPayoutDestination);
   const [wallet, setWallet] = useState<Awaited<ReturnType<typeof getCompanyWallet>> | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -1118,10 +1142,19 @@ function CompanyWalletPanel({ companyId }: { companyId: string }) {
       <Stat label="Paid to company" value={dollars(wallet.paidCents)} />
       <Stat label="Minimum withdrawal" value={dollars(wallet.minimumCents)} />
     </div>
+    <PayoutDestinationForm
+      initial={wallet.payoutDestination}
+      title="Company payout details"
+      onSave={async (destination) => {
+        await saveDestination({ data: { companyId, ...destination } });
+        await reload();
+      }}
+    />
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-4">
       <div>
         <div className="font-medium">Request the full available balance</div>
         <p className="mt-1 text-xs text-muted-foreground">Only successful Stripe tips finalized for the company, plus the company share from employee tips, are available. Payment is completed by the platform within 0–{wallet.processingDays} days.</p>
+        {!wallet.payoutDestination && <p className="mt-2 text-xs font-medium text-secondary">Save company payout details above before requesting a payout.</p>}
       </div>
       <button type="button" disabled={busy || !wallet.canRequest || belowMinimum} onClick={async () => {
         setBusy(true);
@@ -1251,7 +1284,7 @@ function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requ
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="font-semibold">{pendingAction.action === "mark_paid" ? "Record completed payout" : "Reject payout request"}</h3>
-            <p className="mt-1 text-xs text-muted-foreground">{pendingAction.action === "mark_paid" ? "Record how this employee was paid. A reference is optional." : "Add an optional internal reason before rejecting this request."}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{pendingAction.action === "mark_paid" ? "Record how this recipient was paid. A reference is optional." : "Add an optional internal reason before rejecting this request."}</p>
           </div>
           <button type="button" onClick={() => setPendingAction(null)} className="rounded-md border border-border px-3 py-2 text-sm">Cancel</button>
         </div>
@@ -1327,7 +1360,14 @@ function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requ
             <tbody className="divide-y divide-border">
               {wallet.requests.map((request: any) => (
                 <tr key={request.id}>
-                  <td className="py-3 font-medium">{request.recipient_name}</td>
+                  <td className="py-3">
+                    <div className="font-medium">{request.recipient_name}</div>
+                    {request.payout_destination_method ? <div className="mt-1 max-w-72 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">{payoutMethodLabel(request.payout_destination_method)}</span>
+                      {request.payout_destination_account_name ? ` · ${request.payout_destination_account_name}` : ""}
+                      {request.payout_destination_details ? <div className="mt-0.5 whitespace-pre-wrap break-words">{request.payout_destination_details}</div> : null}
+                    </div> : <div className="mt-1 text-xs text-secondary">No payout details</div>}
+                  </td>
                   <td className="capitalize">{request.request_type}</td>
                   <td>{request.company_name}</td>
                   <td>{dollars(Number(request.amount_cents))}</td>

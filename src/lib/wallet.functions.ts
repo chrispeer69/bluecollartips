@@ -4,6 +4,12 @@ import { z } from "zod";
 
 const OPEN_PAYOUT_STATUSES = ["pending", "approved", "processing"] as const;
 const RESERVED_PAYOUT_STATUSES = [...OPEN_PAYOUT_STATUSES, "paid"] as const;
+const payoutMethodSchema = z.enum(["bank_transfer", "cash_app", "venmo", "zelle", "paypal", "check", "other"]);
+const payoutDestinationSchema = z.object({
+  method: payoutMethodSchema,
+  accountName: z.string().trim().min(1).max(120),
+  details: z.string().trim().min(3).max(1000),
+});
 
 async function rolesFor(userId: string) {
   const { db } = await import("@/db/client.server");
@@ -43,6 +49,38 @@ async function requireCompanyAdminAccess(userId: string, companyId: string) {
   if (!allowed) throw new Error("Forbidden");
 }
 
+export const saveDriverPayoutDestination = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => payoutDestinationSchema.extend({ driverId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const driver = await requireDriverAccess(context.userId, data.driverId);
+    const { encryptPayoutDetails } = await import("./payout-destination.server");
+    const { db } = await import("@/db/client.server");
+    const { error } = await db.from("drivers").update({
+      payout_method: data.method,
+      payout_account_name: data.accountName,
+      payout_details_encrypted: encryptPayoutDetails(data.details),
+    }).eq("id", driver.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const saveCompanyPayoutDestination = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => payoutDestinationSchema.extend({ companyId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireCompanyAdminAccess(context.userId, data.companyId);
+    const { encryptPayoutDetails } = await import("./payout-destination.server");
+    const { db } = await import("@/db/client.server");
+    const { error } = await db.from("companies").update({
+      payout_method: data.method,
+      payout_account_name: data.accountName,
+      payout_details_encrypted: encryptPayoutDetails(data.details),
+    }).eq("id", data.companyId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const getDriverWallet = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator((d) => z.object({ driverId: z.string().uuid() }).parse(d))
@@ -50,6 +88,11 @@ export const getDriverWallet = createServerFn({ method: "POST" })
     const driver = await requireDriverAccess(context.userId, data.driverId);
     const { sql } = await import("@/db/client.server");
     const database = sql();
+    const [destination] = await database`
+      SELECT payout_method, payout_account_name, payout_details_encrypted
+      FROM drivers WHERE id = ${driver.id}
+    `;
+    const { decryptPayoutDetails } = await import("./payout-destination.server");
     const [settings] = await database`
       SELECT payout_minimum_cents, payout_processing_days
       FROM platform_settings
@@ -92,8 +135,13 @@ export const getDriverWallet = createServerFn({ method: "POST" })
       paidCents: Number(payouts?.paid_cents ?? 0),
       minimumCents: Number(settings.payout_minimum_cents),
       processingDays: Number(settings.payout_processing_days),
-      canRequest: driver.user_id === context.userId && !openRequest,
+      canRequest: driver.user_id === context.userId && !openRequest && Boolean(destination?.payout_method && destination?.payout_details_encrypted),
       openRequest: openRequest ?? null,
+      payoutDestination: destination?.payout_method && destination?.payout_details_encrypted ? {
+        method: destination.payout_method,
+        accountName: destination.payout_account_name ?? "",
+        details: decryptPayoutDetails(destination.payout_details_encrypted) ?? "",
+      } : null,
     };
   });
 
@@ -107,13 +155,17 @@ export const requestWalletPayout = createServerFn({ method: "POST" })
 
     return database.begin(async (tx) => {
       const [driver] = await tx`
-        SELECT d.id, d.user_id, d.company_id, d.status
+        SELECT d.id, d.user_id, d.company_id, d.status, d.payout_method,
+               d.payout_account_name, d.payout_details_encrypted
         FROM drivers d
         WHERE d.id = ${data.driverId}
         FOR UPDATE
       `;
       if (!driver || driver.user_id !== context.userId) throw new Error("Only the employee can request this payout");
       if (driver.status !== "active") throw new Error("Employee account is not active");
+      if (!driver.payout_method || !driver.payout_account_name || !driver.payout_details_encrypted) {
+        throw new Error("Add your payout details before requesting a payout");
+      }
 
       const [settings] = await tx`
         SELECT payout_minimum_cents, payout_processing_days
@@ -153,9 +205,11 @@ export const requestWalletPayout = createServerFn({ method: "POST" })
 
       const [request] = await tx`
         INSERT INTO payout_requests (
-          company_id, driver_id, amount_cents, requested_by
+          company_id, driver_id, amount_cents, requested_by,
+          requested_payout_method, requested_payout_account_name, requested_payout_details_encrypted
         ) VALUES (
-          ${driver.company_id}, ${driver.id}, ${available}, ${context.userId}
+          ${driver.company_id}, ${driver.id}, ${available}, ${context.userId},
+          ${driver.payout_method}, ${driver.payout_account_name}, ${driver.payout_details_encrypted}
         )
         RETURNING id, amount_cents, status, requested_at
       `;
@@ -170,6 +224,11 @@ export const getCompanyWallet = createServerFn({ method: "POST" })
     await requireCompanyAdminAccess(context.userId, data.companyId);
     const { sql } = await import("@/db/client.server");
     const database = sql();
+    const [destination] = await database`
+      SELECT payout_method, payout_account_name, payout_details_encrypted
+      FROM companies WHERE id = ${data.companyId}
+    `;
+    const { decryptPayoutDetails } = await import("./payout-destination.server");
     const [settings] = await database`
       SELECT payout_minimum_cents, payout_processing_days
       FROM platform_settings WHERE singleton = true
@@ -212,9 +271,14 @@ export const getCompanyWallet = createServerFn({ method: "POST" })
       paidCents: Number(payouts?.paid_cents ?? 0),
       minimumCents: Number(settings.payout_minimum_cents),
       processingDays: Number(settings.payout_processing_days),
-      canRequest: !openRequest,
+      canRequest: !openRequest && Boolean(destination?.payout_method && destination?.payout_details_encrypted),
       openRequest: openRequest ?? null,
       requests,
+      payoutDestination: destination?.payout_method && destination?.payout_details_encrypted ? {
+        method: destination.payout_method,
+        accountName: destination.payout_account_name ?? "",
+        details: decryptPayoutDetails(destination.payout_details_encrypted) ?? "",
+      } : null,
     };
   });
 
@@ -226,9 +290,15 @@ export const requestCompanyWalletPayout = createServerFn({ method: "POST" })
     const { sql } = await import("@/db/client.server");
     const database = sql();
     return database.begin(async (tx) => {
-      const [company] = await tx`SELECT id, status FROM companies WHERE id = ${data.companyId} FOR UPDATE`;
+      const [company] = await tx`
+        SELECT id, status, payout_method, payout_account_name, payout_details_encrypted
+        FROM companies WHERE id = ${data.companyId} FOR UPDATE
+      `;
       if (!company) throw new Error("Company not found");
       if (company.status !== "active") throw new Error("Company account is not active");
+      if (!company.payout_method || !company.payout_account_name || !company.payout_details_encrypted) {
+        throw new Error("Add company payout details before requesting a payout");
+      }
 
       const [settings] = await tx`
         SELECT payout_minimum_cents, payout_processing_days
@@ -265,8 +335,13 @@ export const requestCompanyWalletPayout = createServerFn({ method: "POST" })
         throw new Error(`A minimum balance of $${(Number(settings.payout_minimum_cents) / 100).toFixed(2)} is required`);
       }
       const [request] = await tx`
-        INSERT INTO company_payout_requests (company_id, amount_cents, requested_by)
-        VALUES (${company.id}, ${available}, ${context.userId})
+        INSERT INTO company_payout_requests (
+          company_id, amount_cents, requested_by,
+          requested_payout_method, requested_payout_account_name, requested_payout_details_encrypted
+        ) VALUES (
+          ${company.id}, ${available}, ${context.userId},
+          ${company.payout_method}, ${company.payout_account_name}, ${company.payout_details_encrypted}
+        )
         RETURNING id, amount_cents, status, requested_at
       `;
       return { ok: true, request };
@@ -288,7 +363,10 @@ export const getPlatformWallet = createServerFn({ method: "GET" })
              d.display_name AS recipient_name, c.name AS company_name,
              pr.amount_cents, pr.status, pr.payment_method,
              pr.payment_reference, pr.admin_note, pr.requested_at,
-             pr.reviewed_at, pr.paid_at
+             pr.reviewed_at, pr.paid_at,
+             COALESCE(pr.requested_payout_method, d.payout_method) AS payout_destination_method,
+             COALESCE(pr.requested_payout_account_name, d.payout_account_name) AS payout_destination_account_name,
+             COALESCE(pr.requested_payout_details_encrypted, d.payout_details_encrypted) AS payout_destination_encrypted
       FROM payout_requests pr
       JOIN drivers d ON d.id = pr.driver_id
       JOIN companies c ON c.id = pr.company_id
@@ -297,16 +375,29 @@ export const getPlatformWallet = createServerFn({ method: "GET" })
              c.name AS recipient_name, c.name AS company_name,
              cpr.amount_cents, cpr.status, cpr.payment_method,
              cpr.payment_reference, cpr.admin_note, cpr.requested_at,
-             cpr.reviewed_at, cpr.paid_at
+             cpr.reviewed_at, cpr.paid_at,
+             COALESCE(cpr.requested_payout_method, c.payout_method) AS payout_destination_method,
+             COALESCE(cpr.requested_payout_account_name, c.payout_account_name) AS payout_destination_account_name,
+             COALESCE(cpr.requested_payout_details_encrypted, c.payout_details_encrypted) AS payout_destination_encrypted
       FROM company_payout_requests cpr
       JOIN companies c ON c.id = cpr.company_id
       ORDER BY requested_at DESC
       LIMIT 200
     `;
+    const { decryptPayoutDetails } = await import("./payout-destination.server");
+    const safeRequests = requests.map((request: any) => {
+      const { payout_destination_encrypted, ...safe } = request;
+      return {
+        ...safe,
+        payout_destination_details: payout_destination_encrypted
+          ? decryptPayoutDetails(payout_destination_encrypted)
+          : null,
+      };
+    });
     return {
       minimumCents: Number(settings?.payout_minimum_cents ?? 2500),
       processingDays: Number(settings?.payout_processing_days ?? 5),
-      requests,
+      requests: safeRequests,
     };
   });
 

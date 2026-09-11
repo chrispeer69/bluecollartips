@@ -4,12 +4,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { auth } from "@/auth/client";
 import { getDriverDashboard, logManualTip, updateDriverProfile, updateNotifyPrefs } from "@/lib/driver.functions";
 import { getPayoutStatement } from "@/lib/payouts.functions";
-import { getDriverWallet, requestWalletPayout } from "@/lib/wallet.functions";
+import { getDriverWallet, requestWalletPayout, saveDriverPayoutDestination } from "@/lib/wallet.functions";
 import { PRESET_TIPS, TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib/constants";
 import { sendTipLinkSms } from "@/lib/sms.functions";
 import { confirmCashTip, disputeCashTip, listUnverifiedTips } from "@/lib/reconciliation.functions";
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
 import { JoinWorkspacePanel } from "@/components/JoinWorkspacePanel";
+import { PayoutDestinationForm } from "@/components/PayoutDestinationForm";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Banknote, Building2, LayoutDashboard, QrCode, Settings, WalletCards } from "lucide-react";
 
@@ -68,6 +69,11 @@ function DriverDashboard() {
     setLoading(false);
   };
   useEffect(() => {
+    const requestedPage = sessionStorage.getItem("employeeDashboardPage");
+    if (requestedPage && driverNav.some((item) => item.id === requestedPage)) {
+      setPage(requestedPage as DriverPage);
+      sessionStorage.removeItem("employeeDashboardPage");
+    }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -494,6 +500,7 @@ export function Stat({ label, value, hint }: { label: string; value: string; hin
 function WalletPanel({ driverId, viewingAsAdmin }: { driverId: string; viewingAsAdmin: boolean }) {
   const getWallet = useServerFn(getDriverWallet);
   const requestPayout = useServerFn(requestWalletPayout);
+  const saveDestination = useServerFn(saveDriverPayoutDestination);
   const [wallet, setWallet] = useState<Awaited<ReturnType<typeof getDriverWallet>> | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -516,6 +523,16 @@ function WalletPanel({ driverId, viewingAsAdmin }: { driverId: string; viewingAs
             <Stat label="Paid out" value={dollars(wallet.paidCents)} />
             <Stat label="Minimum withdrawal" value={dollars(wallet.minimumCents)} />
           </div>
+          <div className="mt-4">
+            <PayoutDestinationForm
+              initial={wallet.payoutDestination}
+              title={viewingAsAdmin ? "Employee payout details" : "Where should we send your payout?"}
+              onSave={async (destination) => {
+                await saveDestination({ data: { driverId, ...destination } });
+                await reload();
+              }}
+            />
+          </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-4 text-sm">
             <div>
               <p>Successful online tips are available immediately.</p>
@@ -528,6 +545,7 @@ function WalletPanel({ driverId, viewingAsAdmin }: { driverId: string; viewingAs
                 </p>
               )}
               {viewingAsAdmin && <p className="mt-2 text-xs text-muted-foreground">The employee must sign in to request their own payout.</p>}
+              {!wallet.payoutDestination && !viewingAsAdmin && <p className="mt-2 text-xs font-medium text-secondary">Save payout details above before requesting a payout.</p>}
             </div>
           <button
             disabled={busy || !wallet.canRequest || wallet.availableCents < wallet.minimumCents}

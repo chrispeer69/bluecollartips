@@ -35,6 +35,14 @@ async function requireSuperAdmin(userId: string) {
   if (!allowed) throw new Error("Forbidden");
 }
 
+async function requireCompanyAdminAccess(userId: string, companyId: string) {
+  const roles = await rolesFor(userId);
+  const allowed = roles.some(
+    (role) => role.role === "super_admin" || (role.role === "company_admin" && role.company_id === companyId),
+  );
+  if (!allowed) throw new Error("Forbidden");
+}
+
 export const getDriverWallet = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator((d) => z.object({ driverId: z.string().uuid() }).parse(d))
@@ -155,6 +163,116 @@ export const requestWalletPayout = createServerFn({ method: "POST" })
     });
   });
 
+export const getCompanyWallet = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireCompanyAdminAccess(context.userId, data.companyId);
+    const { sql } = await import("@/db/client.server");
+    const database = sql();
+    const [settings] = await database`
+      SELECT payout_minimum_cents, payout_processing_days
+      FROM platform_settings WHERE singleton = true
+    `;
+    if (!settings) throw new Error("Platform payout settings are unavailable");
+
+    const [earnings] = await database`
+      SELECT COALESCE(SUM(company_amount_cents), 0)::int AS earned_cents
+      FROM tips
+      WHERE company_id = ${data.companyId}
+        AND source = 'stripe'
+        AND verified = true
+        AND stripe_status = 'succeeded'
+        AND disputed = false
+        AND refunded_at IS NULL
+        AND (driver_id IS NOT NULL OR assigned_at IS NOT NULL)
+    `;
+    const [payouts] = await database`
+      SELECT
+        COALESCE(SUM(amount_cents) FILTER (WHERE status IN ${database(RESERVED_PAYOUT_STATUSES)}), 0)::int AS reserved_cents,
+        COALESCE(SUM(amount_cents) FILTER (WHERE status = 'paid'), 0)::int AS paid_cents
+      FROM company_payout_requests
+      WHERE company_id = ${data.companyId}
+    `;
+    const requests = await database`
+      SELECT id, amount_cents, status, payment_method, payment_reference,
+             admin_note, requested_at, reviewed_at, paid_at
+      FROM company_payout_requests
+      WHERE company_id = ${data.companyId}
+      ORDER BY requested_at DESC
+      LIMIT 25
+    `;
+    const openRequest = requests.find((request: any) => OPEN_PAYOUT_STATUSES.includes(request.status));
+    const earnedCents = Number(earnings?.earned_cents ?? 0);
+    const reservedCents = Number(payouts?.reserved_cents ?? 0);
+    return {
+      companyId: data.companyId,
+      earnedCents,
+      availableCents: Math.max(0, earnedCents - reservedCents),
+      paidCents: Number(payouts?.paid_cents ?? 0),
+      minimumCents: Number(settings.payout_minimum_cents),
+      processingDays: Number(settings.payout_processing_days),
+      canRequest: !openRequest,
+      openRequest: openRequest ?? null,
+      requests,
+    };
+  });
+
+export const requestCompanyWalletPayout = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireCompanyAdminAccess(context.userId, data.companyId);
+    const { sql } = await import("@/db/client.server");
+    const database = sql();
+    return database.begin(async (tx) => {
+      const [company] = await tx`SELECT id, status FROM companies WHERE id = ${data.companyId} FOR UPDATE`;
+      if (!company) throw new Error("Company not found");
+      if (company.status !== "active") throw new Error("Company account is not active");
+
+      const [settings] = await tx`
+        SELECT payout_minimum_cents, payout_processing_days
+        FROM platform_settings WHERE singleton = true
+      `;
+      if (!settings) throw new Error("Platform payout settings are unavailable");
+      const [openRequest] = await tx`
+        SELECT id FROM company_payout_requests
+        WHERE company_id = ${company.id}
+          AND status IN ${tx(OPEN_PAYOUT_STATUSES)}
+        LIMIT 1
+      `;
+      if (openRequest) throw new Error("A company payout request is already open");
+
+      const [earnings] = await tx`
+        SELECT COALESCE(SUM(company_amount_cents), 0)::int AS earned_cents
+        FROM tips
+        WHERE company_id = ${company.id}
+          AND source = 'stripe'
+          AND verified = true
+          AND stripe_status = 'succeeded'
+          AND disputed = false
+          AND refunded_at IS NULL
+          AND (driver_id IS NOT NULL OR assigned_at IS NOT NULL)
+      `;
+      const [reserved] = await tx`
+        SELECT COALESCE(SUM(amount_cents), 0)::int AS amount_cents
+        FROM company_payout_requests
+        WHERE company_id = ${company.id}
+          AND status IN ${tx(RESERVED_PAYOUT_STATUSES)}
+      `;
+      const available = Math.max(0, Number(earnings.earned_cents) - Number(reserved.amount_cents));
+      if (available < Number(settings.payout_minimum_cents)) {
+        throw new Error(`A minimum balance of $${(Number(settings.payout_minimum_cents) / 100).toFixed(2)} is required`);
+      }
+      const [request] = await tx`
+        INSERT INTO company_payout_requests (company_id, amount_cents, requested_by)
+        VALUES (${company.id}, ${available}, ${context.userId})
+        RETURNING id, amount_cents, status, requested_at
+      `;
+      return { ok: true, request };
+    });
+  });
+
 export const getPlatformWallet = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .handler(async ({ context }) => {
@@ -166,15 +284,23 @@ export const getPlatformWallet = createServerFn({ method: "GET" })
       FROM platform_settings WHERE singleton = true
     `;
     const requests = await database`
-      SELECT pr.id, pr.driver_id, d.display_name AS driver_name,
-             c.name AS company_name,
+      SELECT pr.id, 'employee'::text AS request_type, pr.driver_id,
+             d.display_name AS recipient_name, c.name AS company_name,
              pr.amount_cents, pr.status, pr.payment_method,
              pr.payment_reference, pr.admin_note, pr.requested_at,
              pr.reviewed_at, pr.paid_at
       FROM payout_requests pr
       JOIN drivers d ON d.id = pr.driver_id
       JOIN companies c ON c.id = pr.company_id
-      ORDER BY pr.requested_at DESC
+      UNION ALL
+      SELECT cpr.id, 'company'::text AS request_type, NULL::uuid AS driver_id,
+             c.name AS recipient_name, c.name AS company_name,
+             cpr.amount_cents, cpr.status, cpr.payment_method,
+             cpr.payment_reference, cpr.admin_note, cpr.requested_at,
+             cpr.reviewed_at, cpr.paid_at
+      FROM company_payout_requests cpr
+      JOIN companies c ON c.id = cpr.company_id
+      ORDER BY requested_at DESC
       LIMIT 200
     `;
     return {
@@ -283,6 +409,7 @@ export const reviewPlatformWalletPayout = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator((d) => z.object({
     requestId: z.string().uuid(),
+    requestType: z.enum(["employee", "company"]),
     action: z.enum(["approve", "reject", "mark_paid"]),
     paymentMethod: z.string().trim().max(100).optional().nullable(),
     paymentReference: z.string().trim().max(200).optional().nullable(),
@@ -297,22 +424,24 @@ export const reviewPlatformWalletPayout = createServerFn({ method: "POST" })
     const { sql } = await import("@/db/client.server");
     const database = sql();
     return database.begin(async (tx) => {
-      const [request] = await tx`
-        SELECT id, company_id, status FROM payout_requests
-        WHERE id = ${data.requestId}
-        FOR UPDATE
-      `;
+      const table = data.requestType === "company" ? "company_payout_requests" : "payout_requests";
+      const [request] = data.requestType === "company"
+        ? await tx`SELECT id, company_id, status FROM company_payout_requests WHERE id = ${data.requestId} FOR UPDATE`
+        : await tx`SELECT id, company_id, status FROM payout_requests WHERE id = ${data.requestId} FOR UPDATE`;
       if (!request) throw new Error("Payout request not found");
 
       if (data.action === "approve") {
         if (request.status !== "pending") throw new Error("Only pending requests can be approved");
-        await tx`UPDATE payout_requests SET status = 'approved', reviewed_by = ${context.userId}, reviewed_at = NOW(), admin_note = ${data.note ?? null}, updated_at = NOW() WHERE id = ${request.id}`;
+        if (table === "company_payout_requests") await tx`UPDATE company_payout_requests SET status = 'approved', reviewed_by = ${context.userId}, reviewed_at = NOW(), admin_note = ${data.note ?? null}, updated_at = NOW() WHERE id = ${request.id}`;
+        else await tx`UPDATE payout_requests SET status = 'approved', reviewed_by = ${context.userId}, reviewed_at = NOW(), admin_note = ${data.note ?? null}, updated_at = NOW() WHERE id = ${request.id}`;
       } else if (data.action === "reject") {
         if (!["pending", "approved"].includes(request.status)) throw new Error("This request can no longer be rejected");
-        await tx`UPDATE payout_requests SET status = 'rejected', reviewed_by = ${context.userId}, reviewed_at = NOW(), admin_note = ${data.note ?? null}, updated_at = NOW() WHERE id = ${request.id}`;
+        if (table === "company_payout_requests") await tx`UPDATE company_payout_requests SET status = 'rejected', reviewed_by = ${context.userId}, reviewed_at = NOW(), admin_note = ${data.note ?? null}, updated_at = NOW() WHERE id = ${request.id}`;
+        else await tx`UPDATE payout_requests SET status = 'rejected', reviewed_by = ${context.userId}, reviewed_at = NOW(), admin_note = ${data.note ?? null}, updated_at = NOW() WHERE id = ${request.id}`;
       } else {
         if (!["pending", "approved", "processing"].includes(request.status)) throw new Error("This request cannot be marked paid");
-        await tx`UPDATE payout_requests SET status = 'paid', reviewed_by = ${context.userId}, reviewed_at = COALESCE(reviewed_at, NOW()), paid_at = NOW(), payment_method = ${data.paymentMethod ?? null}, payment_reference = ${data.paymentReference ?? null}, admin_note = ${data.note ?? null}, updated_at = NOW() WHERE id = ${request.id}`;
+        if (table === "company_payout_requests") await tx`UPDATE company_payout_requests SET status = 'paid', reviewed_by = ${context.userId}, reviewed_at = COALESCE(reviewed_at, NOW()), paid_at = NOW(), payment_method = ${data.paymentMethod ?? null}, payment_reference = ${data.paymentReference ?? null}, admin_note = ${data.note ?? null}, updated_at = NOW() WHERE id = ${request.id}`;
+        else await tx`UPDATE payout_requests SET status = 'paid', reviewed_by = ${context.userId}, reviewed_at = COALESCE(reviewed_at, NOW()), paid_at = NOW(), payment_method = ${data.paymentMethod ?? null}, payment_reference = ${data.paymentReference ?? null}, admin_note = ${data.note ?? null}, updated_at = NOW() WHERE id = ${request.id}`;
       }
       return { ok: true };
     });

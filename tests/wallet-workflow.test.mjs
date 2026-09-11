@@ -6,6 +6,7 @@ const migration = await readFile(new URL("../migrations/012_driver_wallet_payout
 const platformMigration = await readFile(new URL("../migrations/013_platform_payout_settings.sql", import.meta.url), "utf8");
 const assignmentMigration = await readFile(new URL("../migrations/014_tip_driver_assignment_audit.sql", import.meta.url), "utf8");
 const splitMigration = await readFile(new URL("../migrations/015_configurable_company_tip_share.sql", import.meta.url), "utf8");
+const companyWalletMigration = await readFile(new URL("../migrations/016_company_wallet_payouts.sql", import.meta.url), "utf8");
 const adminFunctions = await readFile(new URL("../src/lib/admin.functions.ts", import.meta.url), "utf8");
 const wallet = await readFile(new URL("../src/lib/wallet.functions.ts", import.meta.url), "utf8");
 const ledger = await readFile(new URL("../src/lib/stripe-tip-ledger.server.ts", import.meta.url), "utf8");
@@ -32,6 +33,18 @@ test("only one open payout can reserve a driver's available balance", () => {
   assert.match(wallet, /Only the employee can request this payout/);
   assert.match(wallet, /A payout request is already open/);
   assert.match(wallet, /Math\.max\(0, earnedCents - reservedCents\)/);
+});
+
+test("company wallets reserve only finalized Stripe earnings", () => {
+  assert.match(companyWalletMigration, /CREATE TABLE IF NOT EXISTS company_payout_requests/);
+  assert.match(companyWalletMigration, /company_payout_requests_one_open_per_company_idx/);
+  assert.match(wallet, /export const getCompanyWallet/);
+  assert.match(wallet, /export const requestCompanyWalletPayout/);
+  assert.match(wallet, /driver_id IS NOT NULL OR assigned_at IS NOT NULL/);
+  assert.match(wallet, /A company payout request is already open/);
+  assert.match(adminDashboard, /Section title="Company wallet"/);
+  assert.match(adminDashboard, /Available to withdraw/);
+  assert.match(adminDashboard, /Request the full available balance/);
 });
 
 test("successful Stripe tips have webhook and browser-confirmed idempotent ledger paths", () => {
@@ -85,5 +98,5 @@ test("only platform admins configure and process manual wallet payouts", () => {
   assert.match(adminDashboard, /stripe_payment_intent_id/);
   assert.match(adminDashboard, /onTipsChanged/);
   assert.match(wallet, /action: z\.enum\(\["approve", "reject", "mark_paid"\]\)/);
-  assert.doesNotMatch(wallet, /updateWalletSettings|getCompanyWallet|reviewWalletPayout/);
+  assert.doesNotMatch(wallet, /updateWalletSettings|reviewWalletPayout/);
 });

@@ -23,8 +23,10 @@ import { sendTipLinkSms } from "@/lib/sms.functions";
 import { listTipDisputes, flagTipDispute, clearTipDispute, refundTip } from "@/lib/disputes.functions";
 import { listLocations, createLocation, deleteLocation, setDriverLocation, updateReviewLinks } from "@/lib/locations.functions";
 import {
+  getCompanyWallet,
   getPlatformWallet,
   recoverStripeTip,
+  requestCompanyWalletPayout,
   reviewPlatformWalletPayout,
   syncStripeTipHistory,
   updatePlatformWalletSettings,
@@ -372,6 +374,10 @@ function AdminDashboard() {
             drivers={data.drivers}
             onChanged={() => load(companyId)}
           />
+        </Section>}
+
+        {page === "payments" && <Section title="Company wallet">
+          <CompanyWalletPanel key={`${data.company.id}-${data.tips.filter((tip: any) => tip.assigned_at).length}`} companyId={data.company.id} />
         </Section>}
 
         {page === "payments" && <Section title="Unassigned company tips">
@@ -1089,6 +1095,63 @@ function JoinRequestsPanel({ companyId, onApproved }: { companyId: string; onApp
   );
 }
 
+function CompanyWalletPanel({ companyId }: { companyId: string }) {
+  const getWallet = useServerFn(getCompanyWallet);
+  const requestPayout = useServerFn(requestCompanyWalletPayout);
+  const [wallet, setWallet] = useState<Awaited<ReturnType<typeof getCompanyWallet>> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function reload() {
+    setWallet(await getWallet({ data: { companyId } }));
+  }
+  useEffect(() => {
+    reload().catch((error) => setMessage(error instanceof Error ? error.message : "Could not load company wallet"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId]);
+
+  if (!wallet) return <p className="text-sm text-muted-foreground">Loading company wallet…</p>;
+  const belowMinimum = wallet.availableCents < wallet.minimumCents;
+  return <div className="space-y-4">
+    <div className="grid gap-3 sm:grid-cols-3">
+      <Stat label="Available to withdraw" value={dollars(wallet.availableCents)} />
+      <Stat label="Paid to company" value={dollars(wallet.paidCents)} />
+      <Stat label="Minimum withdrawal" value={dollars(wallet.minimumCents)} />
+    </div>
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-4">
+      <div>
+        <div className="font-medium">Request the full available balance</div>
+        <p className="mt-1 text-xs text-muted-foreground">Only successful Stripe tips finalized for the company, plus the company share from employee tips, are available. Payment is completed by the platform within 0–{wallet.processingDays} days.</p>
+      </div>
+      <button type="button" disabled={busy || !wallet.canRequest || belowMinimum} onClick={async () => {
+        setBusy(true);
+        setMessage(null);
+        try {
+          const result = await requestPayout({ data: { companyId } });
+          setMessage(`Payout request submitted for ${dollars(Number(result.request.amount_cents))}.`);
+          await reload();
+        } catch (error) {
+          setMessage(error instanceof Error ? error.message : "Could not request company payout");
+        } finally { setBusy(false); }
+      }} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
+        {busy ? "Submitting…" : wallet.openRequest ? "Payout request pending" : belowMinimum ? `Reach ${dollars(wallet.minimumCents)} to withdraw` : `Request ${dollars(wallet.availableCents)}`}
+      </button>
+    </div>
+    {message && <p className="text-sm text-muted-foreground">{message}</p>}
+    {wallet.requests.length > 0 && <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead className="text-xs uppercase text-muted-foreground"><tr><th className="py-2">Requested</th><th>Amount</th><th>Status</th><th>Payment</th></tr></thead>
+        <tbody className="divide-y divide-border">{wallet.requests.map((request: any) => <tr key={request.id}>
+          <td className="py-2">{new Date(request.requested_at).toLocaleString()}</td>
+          <td>{dollars(Number(request.amount_cents))}</td>
+          <td><span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize">{request.status}</span></td>
+          <td className="text-xs text-muted-foreground">{request.status === "paid" ? `${request.payment_method || "Paid"}${request.payment_reference ? ` · ${request.payment_reference}` : ""}` : "—"}</td>
+        </tr>)}</tbody>
+      </table>
+    </div>}
+  </div>;
+}
+
 function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requests"; onTipsChanged?: () => void | Promise<void> }) {
   const getWallet = useServerFn(getPlatformWallet);
   const saveSettings = useServerFn(updatePlatformWalletSettings);
@@ -1101,7 +1164,7 @@ function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requ
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState("");
-  const [pendingAction, setPendingAction] = useState<{ requestId: string; action: "reject" | "mark_paid" } | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ requestId: string; requestType: "employee" | "company"; action: "reject" | "mark_paid" } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
   const [paymentReference, setPaymentReference] = useState("");
   const [payoutNote, setPayoutNote] = useState("");
@@ -1118,12 +1181,13 @@ function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function act(requestId: string, action: "approve" | "reject" | "mark_paid", details?: { paymentMethod?: string; paymentReference?: string; note?: string }) {
+  async function act(requestId: string, requestType: "employee" | "company", action: "approve" | "reject" | "mark_paid", details?: { paymentMethod?: string; paymentReference?: string; note?: string }) {
     setBusy(true);
     setMessage(null);
     try {
       await reviewPayout({ data: {
         requestId,
+        requestType,
         action,
         paymentMethod: details?.paymentMethod?.trim() || null,
         paymentReference: details?.paymentReference?.trim() || null,
@@ -1179,9 +1243,9 @@ function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requ
       {mode === "requests" && pendingAction && <form onSubmit={(event) => {
         event.preventDefault();
         if (pendingAction.action === "mark_paid") {
-          act(pendingAction.requestId, "mark_paid", { paymentMethod, paymentReference });
+          act(pendingAction.requestId, pendingAction.requestType, "mark_paid", { paymentMethod, paymentReference });
         } else {
-          act(pendingAction.requestId, "reject", { note: payoutNote });
+          act(pendingAction.requestId, pendingAction.requestType, "reject", { note: payoutNote });
         }
       }} className="mt-4 rounded-lg border border-border bg-muted/30 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1255,23 +1319,24 @@ function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requ
         <p className="mt-4 text-sm text-muted-foreground">No payout requests yet.</p>
       ) : (
         <div className="mt-4 overflow-x-auto rounded-lg border border-border p-4">
-          <h3 className="mb-3 font-semibold">Employee payout requests</h3>
+          <h3 className="mb-3 font-semibold">Payout requests</h3>
           <table className="w-full text-left text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
-              <tr><th className="py-2">Employee</th><th>Company</th><th>Amount</th><th>Status</th><th>Requested</th><th className="text-right">Actions</th></tr>
+              <tr><th className="py-2">Recipient</th><th>Type</th><th>Company</th><th>Amount</th><th>Status</th><th>Requested</th><th className="text-right">Actions</th></tr>
             </thead>
             <tbody className="divide-y divide-border">
               {wallet.requests.map((request: any) => (
                 <tr key={request.id}>
-                  <td className="py-3 font-medium">{request.driver_name}</td>
+                  <td className="py-3 font-medium">{request.recipient_name}</td>
+                  <td className="capitalize">{request.request_type}</td>
                   <td>{request.company_name}</td>
                   <td>{dollars(Number(request.amount_cents))}</td>
                   <td className="capitalize">{String(request.status)}</td>
                   <td>{new Date(request.requested_at).toLocaleString()}</td>
                   <td className="whitespace-nowrap text-right">
-                    {request.status === "pending" && <button disabled={busy} onClick={() => act(request.id, "approve")} className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50">Approve</button>}{" "}
-                    {["pending", "approved"].includes(request.status) && <button disabled={busy} onClick={() => setPendingAction({ requestId: request.id, action: "reject" })} className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50">Reject</button>}{" "}
-                    {["pending", "approved", "processing"].includes(request.status) && <button disabled={busy} onClick={() => setPendingAction({ requestId: request.id, action: "mark_paid" })} className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50">Mark paid</button>}
+                    {request.status === "pending" && <button disabled={busy} onClick={() => act(request.id, request.request_type, "approve")} className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50">Approve</button>}{" "}
+                    {["pending", "approved"].includes(request.status) && <button disabled={busy} onClick={() => setPendingAction({ requestId: request.id, requestType: request.request_type, action: "reject" })} className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50">Reject</button>}{" "}
+                    {["pending", "approved", "processing"].includes(request.status) && <button disabled={busy} onClick={() => setPendingAction({ requestId: request.id, requestType: request.request_type, action: "mark_paid" })} className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50">Mark paid</button>}
                     {request.status === "paid" && <span className="text-xs text-muted-foreground">{request.payment_method}{request.payment_reference ? ` · ${request.payment_reference}` : ""}</span>}
                   </td>
                 </tr>

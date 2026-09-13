@@ -61,12 +61,17 @@ export const getAdminDashboard = createServerFn({ method: "POST" })
         .select(ADMIN_DRIVER_FIELDS)
         .eq("company_id", companyId)
         .order("created_at", { ascending: false }),
-      db
-        .from("ratings")
-        .select("id, stars, feedback, customer_name, driver_id, created_at, flagged")
-        .eq("company_id", companyId)
-        .order("created_at", { ascending: false })
-        .limit(200),
+      // Include the driver name dispatch sent with the job (from the review
+      // link) so unattributed reviews show who they were meant for.
+      import("@/db/client.server").then(({ sql }) => sql()`
+        SELECT r.id, r.stars, r.feedback, r.customer_name, r.driver_id, r.created_at, r.flagged,
+               rc.dispatch_driver_name
+        FROM ratings r
+        LEFT JOIN review_contexts rc ON rc.id = r.review_context_id
+        WHERE r.company_id = ${companyId}
+        ORDER BY r.created_at DESC
+        LIMIT 200
+      `.then((rows) => ({ data: rows as unknown as Record<string, any>[] }))),
       db
         .from("tips")
         .select("id, amount_cents, source, customer_name, customer_contact, driver_id, driver_amount_cents, company_amount_cents, platform_amount_cents, verified, disputed, refunded_at, stripe_payment_intent_id, stripe_status, assigned_by, assigned_at, created_at")

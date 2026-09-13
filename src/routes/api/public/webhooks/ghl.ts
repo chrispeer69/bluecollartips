@@ -171,6 +171,10 @@ export const Route = createFileRoute("/api/public/webhooks/ghl")({
           customer_name: contact?.name ?? null,
           customer_phone: contact?.phone ?? null,
           customer_email: validEmail(contact?.email),
+          // Remember who dispatch said did the job, matched or not, so an admin
+          // can attribute the review later if matching failed.
+          dispatch_driver_name:
+            driverKey?.name ?? driverKey?.slug ?? driverKey?.email ?? driverKey?.phone ?? null,
         }, { onConflict: "company_id,external_job_id" });
         if (contextError) return json(500, { error: "Could not create review link" });
         const path = driver ? `/${company.slug}/d/${driver.slug}` : `/${company.slug}`;

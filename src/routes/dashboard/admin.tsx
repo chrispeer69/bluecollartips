@@ -750,6 +750,22 @@ function BrandingForm({
 
 const COMPANY_OPTION = "__company__";
 
+// Best-guess employee for a name dispatch sent: exact name, then first+last
+// tokens, only when it points at one person.
+function suggestDriver<T extends { id: string; display_name: string }>(drivers: T[], raw: string): T | null {
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+  const target = norm(raw);
+  const exact = drivers.filter((d) => norm(d.display_name) === target);
+  if (exact.length === 1) return exact[0];
+  const t = target.split(" ");
+  if (t.length < 2) return null;
+  const fuzzy = drivers.filter((d) => {
+    const dt = norm(d.display_name).split(" ");
+    return dt.length >= 2 && dt[0] === t[0] && dt[dt.length - 1] === t[t.length - 1];
+  });
+  return fuzzy.length === 1 ? fuzzy[0] : null;
+}
+
 function FeedbackList({
   ratings,
   drivers,
@@ -784,6 +800,27 @@ function FeedbackList({
           </div>
           {r.feedback && <p className="mt-1">{r.feedback}</p>}
           {r.customer_name && <p className="text-xs text-muted-foreground">— {r.customer_name}</p>}
+          {!r.driver_id && r.dispatch_driver_name && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Dispatch said: <span className="font-medium text-foreground">{r.dispatch_driver_name}</span>
+              {editable && onAssign && (() => {
+                const match = suggestDriver(assignable, r.dispatch_driver_name);
+                return match ? (
+                  <button
+                    type="button"
+                    className="ml-2 underline"
+                    disabled={pendingId === r.id}
+                    onClick={() => {
+                      setPendingId(r.id);
+                      Promise.resolve(onAssign(r.id, match.id)).finally(() => setPendingId(null));
+                    }}
+                  >
+                    Assign to {match.display_name}
+                  </button>
+                ) : null;
+              })()}
+            </p>
+          )}
           {editable && onAssign && (
             <div className="mt-2 flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Employee</span>

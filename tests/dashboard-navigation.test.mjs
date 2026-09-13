@@ -114,8 +114,12 @@ test("platform user administration exposes memberships and filters", () => {
   assert.match(admin, /Recent customer payments/);
   assert.match(admin, /Latest payment/);
   assert.match(admin, /Customer details not provided/);
-  assert.doesNotMatch(admin, /Employee tips & payouts/);
-  assert.doesNotMatch(admin, /Unverified \(30d\)/);
+  // Owners get a per-employee earnings/payout view so "did my tech get paid?"
+  // is answerable without opening each employee dashboard.
+  assert.match(admin, /Employee earnings & payouts/);
+  assert.match(admin, /Download CSV/);
+  assert.match(admin, /Help & support/);
+  assert.match(admin, /Support inbox/);
   assert.match(admin, /\{d\.email \|\| "No email added"\}/);
 });
 

@@ -13,9 +13,10 @@ import { JoinWorkspacePanel } from "@/components/JoinWorkspacePanel";
 import { PayoutDestinationForm, payoutMethodLabel } from "@/components/PayoutDestinationForm";
 import { LeaveWorkspacePanel } from "@/components/LeaveWorkspacePanel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Banknote, Building2, Landmark, LayoutDashboard, QrCode, Settings, WalletCards } from "lucide-react";
+import { Banknote, Building2, Landmark, LayoutDashboard, LifeBuoy, QrCode, Settings, WalletCards } from "lucide-react";
+import { HelpCenter, TenantSupportPanel } from "@/components/SupportCenter";
 
-type DriverPage = "overview" | "share" | "tips" | "earnings" | "payoutAccount" | "settings";
+type DriverPage = "overview" | "share" | "tips" | "earnings" | "payoutAccount" | "settings" | "support";
 const driverNav: DashboardNavItem<DriverPage>[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, group: "Workspace" },
   { id: "share", label: "QR & share", icon: QrCode, group: "Customer tools" },
@@ -23,6 +24,7 @@ const driverNav: DashboardNavItem<DriverPage>[] = [
   { id: "earnings", label: "Earnings & withdrawals", icon: WalletCards },
   { id: "payoutAccount", label: "Payout account", icon: Landmark },
   { id: "settings", label: "Settings", icon: Settings, group: "Account" },
+  { id: "support", label: "Help & support", icon: LifeBuoy, group: "Help" },
 ];
 
 export const Route = createFileRoute("/dashboard/driver")({
@@ -48,6 +50,7 @@ function DriverDashboard() {
   const [loading, setLoading] = useState(true);
   const [showQR, setShowQR] = useState(false);
   const [page, setPage] = useState<DriverPage>("share");
+  const [composeSupport, setComposeSupport] = useState(0);
 
   const load = async (driverId?: string) => {
     const { data: session } = await auth.getSession();
@@ -206,6 +209,14 @@ function DriverDashboard() {
         {page === "settings" && !data.viewingAsAdmin && <LeaveWorkspacePanel companyId={data.driver.company_id} companyName={data.driver.companies?.name ?? "this workspace"} />}
 
         {page === "share" && <SmsPanel driverId={data.driver.id} />}
+
+        {page === "support" && <Section title="Support tickets">
+          <TenantSupportPanel companyId={data.driver.company_id} composeSignal={composeSupport} />
+        </Section>}
+
+        {page === "support" && <Section title="Help center">
+          <HelpCenter audience="employee" onContact={() => { setComposeSupport((n) => n + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+        </Section>}
 
         {page === "tips" && <UnverifiedPanel driverId={data.driver.id} onChange={() => load(data.driver.id)} />}
 
@@ -570,7 +581,11 @@ function WalletPanel({ driverId, viewingAsAdmin, onManageAccount }: { driverId: 
                   />
                 </span>
               </label>
-              <p className="mt-2 text-xs text-muted-foreground">Choose any amount from {dollars(wallet.minimumCents)} to {dollars(wallet.availableCents)}.</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {wallet.availableCents < wallet.minimumCents
+                  ? `${dollars(wallet.minimumCents - wallet.availableCents)} more in tips is needed to reach the ${dollars(wallet.minimumCents)} minimum.`
+                  : `Choose any amount from ${dollars(wallet.minimumCents)} to ${dollars(wallet.availableCents)}.`}
+              </p>
               <p className="mt-2">Successful online tips are available immediately.</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 After you request a payout, the Blue Collar Tips platform team will complete it within {wallet.processingDays === 0 ? "the same day" : `0–${wallet.processingDays} days`}.

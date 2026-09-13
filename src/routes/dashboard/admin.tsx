@@ -33,9 +33,14 @@ import {
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
 import { PayoutDestinationForm, formatPayoutDetails, payoutMethodLabel } from "@/components/PayoutDestinationForm";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, CreditCard, LayoutDashboard, MessageSquareText, Settings, ShieldCheck, Users } from "lucide-react";
+import { Building2, CreditCard, LayoutDashboard, LifeBuoy, MessageSquareText, Settings, ShieldCheck, Users } from "lucide-react";
+import { HelpCenter, SupportInbox, TenantSupportPanel } from "@/components/SupportCenter";
+import { reconciliationOverview } from "@/lib/reconciliation.functions";
 
 export const Route = createFileRoute("/dashboard/admin")({
+  // ?support=<ticketId> deep-links from support emails straight to a ticket.
+  validateSearch: (search: Record<string, unknown>): { support?: string } =>
+    typeof search.support === "string" ? { support: search.support } : {},
   head: () => ({
     meta: [
       { title: "Admin — Blue Collar Tips" },
@@ -50,8 +55,8 @@ export const Route = createFileRoute("/dashboard/admin")({
 });
 
 type Data = any;
-type CompanyPage = "overview" | "employees" | "feedback" | "payments" | "settings";
-type PlatformPage = "platformOverview" | "platformOrganizations" | "platformUsers" | "platformPayments" | "platformSettings";
+type CompanyPage = "overview" | "employees" | "feedback" | "payments" | "settings" | "support";
+type PlatformPage = "platformOverview" | "platformOrganizations" | "platformUsers" | "platformPayments" | "platformSupport" | "platformSettings";
 type AdminPage = CompanyPage | PlatformPage;
 const adminNav: DashboardNavItem<AdminPage>[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, group: "Workspace" },
@@ -59,12 +64,14 @@ const adminNav: DashboardNavItem<AdminPage>[] = [
   { id: "feedback", label: "Ratings & feedback", icon: MessageSquareText },
   { id: "payments", label: "Tips & payments", icon: CreditCard, group: "Money" },
   { id: "settings", label: "Company settings", icon: Settings, group: "Configure" },
+  { id: "support", label: "Help & support", icon: LifeBuoy, group: "Help" },
 ];
 const platformNav: DashboardNavItem<AdminPage>[] = [
   { id: "platformOverview", label: "Platform overview", icon: ShieldCheck, group: "Administration" },
   { id: "platformOrganizations", label: "Organizations", icon: Building2 },
   { id: "platformUsers", label: "Registered users", icon: Users, group: "Access" },
   { id: "platformPayments", label: "Platform earnings", icon: CreditCard, group: "Money" },
+  { id: "platformSupport", label: "Support inbox", icon: LifeBuoy, group: "Support" },
   { id: "platformSettings", label: "Platform settings", icon: Settings, group: "Configure" },
 ];
 
@@ -82,7 +89,9 @@ function AdminDashboard() {
   const [companyId, setCompanyId] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [page, setPage] = useState<AdminPage>("overview");
+  const { support: supportTicketId } = Route.useSearch();
+  const [page, setPage] = useState<AdminPage>(supportTicketId ? "support" : "overview");
+  const [composeSupport, setComposeSupport] = useState(0);
   const [inviteInfo, setInviteInfo] = useState<{ label: string; url: string; code: string } | null>(null);
 
   function showInvite(label: string, code: string) {
@@ -120,6 +129,8 @@ function AdminDashboard() {
 
       setData(d);
       if (d.company) setCompanyId(d.company.id);
+      // Platform staff following a ticket email land in the inbox, not a tenant page.
+      if (supportTicketId && d.isSuper) setPage("platformSupport");
       if (import.meta.env.DEV && d.company) {
         try { localStorage.setItem("devTenantId", d.company.id); } catch { /* ignore */ }
       }
@@ -387,7 +398,11 @@ function AdminDashboard() {
         </Section>}
 
         {page === "payments" && <Section title="Recent customer payments">
-          <CompanyPaymentLedger tips={data.tips} drivers={data.drivers} />
+          <CompanyPaymentLedger tips={data.tips} drivers={data.drivers} companyName={data.company.name} />
+        </Section>}
+
+        {page === "payments" && <Section title="Employee earnings & payouts">
+          <EmployeePayoutsPanel companyId={data.company.id} />
         </Section>}
 
         {page === "payments" && <Section title="Unassigned company tips">
@@ -398,11 +413,33 @@ function AdminDashboard() {
           />
         </Section>}
 
+        {page === "payments" && <Section title="How money moves">
+          <MoneyFlowExplainer company={data.company} />
+        </Section>}
+
         {page === "employees" && <Section title="SMS a tip link to a customer">
           <AdminSmsPanel drivers={data.drivers} />
         </Section>}
 
-        {isPlatform && data.isSuper && (
+        {page === "support" && <Section title="Support tickets">
+          <TenantSupportPanel
+            companyId={data.company.id}
+            initialTicketId={supportTicketId ?? null}
+            composeSignal={composeSupport}
+          />
+        </Section>}
+
+        {page === "support" && <Section title="Help center">
+          <HelpCenter audience="admin" onContact={() => { setComposeSupport((n) => n + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+        </Section>}
+
+        {page === "platformSupport" && data.isSuper && (
+          <Section title="Support inbox — all tenants">
+            <SupportInbox initialTicketId={supportTicketId ?? null} />
+          </Section>
+        )}
+
+        {isPlatform && page !== "platformSupport" && data.isSuper && (
           <Section title={pageTitle}>
             <PlatformPanel view={page as PlatformPage} />
           </Section>
@@ -1191,7 +1228,11 @@ function CompanyWalletPanel({ companyId }: { companyId: string }) {
             />
           </span>
         </label>
-        <p className="mt-2 text-xs text-muted-foreground">Choose any amount from {dollars(wallet.minimumCents)} to {dollars(wallet.availableCents)}.</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {belowMinimum
+            ? `${dollars(wallet.minimumCents - wallet.availableCents)} more in company share is needed to reach the ${dollars(wallet.minimumCents)} minimum.`
+            : `Choose any amount from ${dollars(wallet.minimumCents)} to ${dollars(wallet.availableCents)}.`}
+        </p>
         <p className="mt-1 text-xs text-muted-foreground">Only successful Stripe tips finalized for the company, plus the company share from employee tips, are available. Payment is completed by the platform within 0–{wallet.processingDays} days.</p>
         {!wallet.payoutDestination && <p className="mt-2 text-xs font-medium text-secondary">Save company payout details above before requesting a payout.</p>}
       </div>
@@ -1526,26 +1567,124 @@ function UnassignedTipsPanel({ tips, drivers, onChanged }: {
   </div>;
 }
 
-function CompanyPaymentLedger({ tips, drivers }: { tips: Data["tips"]; drivers: Data["drivers"] }) {
-  const payments = tips.filter((tip: any) => tip.source === "stripe" && tip.stripe_status === "succeeded" && tip.verified);
-  const driverNames = new Map(drivers.map((driver: any) => [driver.id, driver.display_name]));
+function csvCell(v: unknown) {
+  const str = v == null ? "" : String(v);
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+function downloadCsv(filename: string, rows: (string | number | null | undefined)[][]) {
+  const blob = new Blob([rows.map((r) => r.map(csvCell).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+const isoDay = (d: Date) => d.toISOString().slice(0, 10);
 
-  if (!payments.length) {
+function CompanyPaymentLedger({ tips, drivers, companyName }: { tips: Data["tips"]; drivers: Data["drivers"]; companyName: string }) {
+  // Default range: this calendar month.
+  const now = new Date();
+  const [from, setFrom] = useState(isoDay(new Date(now.getFullYear(), now.getMonth(), 1)));
+  const [to, setTo] = useState(isoDay(now));
+  const [employee, setEmployee] = useState<string>("all");
+  const driverNames = new Map<string, string>(drivers.map((driver: any) => [driver.id, driver.display_name]));
+
+  const all = tips.filter((tip: any) => tip.source === "stripe" && tip.stripe_status === "succeeded" && tip.verified);
+  const fromMs = from ? new Date(`${from}T00:00:00`).getTime() : -Infinity;
+  const toMs = to ? new Date(`${to}T23:59:59.999`).getTime() : Infinity;
+  const payments = all.filter((tip: any) => {
+    const t = new Date(tip.created_at).getTime();
+    if (t < fromMs || t > toMs) return false;
+    if (employee === "all") return true;
+    if (employee === "__company__") return !tip.driver_id;
+    return tip.driver_id === employee;
+  });
+  const status = (tip: any) => (tip.refunded_at ? "Refunded" : tip.disputed ? "Disputed" : "Paid");
+  const counted = payments.filter((tip: any) => !tip.refunded_at && !tip.disputed);
+  const totals = counted.reduce(
+    (acc: any, tip: any) => {
+      acc.gross += Number(tip.amount_cents);
+      acc.driver += Number(tip.driver_amount_cents);
+      acc.company += Number(tip.company_amount_cents);
+      acc.platform += Number(tip.platform_amount_cents);
+      return acc;
+    },
+    { gross: 0, driver: 0, company: 0, platform: 0 },
+  );
+  const refunded = payments.filter((tip: any) => tip.refunded_at).reduce((n: number, tip: any) => n + Number(tip.amount_cents), 0);
+
+  function exportCsv() {
+    downloadCsv(`${companyName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-tips-${from || "start"}-to-${to || "today"}.csv`, [
+      ["Paid at", "Customer", "Customer contact", "Employee", "Gross", "Employee share", "Company share", "Platform fee", "Status", "Stripe payment ID"],
+      ...payments.map((tip: any) => [
+        new Date(tip.created_at).toISOString(),
+        tip.customer_name || "",
+        tip.customer_contact || "",
+        tip.driver_id ? driverNames.get(tip.driver_id) || "Unknown employee" : "Company / unassigned",
+        (Number(tip.amount_cents) / 100).toFixed(2),
+        (Number(tip.driver_amount_cents) / 100).toFixed(2),
+        (Number(tip.company_amount_cents) / 100).toFixed(2),
+        (Number(tip.platform_amount_cents) / 100).toFixed(2),
+        status(tip),
+        tip.stripe_payment_intent_id || "",
+      ]),
+      [],
+      ["Totals (paid only)", "", "", "", (totals.gross / 100).toFixed(2), (totals.driver / 100).toFixed(2), (totals.company / 100).toFixed(2), (totals.platform / 100).toFixed(2), "", ""],
+    ]);
+  }
+
+  if (!all.length) {
     return <p className="text-sm text-muted-foreground">No Stripe customer payments have been recorded yet.</p>;
   }
 
-  return <div>
-    <p className="mb-3 text-sm text-muted-foreground">Newest first. This ledger shows who paid, who received credit, and how each payment was divided.</p>
-    <div className="overflow-x-auto">
+  return <div className="space-y-4">
+    <div className="flex flex-wrap items-end gap-3">
+      <label className="text-xs text-muted-foreground">From
+        <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} className="mt-1 block rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground" />
+      </label>
+      <label className="text-xs text-muted-foreground">To
+        <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className="mt-1 block rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground" />
+      </label>
+      <label className="text-xs text-muted-foreground">Employee
+        <div className="mt-1">
+          <Select value={employee} onValueChange={setEmployee}>
+            <SelectTrigger className="h-8 w-48 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Everyone</SelectItem>
+              <SelectItem value="__company__">Company / unassigned</SelectItem>
+              {[...drivers].sort((a: any, b: any) => a.display_name.localeCompare(b.display_name)).map((d: any) => <SelectItem key={d.id} value={d.id}>{d.display_name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </label>
+      <div className="flex gap-1 text-xs">
+        <button type="button" className="rounded-md border border-border px-2 py-1.5" onClick={() => { setFrom(isoDay(new Date(now.getFullYear(), now.getMonth(), 1))); setTo(isoDay(now)); }}>This month</button>
+        <button type="button" className="rounded-md border border-border px-2 py-1.5" onClick={() => { const s = new Date(now.getFullYear(), now.getMonth() - 1, 1); const e = new Date(now.getFullYear(), now.getMonth(), 0); setFrom(isoDay(s)); setTo(isoDay(e)); }}>Last month</button>
+        <button type="button" className="rounded-md border border-border px-2 py-1.5" onClick={() => { setFrom(""); setTo(""); }}>All time</button>
+      </div>
+      <span className="flex-1" />
+      <button type="button" onClick={exportCsv} disabled={!payments.length} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50">Download CSV</button>
+    </div>
+
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <Stat label="Payments" value={String(counted.length)} hint={refunded ? `${dollars(refunded)} refunded` : undefined} />
+      <Stat label="Gross" value={dollars(totals.gross)} />
+      <Stat label="To employees" value={dollars(totals.driver)} />
+      <Stat label="To company" value={dollars(totals.company)} />
+      <Stat label="Platform fee" value={dollars(totals.platform)} />
+    </div>
+
+    {!payments.length ? <p className="text-sm text-muted-foreground">No payments in this range.</p> : <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead className="text-xs uppercase text-muted-foreground">
           <tr><th className="py-2">Paid</th><th>Customer</th><th>Employee</th><th>Gross</th><th>Employee net</th><th>Company share</th><th>Platform fee</th><th>Status</th><th>Stripe ID</th></tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {payments.map((tip: any, index: number) => <tr key={tip.id}>
+          {payments.map((tip: any) => <tr key={tip.id} className={tip.refunded_at || tip.disputed ? "text-muted-foreground" : ""}>
             <td className="whitespace-nowrap py-3">
               <div>{new Date(tip.created_at).toLocaleString()}</div>
-              {index === 0 && <span className="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Latest payment</span>}
+              {tip.id === all[0]?.id && <span className="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Latest payment</span>}
             </td>
             <td>
               <div>{tip.customer_name || "Customer details not provided"}</div>
@@ -1556,11 +1695,86 @@ function CompanyPaymentLedger({ tips, drivers }: { tips: Data["tips"]; drivers: 
             <td>{dollars(Number(tip.driver_amount_cents))}</td>
             <td>{dollars(Number(tip.company_amount_cents))}</td>
             <td>{dollars(Number(tip.platform_amount_cents))}</td>
-            <td>{tip.refunded_at ? "Refunded" : tip.disputed ? "Disputed" : "Paid"}</td>
+            <td>{status(tip)}</td>
             <td className="font-mono text-xs">{tip.stripe_payment_intent_id || "—"}</td>
           </tr>)}
         </tbody>
+        <tfoot className="border-t-2 border-border font-semibold">
+          <tr><td className="py-2" colSpan={3}>Totals (paid only)</td><td>{dollars(totals.gross)}</td><td>{dollars(totals.driver)}</td><td>{dollars(totals.company)}</td><td>{dollars(totals.platform)}</td><td colSpan={2}></td></tr>
+        </tfoot>
       </table>
+    </div>}
+  </div>;
+}
+
+function EmployeePayoutsPanel({ companyId }: { companyId: string }) {
+  const overview = useServerFn(reconciliationOverview);
+  const [rows, setRows] = useState<Awaited<ReturnType<typeof reconciliationOverview>>["rows"] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    overview({ data: { companyId } })
+      .then((r) => setRows(r.rows))
+      .catch((err) => setError(err instanceof Error ? err.message : "Could not load employee earnings"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId]);
+  if (error) return <p className="text-sm text-destructive">{error}</p>;
+  if (!rows) return <p className="text-sm text-muted-foreground">Loading employee earnings…</p>;
+  if (!rows.length) return <p className="text-sm text-muted-foreground">No employees yet.</p>;
+  const sum = (k: keyof (typeof rows)[number]) => rows.reduce((n, r) => n + Number(r[k] || 0), 0);
+  return <div className="space-y-3">
+    <p className="text-sm text-muted-foreground">Per-employee view of what they have earned from card tips, what is sitting in their wallet, what they have requested, and what Blue Collar Tips has paid them. Employees request their own withdrawals from their dashboard.</p>
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead className="text-xs uppercase text-muted-foreground">
+          <tr><th className="py-2">Employee</th><th>Tips</th><th>Gross</th><th>Employee share</th><th>Available now</th><th>Payout pending</th><th>Paid out</th><th>Unverified cash (30d)</th><th>Last tip</th></tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {rows.map((r) => <tr key={r.driverId} className={r.status !== "active" ? "text-muted-foreground" : ""}>
+            <td className="py-2">{r.displayName}{r.status !== "active" && <span className="ml-1 text-xs">({r.status})</span>}</td>
+            <td>{r.total}</td>
+            <td>{dollars(r.grossCents)}</td>
+            <td>{dollars(r.employeeNetCents)}</td>
+            <td className="font-medium">{dollars(r.availableCents)}</td>
+            <td>{r.pendingPayoutCents ? dollars(r.pendingPayoutCents) : "—"}</td>
+            <td>{dollars(r.paidOutCents)}</td>
+            <td>{r.unverified ? `${r.unverified} · ${dollars(r.amountUnverified)}` : "—"}</td>
+            <td className="whitespace-nowrap text-xs text-muted-foreground">{r.lastTipAt ? new Date(r.lastTipAt).toLocaleDateString() : "—"}</td>
+          </tr>)}
+        </tbody>
+        <tfoot className="border-t-2 border-border font-semibold">
+          <tr><td className="py-2">Total</td><td>{sum("total")}</td><td>{dollars(sum("grossCents"))}</td><td>{dollars(sum("employeeNetCents"))}</td><td>{dollars(sum("availableCents"))}</td><td>{dollars(sum("pendingPayoutCents"))}</td><td>{dollars(sum("paidOutCents"))}</td><td colSpan={2}></td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>;
+}
+
+function MoneyFlowExplainer({ company }: { company: Data["company"] }) {
+  const c = Number(company?.company_pct ?? 10);
+  const d = 90 - c;
+  const step = (n: number, title: string, body: string) => (
+    <li className="flex gap-3">
+      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{n}</span>
+      <div><div className="text-sm font-medium">{title}</div><div className="text-xs text-muted-foreground">{body}</div></div>
+    </li>
+  );
+  return <div className="grid gap-4 md:grid-cols-[1fr_auto]">
+    <ol className="space-y-3">
+      {step(1, "Customer tips by card", "Apple Pay, Google Pay or card on the rating page. Stripe processes it into the Blue Collar Tips account.")}
+      {step(2, `Split instantly: ${d}% employee · ${c}% company · 10% Blue Collar Tips`, "Every tip stores its own split. Change the company share under Company settings → Tip distribution.")}
+      {step(3, "Shares land in wallets", "Employee share → their Earnings wallet. Company share → the Company wallet above. Tips with no employee wait under Unassigned company tips until you assign them.")}
+      {step(4, "Request a withdrawal", "Once a wallet reaches the platform minimum, request any amount up to the available balance. One open request at a time.")}
+      {step(5, "Blue Collar Tips pays it", "Reviewed and paid within the processing window to the payout method on file, then marked paid with a reference you can see here.")}
+    </ol>
+    <div className="rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground md:w-64">
+      <div className="font-medium text-foreground">Not counted in wallets</div>
+      <ul className="mt-2 list-disc space-y-1 pl-4">
+        <li>Refunded tips (returned to the customer)</li>
+        <li>Disputed tips (held until cleared)</li>
+        <li>Cash / manual tips — bookkeeping only, no fee taken</li>
+      </ul>
+      <div className="mt-3 font-medium text-foreground">Need a hand?</div>
+      <p className="mt-1">Help & support has a full guide and a ticket form for payout questions.</p>
     </div>
   </div>;
 }

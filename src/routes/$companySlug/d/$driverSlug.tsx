@@ -35,6 +35,9 @@ function TipPage() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
+  // Name/phone already known from the tracked review link — don't ask again.
+  const [knownName, setKnownName] = useState(false);
+  const [knownPhone, setKnownPhone] = useState(false);
   const [tipCents, setTipCents] = useState<number | null>(null);
   const [customTip, setCustomTip] = useState("");
   const [customTipOpen, setCustomTipOpen] = useState(false);
@@ -47,8 +50,12 @@ function TipPage() {
       .then((result) => {
         setData(result);
         if (result.reviewContact) {
-          setCustomerName(result.reviewContact.name ?? "");
-          setCustomerPhone(result.reviewContact.phone ?? "");
+          const name = (result.reviewContact.name ?? "").trim();
+          const phone = (result.reviewContact.phone ?? "").trim();
+          setCustomerName(name);
+          setCustomerPhone(phone);
+          setKnownName(!!name);
+          setKnownPhone(!!phone);
           const email = result.reviewContact.email ?? "";
           setCustomerEmail(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "");
         }
@@ -160,7 +167,11 @@ function TipPage() {
       setError("Please tap a star rating.");
       return;
     }
-    if (customerEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) {
+    if (!customerEmail.trim()) {
+      setError("Please provide your email for confirmation and receipt.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) {
       setError("Please enter a valid email address.");
       return;
     }
@@ -222,12 +233,16 @@ function TipPage() {
             <div className="text-lg font-semibold">{driver.display_name}</div>
           </div>
         </div>
+        <p className="mx-auto mt-5 max-w-sm text-sm leading-snug opacity-90">
+          {knownName ? `${firstName(customerName)}, we` : "We"} can not thank you enough for choosing{" "}
+          {company.name}
+        </p>
       </header>
 
       <form onSubmit={onSubmit} className="mx-auto max-w-md px-5 pt-6">
         <h1 className="sr-only">Rate your service{driver ? ` with ${driver.display_name}` : ""}</h1>
         <section className="rounded-xl border border-border bg-card p-5">
-          <h2 className="text-base font-semibold">How did we do?</h2>
+          <h2 className="text-base font-semibold">How did the driver do?</h2>
           <div
             className="mt-3 flex justify-between"
             onMouseLeave={() => setHoverStars(0)}
@@ -251,8 +266,29 @@ function TipPage() {
           </div>
 
           <label className="mt-5 block text-sm font-medium">Anything you'd like to share?</label>
+          <p className="mt-1 text-xs text-muted-foreground">Tap a suggestion or write your own.</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {suggestedFeedback(driver.display_name).map((msg) => {
+              const selected = feedback === msg;
+              return (
+                <button
+                  type="button"
+                  key={msg}
+                  onClick={() => setFeedback(selected ? "" : msg)}
+                  className="rounded-full border px-3 py-1.5 text-left text-xs font-medium transition-colors"
+                  style={
+                    selected
+                      ? { background: brand.secondary, color: "white", borderColor: brand.secondary }
+                      : { borderColor: "var(--border)" }
+                  }
+                >
+                  {msg}
+                </button>
+              );
+            })}
+          </div>
           <textarea
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             rows={3}
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
@@ -261,29 +297,36 @@ function TipPage() {
           />
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium">Your name</label>
-              <input
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                maxLength={120}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">Phone</label>
-              <input
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                placeholder="(555) 123-4567"
-                maxLength={40}
-              />
-            </div>
+            {!knownName && (
+              <div>
+                <label className="block text-sm font-medium">Your name</label>
+                <input
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  maxLength={120}
+                />
+              </div>
+            )}
+            {!knownPhone && (
+              <div>
+                <label className="block text-sm font-medium">Phone</label>
+                <input
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder="(555) 123-4567"
+                  maxLength={40}
+                />
+              </div>
+            )}
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium">Email</label>
+              <label className="block text-sm font-medium">
+                Please provide your email for confirmation and receipt
+              </label>
               <input
                 type="email"
+                required
                 value={customerEmail}
                 onChange={(e) => setCustomerEmail(e.target.value)}
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -294,8 +337,13 @@ function TipPage() {
           </div>
         </section>
 
-        <section className="mt-5 rounded-xl border border-border bg-card p-5">
-          <h2 className="text-base font-semibold">Leave a tip (optional)</h2>
+        <section
+          className="mt-5 rounded-xl border-2 bg-card p-5"
+          style={{ borderColor: SKY, boxShadow: `0 0 0 4px ${SKY}22` }}
+        >
+          <h2 className="text-lg font-bold" style={{ color: SKY }}>
+            Leave {firstName(driver.display_name)} a tip
+          </h2>
           <div className="mt-3 grid grid-cols-4 gap-2">
             {PRESET_TIPS.map((c) => {
               const selected = tipCents === c;
@@ -309,11 +357,11 @@ function TipPage() {
                     setCustomTipOpen(false);
                     setError(null);
                   }}
-                  className="rounded-md border px-2 py-3 text-sm font-medium"
+                  className="rounded-md border-2 px-2 py-3 text-base font-bold"
                   style={
                     selected
-                      ? { background: brand.secondary, color: "white", borderColor: brand.secondary }
-                      : { borderColor: "var(--border)" }
+                      ? { background: SKY, color: "white", borderColor: SKY }
+                      : { borderColor: SKY, color: SKY }
                   }
                 >
                   ${(c / 100).toFixed(0)}
@@ -328,11 +376,11 @@ function TipPage() {
                 setCustomTipOpen((open) => !open);
                 setError(null);
               }}
-              className="rounded-md border px-2 py-3 text-sm font-medium"
+              className="rounded-md border-2 px-2 py-3 text-base font-bold"
               style={
                 customTipOpen
-                  ? { background: brand.secondary, color: "white", borderColor: brand.secondary }
-                  : { borderColor: "var(--border)" }
+                  ? { background: SKY, color: "white", borderColor: SKY }
+                  : { borderColor: SKY, color: SKY }
               }
             >
               Custom
@@ -410,10 +458,10 @@ function TipPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="mt-6 w-full rounded-md px-4 py-3 text-base font-semibold text-white disabled:opacity-50"
-            style={{ background: brand.primary }}
+            className="mt-6 w-full rounded-md px-4 py-3 text-base font-bold disabled:opacity-50"
+            style={{ background: brand.primary, color: SKY }}
           >
-            {submitting ? "Submitting…" : "Submit rating"}
+            {submitting ? "Submitting…" : "Submit Rating"}
           </button>
         )}
 
@@ -431,4 +479,20 @@ function TipPage() {
       </form>
     </div>
   );
+}
+
+// Sky blue used to draw attention to the tip box and submit button.
+const SKY = "#0ea5e9";
+
+function firstName(fullName: string): string {
+  return fullName.trim().split(/\s+/)[0] || "";
+}
+
+function suggestedFeedback(driverName: string): string[] {
+  const name = firstName(driverName) || "Our driver";
+  return [
+    `${name} did a fantastic job!`,
+    `${name} was fast, friendly and professional.`,
+    `${name} went above and beyond to help me.`,
+  ];
 }

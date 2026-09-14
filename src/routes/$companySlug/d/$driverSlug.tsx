@@ -458,8 +458,10 @@ function TipPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="mt-6 w-full rounded-md px-4 py-3 text-base font-bold disabled:opacity-50"
-            style={{ background: brand.primary, color: SKY }}
+            className="mt-6 w-full rounded-md border-2 bg-white px-4 py-3 text-base font-bold shadow-sm disabled:opacity-50"
+            // White with sky text/border so it reads on any brand color (some
+            // tenants' primary is itself a blue that swallows sky text).
+            style={{ borderColor: SKY, color: SKY }}
           >
             {submitting ? "Submitting…" : "Submit Rating"}
           </button>

@@ -110,12 +110,62 @@ async function remove() {
   console.log(`Deleted ${company.name}.`);
 }
 
+// Change a company's URL slug (e.g. the app's random-suffix slug -> a clean one).
+async function setSlug() {
+  const slug = need("slug");
+  const newSlug = slugify(need("new-slug"));
+  const [company] = await sql`SELECT id, name FROM companies WHERE slug = ${slug}`;
+  if (!company) throw new Error(`No company with slug "${slug}"`);
+  const [taken] = await sql`SELECT id FROM companies WHERE slug = ${newSlug}`;
+  if (taken) throw new Error(`Slug "${newSlug}" is already in use`);
+  await sql`UPDATE companies SET slug = ${newSlug} WHERE id = ${company.id}`;
+  const base = (process.env.APP_BASE_URL ?? "https://bluecollartips.app").replace(/\/$/, "");
+  console.log(`${company.name}: /${slug} -> /${newSlug}`);
+  console.log(`  Company page: ${base}/${newSlug}   (old QR codes/links using /${slug} will stop working)`);
+}
+
+// Issue (or re-issue) a company-admin invite, or attach an existing user directly.
+async function invite() {
+  const slug = need("slug");
+  const email = need("email").trim().toLowerCase();
+  const [company] = await sql`SELECT id, name FROM companies WHERE slug = ${slug}`;
+  if (!company) throw new Error(`No company with slug "${slug}"`);
+  const base = (process.env.APP_BASE_URL ?? "https://bluecollartips.app").replace(/\/$/, "");
+  const [user] = await sql`SELECT id FROM users WHERE email = ${email}`;
+  if (user) {
+    await sql`INSERT INTO user_roles (user_id, company_id, role) VALUES (${user.id}, ${company.id}, 'company_admin') ON CONFLICT DO NOTHING`;
+    console.log(`${email} already has an account and is now a company admin of ${company.name}.`);
+    console.log(`  Dashboard: ${base}/dashboard/admin`);
+    return;
+  }
+  const existing = await sql`
+    SELECT code, expires_at FROM invites
+    WHERE company_id = ${company.id} AND role = 'company_admin' AND lower(email) = ${email}
+      AND used_at IS NULL AND expires_at > NOW()
+    ORDER BY created_at DESC LIMIT 1`;
+  let code = existing[0]?.code;
+  if (!code) {
+    code = randomBytes(6).toString("hex").toUpperCase();
+    const [anySuper] = await sql`SELECT user_id FROM user_roles WHERE role = 'super_admin' LIMIT 1`;
+    await sql`
+      INSERT INTO invites (company_id, code, role, email, created_by, expires_at)
+      VALUES (${company.id}, ${code}, 'company_admin', ${email}, ${anySuper?.user_id ?? null}, NOW() + INTERVAL '30 days')`;
+    console.log(`New admin invite for ${email} at ${company.name}:`);
+  } else {
+    console.log(`Existing unredeemed admin invite for ${email} at ${company.name}:`);
+  }
+  console.log(`  ${base}/join/${code}   (code ${code})`);
+  console.log(`  Send that link; they sign up with it and land in the workspace as admin.`);
+}
+
 try {
   if (command === "list") await list();
   else if (command === "create") await create();
   else if (command === "delete") await remove();
+  else if (command === "set-slug") await setSlug();
+  else if (command === "invite") await invite();
   else {
-    console.log("Usage: node scripts/tenant-admin.mjs <list|create|delete> [--options]");
+    console.log("Usage: node scripts/tenant-admin.mjs <list|create|delete|set-slug|invite> [--options]");
     process.exitCode = 1;
   }
 } catch (error) {

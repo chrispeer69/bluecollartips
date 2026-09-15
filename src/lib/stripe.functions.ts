@@ -129,9 +129,10 @@ export const createTipPaymentIntent = createServerFn({ method: "POST" })
       amount: data.amountCents,
       currency: "usd",
       // Tips are small, one-off, on a phone: card (which carries Apple Pay /
-      // Google Pay), Link one-tap, and Cash App. Never BNPL, bank debit or
-      // Amazon Pay, whatever the Stripe dashboard has switched on.
-      payment_method_types: ["card", "link", "cashapp"],
+      // Google Pay) and Cash App. Not Link — it bundles "Pay by bank" and
+      // Klarna into the form — and never BNPL, bank debit or Amazon Pay,
+      // whatever the Stripe dashboard has switched on.
+      payment_method_types: ["card", "cashapp"],
       metadata: {
         company_id: company.id,
         driver_id: driver?.id ?? "",

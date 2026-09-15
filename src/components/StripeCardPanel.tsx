@@ -158,9 +158,6 @@ function CardForm({
   return (
     <div className="mt-3 rounded-md border border-border p-3">
       <PaymentElement
-        // Link injects "Pay by bank" and Klarna rows into the element even
-        // when the PaymentIntent excludes them; a tip form should not offer those.
-        options={{ wallets: { applePay: "auto", googlePay: "auto", link: "never" } }}
         onChange={(event) => {
           setPaymentMethod(event.value.type);
           setPaymentDetailsComplete(event.complete);

@@ -16,7 +16,7 @@ import {
 import { dollars } from "@/lib/constants";
 import { Section, Stat, TopBar } from "./driver";
 import { createInvite, listInvites, revokeInvite, listJoinRequests, reviewJoinRequest } from "@/lib/invites.functions";
-import { platformOverview, suspendTenant } from "@/lib/platform.functions";
+import { platformOverview, suspendTenant, tenantFootprint, deleteTenant, updateTenantSlug, issueTenantAdminInvite } from "@/lib/platform.functions";
 import { sendTipLinkSms } from "@/lib/sms.functions";
 import { listTipDisputes, flagTipDispute, clearTipDispute, refundTip } from "@/lib/disputes.functions";
 import { listLocations, createLocation, deleteLocation, setDriverLocation, updateReviewLinks } from "@/lib/locations.functions";
@@ -35,6 +35,7 @@ import { PayoutDestinationForm, formatPayoutDetails, payoutMethodLabel } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, CreditCard, LayoutDashboard, LifeBuoy, MessageSquareText, Settings, ShieldCheck, Users } from "lucide-react";
 import { HelpCenter, SupportInbox, TenantSupportPanel } from "@/components/SupportCenter";
+import { DispatchImportPanel } from "@/components/DispatchImportPanel";
 import { reconciliationOverview } from "@/lib/reconciliation.functions";
 
 export const Route = createFileRoute("/dashboard/admin")({
@@ -363,6 +364,10 @@ function AdminDashboard() {
               await load(companyId);
             }}
           />
+        </Section>}
+
+        {page === "feedback" && <Section title="Attribute ratings from your dispatch export">
+          <DispatchImportPanel companyId={data.company.id} onApplied={() => load(companyId)} />
         </Section>}
 
         {page === "feedback" && <Section title="Discrepancy flags">
@@ -1974,32 +1979,115 @@ function PlatformPanel({ view }: { view: PlatformPage }) {
           </thead>
           <tbody className="divide-y divide-border">
             {data.tenants.map((t) => (
-              <tr key={t.id}>
-                <td className="py-2 font-medium">{t.name}</td>
-                <td><span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize">{t.status}</span></td>
-                <td className="hidden sm:table-cell">{t.count}</td>
-                <td>{dollars(t.gross)}</td>
-                <td className="hidden md:table-cell">{dollars(t.companyShare)}</td>
-                <td className="hidden md:table-cell">{dollars(t.platformShare)}</td>
-                <td className="hidden lg:table-cell">{dollars(t.pendingCompany)}</td>
-                <td className="text-right">
-                  <button
-                    onClick={async () => {
-                      await suspend({ data: { companyId: t.id, status: t.status === "active" ? "suspended" : "active" } });
-                      await reload();
-                    }}
-                    className="rounded border border-border px-2 py-1 text-xs"
-                  >
-                    {t.status === "active" ? "Suspend" : "Reactivate"}
-                  </button>
-                </td>
-              </tr>
+              <TenantRow key={t.id} tenant={t} onChanged={reload} onSuspend={async () => {
+                await suspend({ data: { companyId: t.id, status: t.status === "active" ? "suspended" : "active" } });
+                await reload();
+              }} />
             ))}
           </tbody>
         </table>
       </div>}
     </div>
   );
+}
+
+function TenantRow({ tenant: t, onChanged, onSuspend }: { tenant: any; onChanged: () => Promise<void>; onSuspend: () => Promise<void> }) {
+  const footprint = useServerFn(tenantFootprint);
+  const remove = useServerFn(deleteTenant);
+  const setSlug = useServerFn(updateTenantSlug);
+  const inviteAdmin = useServerFn(issueTenantAdminInvite);
+  const [open, setOpen] = useState(false);
+  const [fp, setFp] = useState<Awaited<ReturnType<typeof tenantFootprint>> | null>(null);
+  const [slug, setSlugValue] = useState<string>(t.slug ?? "");
+  const [email, setEmail] = useState("");
+  const [inviteResult, setInviteResult] = useState<string | null>(null);
+  const [confirmName, setConfirmName] = useState("");
+  const [force, setForce] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const base = typeof window !== "undefined" ? window.location.origin : "https://bluecollartips.app";
+
+  async function toggle() {
+    const next = !open;
+    setOpen(next);
+    setMsg(null);
+    if (next && !fp) {
+      try { setFp(await footprint({ data: { companyId: t.id } })); } catch (err) { setMsg(err instanceof Error ? err.message : "Could not load"); }
+    }
+  }
+  async function run(fn: () => Promise<unknown>) {
+    setBusy(true); setMsg(null);
+    try { await fn(); } catch (err) { setMsg(err instanceof Error ? err.message : "Something went wrong"); } finally { setBusy(false); }
+  }
+  const nameMatches = confirmName.trim().toLowerCase() === String(t.name).trim().toLowerCase();
+
+  return <>
+    <tr>
+      <td className="py-2 font-medium">
+        <div>{t.name}</div>
+        <div className="text-xs text-muted-foreground">/{fp?.slug ?? t.slug ?? "…"}</div>
+      </td>
+      <td><span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize">{t.status}</span></td>
+      <td className="hidden sm:table-cell">{t.count}</td>
+      <td>{dollars(t.gross)}</td>
+      <td className="hidden md:table-cell">{dollars(t.companyShare)}</td>
+      <td className="hidden md:table-cell">{dollars(t.platformShare)}</td>
+      <td className="hidden lg:table-cell">{dollars(t.pendingCompany)}</td>
+      <td className="whitespace-nowrap text-right">
+        <button onClick={toggle} className="rounded border border-border px-2 py-1 text-xs">{open ? "Close" : "Manage"}</button>
+        <button onClick={onSuspend} className="ml-1 rounded border border-border px-2 py-1 text-xs">{t.status === "active" ? "Suspend" : "Reactivate"}</button>
+      </td>
+    </tr>
+    {open && <tr>
+      <td colSpan={8} className="bg-muted/30 p-4">
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-lg border border-border bg-background p-3">
+            <div className="text-sm font-semibold">Company URL</div>
+            <p className="mt-1 text-xs text-muted-foreground">Used for the company page, QR codes and every tip link. Changing it breaks anything already printed.</p>
+            <div className="mt-2 flex items-center gap-1 text-sm">
+              <span className="text-muted-foreground">{base.replace(/^https?:\/\//, "")}/</span>
+              <input value={slug} onChange={(e) => setSlugValue(e.target.value)} className="min-w-0 flex-1 rounded-md border border-input bg-background px-2 py-1 text-sm" />
+            </div>
+            <button disabled={busy || !slug.trim() || slug === (fp?.slug ?? t.slug)} onClick={() => run(async () => {
+              const r = await setSlug({ data: { companyId: t.id, slug } });
+              setSlugValue(r.slug); setFp((f) => (f ? { ...f, slug: r.slug } : f)); setMsg(`URL is now /${r.slug}`); await onChanged();
+            })} className="mt-2 rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50">Save URL</button>
+          </div>
+
+          <div className="rounded-lg border border-border bg-background p-3">
+            <div className="text-sm font-semibold">Company admin invite</div>
+            <p className="mt-1 text-xs text-muted-foreground">Makes an existing account a company admin, or creates a 30-day invite link to send them.</p>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@company.com" className="mt-2 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
+            <button disabled={busy || !email.includes("@")} onClick={() => run(async () => {
+              const r = await inviteAdmin({ data: { companyId: t.id, email } });
+              setInviteResult(r.attached ? `${email} is now a company admin.` : `Invite link: ${r.inviteUrl}`);
+              await onChanged();
+            })} className="mt-2 rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50">Invite / attach</button>
+            {inviteResult && <div className="mt-2 flex items-start gap-2 text-xs">
+              <span className="break-all">{inviteResult}</span>
+              {inviteResult.startsWith("Invite link:") && <button onClick={() => navigator.clipboard?.writeText(inviteResult.replace("Invite link: ", ""))} className="shrink-0 rounded border border-border px-2 py-0.5">Copy</button>}
+            </div>}
+          </div>
+
+          <div className="rounded-lg border border-destructive/40 bg-background p-3">
+            <div className="text-sm font-semibold text-destructive">Delete tenant</div>
+            {fp ? <p className="mt-1 text-xs text-muted-foreground">
+              Removes {fp.drivers} employee{fp.drivers === 1 ? "" : "s"}, {fp.ratings} rating{fp.ratings === 1 ? "" : "s"}, {fp.tips} tip{fp.tips === 1 ? "" : "s"}, {fp.members} member{fp.members === 1 ? "" : "s"}, {fp.tickets} ticket{fp.tickets === 1 ? "" : "s"}. Cannot be undone.
+            </p> : <p className="mt-1 text-xs text-muted-foreground">Loading…</p>}
+            <input value={confirmName} onChange={(e) => setConfirmName(e.target.value)} placeholder={`Type "${t.name}" to confirm`} className="mt-2 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
+            {fp && fp.tips > 0 && <label className="mt-2 flex items-center gap-1.5 text-xs text-destructive">
+              <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} /> Delete financial history too ({fp.tips} tips)
+            </label>}
+            <button disabled={busy || !nameMatches || (!!fp && fp.tips > 0 && !force)} onClick={() => run(async () => {
+              await remove({ data: { companyId: t.id, confirmName, force } });
+              await onChanged();
+            })} className="mt-2 rounded-md bg-destructive px-3 py-1.5 text-xs text-destructive-foreground disabled:opacity-50">Delete permanently</button>
+          </div>
+        </div>
+        {msg && <p className="mt-3 text-xs">{msg}</p>}
+      </td>
+    </tr>}
+  </>;
 }
 
 function LocationsPanel({ companyId }: { companyId: string }) {

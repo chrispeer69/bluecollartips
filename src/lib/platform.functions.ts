@@ -100,3 +100,94 @@ export const suspendTenant = createServerFn({ method: "POST" })
     await db.from("companies").update({ status: data.status }).eq("id", data.companyId);
     return { ok: true };
   });
+
+/** Counts a super admin sees before deleting a tenant. */
+export const tenantFootprint = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertSuper(context.userId);
+    const { sql } = await import("@/db/client.server");
+    const [row] = await sql()`
+      SELECT c.name, c.slug,
+        (SELECT COUNT(*) FROM drivers WHERE company_id = c.id)::int AS drivers,
+        (SELECT COUNT(*) FROM ratings WHERE company_id = c.id)::int AS ratings,
+        (SELECT COUNT(*) FROM tips WHERE company_id = c.id)::int AS tips,
+        (SELECT COUNT(*) FROM user_roles WHERE company_id = c.id)::int AS members,
+        (SELECT COUNT(*) FROM support_tickets WHERE company_id = c.id)::int AS tickets
+      FROM companies c WHERE c.id = ${data.companyId}`;
+    if (!row) throw new Error("Company not found");
+    return row as { name: string; slug: string; drivers: number; ratings: number; tips: number; members: number; tickets: number };
+  });
+
+/** Permanently delete a tenant and everything under it. Requires the exact
+ *  company name typed back; refuses tenants with tips unless force is set. */
+export const deleteTenant = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) =>
+    z.object({ companyId: z.string().uuid(), confirmName: z.string().trim().min(1), force: z.boolean().default(false) }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertSuper(context.userId);
+    const { sql } = await import("@/db/client.server");
+    const database = sql();
+    const [company] = await database`SELECT id, name FROM companies WHERE id = ${data.companyId}`;
+    if (!company) throw new Error("Company not found");
+    if (company.name.trim().toLowerCase() !== data.confirmName.trim().toLowerCase()) {
+      throw new Error("Type the company name exactly to confirm deletion");
+    }
+    const [{ tips }] = await database`SELECT COUNT(*)::int AS tips FROM tips WHERE company_id = ${company.id}`;
+    if (Number(tips) > 0 && !data.force) {
+      throw new Error("This company has tips on record. Tick 'delete financial history too' to proceed.");
+    }
+    await database`DELETE FROM companies WHERE id = ${company.id}`;
+    return { ok: true };
+  });
+
+/** Change a tenant's URL slug (company page, QR codes and tip links). */
+export const updateTenantSlug = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({ companyId: z.string().uuid(), slug: z.string().trim().min(2).max(60) }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertSuper(context.userId);
+    const { slugify } = await import("./constants");
+    const slug = slugify(data.slug);
+    if (!slug) throw new Error("Enter a valid URL name (letters, numbers, dashes)");
+    const { sql } = await import("@/db/client.server");
+    const database = sql();
+    const [taken] = await database`SELECT id FROM companies WHERE slug = ${slug} AND id <> ${data.companyId}`;
+    if (taken) throw new Error(`"${slug}" is already used by another company`);
+    await database`UPDATE companies SET slug = ${slug} WHERE id = ${data.companyId}`;
+    return { ok: true, slug };
+  });
+
+/** Issue (or re-surface) a company-admin invite, or attach an existing user directly. */
+export const issueTenantAdminInvite = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({ companyId: z.string().uuid(), email: z.string().trim().email().max(200) }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertSuper(context.userId);
+    const { sql } = await import("@/db/client.server");
+    const database = sql();
+    const email = data.email.toLowerCase();
+    const base = (process.env.APP_BASE_URL ?? "https://bluecollartips.app").replace(/\/$/, "");
+    const [user] = await database`SELECT id FROM users WHERE lower(email) = ${email}`;
+    if (user) {
+      await database`INSERT INTO user_roles (user_id, company_id, role) VALUES (${user.id}, ${data.companyId}, 'company_admin') ON CONFLICT DO NOTHING`;
+      return { ok: true, attached: true as const, inviteUrl: null, code: null };
+    }
+    const [existing] = await database`
+      SELECT code FROM invites
+      WHERE company_id = ${data.companyId} AND role = 'company_admin' AND lower(email) = ${email}
+        AND used_at IS NULL AND expires_at > NOW()
+      ORDER BY created_at DESC LIMIT 1`;
+    let code: string = existing?.code;
+    if (!code) {
+      const { randomBytes } = await import("crypto");
+      code = randomBytes(6).toString("hex").toUpperCase();
+      await database`
+        INSERT INTO invites (company_id, code, role, email, created_by, expires_at)
+        VALUES (${data.companyId}, ${code}, 'company_admin', ${email}, ${context.userId}, NOW() + INTERVAL '30 days')`;
+    }
+    return { ok: true, attached: false as const, inviteUrl: `${base}/join/${code}`, code };
+  });

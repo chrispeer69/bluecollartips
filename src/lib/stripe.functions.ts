@@ -128,7 +128,10 @@ export const createTipPaymentIntent = createServerFn({ method: "POST" })
     const pi = await stripe.paymentIntents.create({
       amount: data.amountCents,
       currency: "usd",
-      automatic_payment_methods: { enabled: true },
+      // Tips are small, one-off, on a phone: card (which carries Apple Pay /
+      // Google Pay), Link one-tap, and Cash App. Never BNPL, bank debit or
+      // Amazon Pay, whatever the Stripe dashboard has switched on.
+      payment_method_types: ["card", "link", "cashapp"],
       metadata: {
         company_id: company.id,
         driver_id: driver?.id ?? "",

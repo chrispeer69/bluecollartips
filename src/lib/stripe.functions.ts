@@ -101,7 +101,7 @@ export const createTipPaymentIntent = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { getStripe } = await import("./stripe.server");
     const stripe = getStripe();
-    if (!stripe) throw new Error("Card payments are not configured yet.");
+    if (!stripe) throw new Error("Online payments are not configured yet.");
     if (data.customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.customerEmail)) {
       throw new Error("Please enter a valid email address.");
     }

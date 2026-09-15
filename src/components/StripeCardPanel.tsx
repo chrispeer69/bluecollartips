@@ -5,6 +5,23 @@ import { useServerFn } from "@tanstack/react-start";
 import { createTipPaymentIntent, finalizeTipPayment, getStripePublishableKey } from "@/lib/stripe.functions";
 import { dollars } from "@/lib/constants";
 
+const PAYMENT_METHOD_NAMES: Record<string, string> = {
+  affirm: "Affirm",
+  afterpay_clearpay: "Afterpay / Clearpay",
+  amazon_pay: "Amazon Pay",
+  cashapp: "Cash App Pay",
+  card: "card",
+  klarna: "Klarna",
+  link: "Link",
+  paypal: "PayPal",
+  us_bank_account: "a bank account",
+};
+
+function paymentMethodName(method: string | null) {
+  if (!method) return "securely";
+  return PAYMENT_METHOD_NAMES[method] ?? method.replaceAll("_", " ");
+}
+
 type Props = {
   companySlug: string;
   driverSlug?: string | null;
@@ -47,7 +64,7 @@ export function StripeCardPanel(props: Props) {
         setClientSecret(r.clientSecret as string);
         setPaymentIntentId(r.paymentIntentId);
       })
-      .catch((e: unknown) => setErr(e instanceof Error ? e.message : "Card not available"));
+      .catch((e: unknown) => setErr(e instanceof Error ? e.message : "Online payment is not available"));
   }, [pk, props.amountCents, props.companySlug, props.driverSlug, props.customerName, props.customerPhone, props.customerEmail, props.stars, createPi]);
 
   const stripePromise = useMemo<Promise<Stripe | null> | null>(
@@ -56,8 +73,8 @@ export function StripeCardPanel(props: Props) {
   );
 
   if (err) return <p className="mt-3 text-sm text-destructive">{err}</p>;
-  if (!pk) return <p className="mt-3 text-xs text-muted-foreground">Card payments are not enabled yet on this platform.</p>;
-  if (!stripePromise || !clientSecret) return <p className="mt-3 text-sm text-muted-foreground">Preparing secure card form…</p>;
+  if (!pk) return <p className="mt-3 text-xs text-muted-foreground">Online payments are not enabled yet on this platform.</p>;
+  if (!stripePromise || !clientSecret) return <p className="mt-3 text-sm text-muted-foreground">Preparing secure payment options…</p>;
 
   return (
     <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "stripe" } }}>
@@ -89,6 +106,7 @@ function CardForm({
   const elements = useElements();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
   const [paymentDetailsComplete, setPaymentDetailsComplete] = useState(false);
   const cashAppAttemptStarted = useRef(false);
@@ -97,6 +115,7 @@ function CardForm({
     if (!stripe || !elements) return;
     setBusy(true);
     setErr(null);
+    setNotice(null);
     const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
       redirect: "if_required",
@@ -118,6 +137,8 @@ function CardForm({
       } catch {
         setErr("Payment received. Your balance is still being updated.");
       }
+    } else if (paymentIntent?.status === "processing") {
+      setNotice("Payment submitted. Your tip will appear after the payment provider confirms it.");
     }
   }, [clientSecret, elements, finalizePayment, onPaid, paymentIntentId, stripe]);
 
@@ -146,6 +167,7 @@ function CardForm({
         }}
       />
       {err && <p className="mt-2 text-sm text-destructive">{err}</p>}
+      {notice && <p className="mt-2 text-sm text-muted-foreground" role="status">{notice}</p>}
       {paymentMethod === "cashapp" ? (
         err ? (
           <button
@@ -170,7 +192,7 @@ function CardForm({
           className="mt-3 w-full rounded-md px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
           style={{ background: brandColor }}
         >
-          {busy ? "Processing…" : `Pay ${dollars(amountCents)} by card`}
+          {busy ? "Processing…" : `Pay ${dollars(amountCents)} with ${paymentMethodName(paymentMethod)}`}
         </button>
       )}
     </div>

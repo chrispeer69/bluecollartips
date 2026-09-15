@@ -63,6 +63,9 @@ test("successful Stripe tips have webhook and browser-confirmed idempotent ledge
   assert.match(stripeFunctions, /pi\.client_secret !== data\.clientSecret/);
   assert.match(stripePanel, /finalizePayment/);
   assert.match(stripePanel, /paymentIntent\?\.status === "succeeded"/);
+  assert.match(stripePanel, /paymentIntent\?\.status === "processing"/);
+  assert.match(stripePanel, /paymentMethodName\(paymentMethod\)/);
+  assert.match(stripeFunctions, /automatic_payment_methods: \{ enabled: true \}/);
   assert.match(ledger, /webhook retries must never undo that/);
   assert.match(wallet, /export const syncStripeTipHistory/);
   assert.match(wallet, /scanned < 1000/);

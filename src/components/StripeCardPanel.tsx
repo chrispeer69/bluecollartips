@@ -158,6 +158,30 @@ function CardForm({
   return (
     <div className="mt-3 rounded-md border border-border p-3">
       <PaymentElement
+        options={{
+          layout: {
+            type: "accordion",
+            defaultCollapsed: false,
+            radios: true,
+            spacedAccordionItems: true,
+            // Display every eligible method instead of putting later methods
+            // behind Stripe's default "More" control.
+            visibleAccordionItemsCount: 0,
+          },
+          paymentMethodOrder: [
+            "apple_pay",
+            "google_pay",
+            "cashapp",
+            "amazon_pay",
+            "link",
+            "card",
+            "us_bank_account",
+            "paypal",
+            "klarna",
+            "afterpay_clearpay",
+            "affirm",
+          ],
+        }}
         onChange={(event) => {
           setPaymentMethod(event.value.type);
           setPaymentDetailsComplete(event.complete);

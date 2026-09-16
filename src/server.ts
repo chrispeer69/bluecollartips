@@ -37,9 +37,39 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   });
 }
 
+/**
+ * Stripe Apple Pay domain verification.
+ * Apple requires this exact path (with a leading dot) which most file routers
+ * cannot express as a file name.  Intercept it before TanStack Start handles
+ * the request so the file contents are always served at the right URL.
+ */
+function handleApplePayDomainAssociation(): Response {
+  const fileContents = process.env.STRIPE_APPLE_PAY_DOMAIN_ASSOCIATION;
+  if (!fileContents) {
+    return new Response(
+      "Apple Pay domain association file not configured.\n" +
+        "Set STRIPE_APPLE_PAY_DOMAIN_ASSOCIATION in your environment.",
+      { status: 404, headers: { "Content-Type": "text/plain" } },
+    );
+  }
+  return new Response(fileContents, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/plain",
+      "Cache-Control": "public, max-age=86400",
+    },
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      // Apple Pay domain verification — must be served at this exact path.
+      const url = new URL(request.url);
+      if (url.pathname === "/.well-known/apple-developer-merchantid-domain-association") {
+        return handleApplePayDomainAssociation();
+      }
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

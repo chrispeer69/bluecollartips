@@ -128,9 +128,12 @@ export const createTipPaymentIntent = createServerFn({ method: "POST" })
     const pi = await stripe.paymentIntents.create({
       amount: data.amountCents,
       currency: "usd",
-      // Stripe displays only methods enabled in the active Dashboard payment
-      // configuration that are eligible for this amount, currency and buyer.
-      automatic_payment_methods: { enabled: true },
+      payment_method_types: [
+        "card",
+        "cashapp",
+        "amazon_pay",
+        "link",
+      ],
       metadata: {
         company_id: company.id,
         driver_id: driver?.id ?? "",

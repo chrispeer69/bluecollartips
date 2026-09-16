@@ -95,6 +95,9 @@ function CardForm({
   clientSecret,
   paymentIntentId,
   finalizePayment,
+  customerName,
+  customerEmail,
+  customerPhone,
 }: Props & {
   clientSecret: string;
   paymentIntentId: string | null;
@@ -165,6 +168,13 @@ function CardForm({
             radios: "always",
             spacedAccordionItems: true,
             visibleAccordionItemsCount: 0,
+          },
+          defaultValues: {
+            billingDetails: {
+              name: customerName ?? undefined,
+              email: customerEmail ?? undefined,
+              phone: customerPhone ?? undefined,
+            },
           },
         }}
         onChange={(event) => {

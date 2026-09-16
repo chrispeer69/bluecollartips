@@ -168,19 +168,6 @@ function CardForm({
             // behind Stripe's default "More" control.
             visibleAccordionItemsCount: 0,
           },
-          paymentMethodOrder: [
-            "apple_pay",
-            "google_pay",
-            "cashapp",
-            "amazon_pay",
-            "link",
-            "card",
-            "us_bank_account",
-            "paypal",
-            "klarna",
-            "afterpay_clearpay",
-            "affirm",
-          ],
         }}
         onChange={(event) => {
           setPaymentMethod(event.value.type);

@@ -128,9 +128,15 @@ export const createTipPaymentIntent = createServerFn({ method: "POST" })
     const pi = await stripe.paymentIntents.create({
       amount: data.amountCents,
       currency: "usd",
-      // Automatically shows every method enabled in the Stripe Dashboard that
-      // is eligible for this currency, amount, and buyer region.
-      automatic_payment_methods: { enabled: true, allow_redirects: "always" },
+      // Every Dashboard-enabled method available in the US, listed explicitly
+      // so Stripe doesn't silently filter any out.
+      payment_method_types: [
+        "card",          // Visa/MC/Amex + Apple Pay & Google Pay wallets
+        "cashapp",       // Cash App Pay
+        "amazon_pay",    // Amazon Pay
+        "link",          // Stripe Link (one-click checkout)
+        "klarna",        // Klarna buy-now-pay-later
+      ],
       metadata: {
         company_id: company.id,
         driver_id: driver?.id ?? "",

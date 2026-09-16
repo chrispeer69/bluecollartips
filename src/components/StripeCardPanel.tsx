@@ -162,7 +162,7 @@ function CardForm({
           layout: {
             type: "accordion",
             defaultCollapsed: false,
-            radios: true,
+            radios: "always",
             spacedAccordionItems: true,
             // Display every eligible method instead of putting later methods
             // behind Stripe's default "More" control.

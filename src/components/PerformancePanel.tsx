@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowDownRight, ArrowUpRight, Minus, Sparkles, Trophy } from "lucide-react";
+import { ArrowDown, ArrowDownRight, ArrowRight, ArrowUp, ArrowUpRight, Minus, Sparkles, Trophy } from "lucide-react";
 import {
   getDriverPerformance,
   PERIODS,
@@ -13,12 +13,12 @@ import {
 // Employee performance report: who's earning the best reviews this period and
 // who's moving up or down compared with the period before.
 
-const TREND: Record<Trend, { label: string; className: string; Icon: typeof ArrowUpRight }> = {
-  up: { label: "Trending up", className: "bg-emerald-50 text-emerald-800", Icon: ArrowUpRight },
-  down: { label: "Trending down", className: "bg-destructive/10 text-destructive", Icon: ArrowDownRight },
-  steady: { label: "Steady", className: "bg-muted text-muted-foreground", Icon: Minus },
-  new: { label: "New this period", className: "bg-primary/10 text-primary", Icon: Sparkles },
-  quiet: { label: "No reviews", className: "bg-muted text-muted-foreground", Icon: Minus },
+const TREND: Record<Trend, { label: string; className: string; Icon: typeof ArrowUp }> = {
+  up: { label: "Up", className: "text-emerald-700", Icon: ArrowUp },
+  down: { label: "Down", className: "text-destructive", Icon: ArrowDown },
+  steady: { label: "Steady", className: "text-muted-foreground", Icon: ArrowRight },
+  new: { label: "New", className: "text-primary", Icon: Sparkles },
+  quiet: { label: "No reviews", className: "text-muted-foreground", Icon: Minus },
 };
 
 function fmtAvg(avg: number | null) {
@@ -35,14 +35,18 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function TrendBadge({ trend, delta }: { trend: Trend; delta: number | null }) {
+// Big arrow first, then the label and the change in average vs the prior
+// period, so direction reads at a glance and never by color alone.
+function TrendArrow({ trend, delta, size = "md" }: { trend: Trend; delta: number | null; size?: "md" | "lg" }) {
   const { label, className, Icon } = TREND[trend];
-  const d = trend === "up" || trend === "down" || trend === "steady" ? fmtDelta(delta) : null;
+  const showDelta = (trend === "up" || trend === "down" || trend === "steady") && delta != null && Math.abs(delta) >= 0.005;
   return (
-    <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium ${className}`}>
-      <Icon size={12} aria-hidden />
-      {label}
-      {d && <span className="font-normal opacity-80">({d})</span>}
+    <span className={`inline-flex items-center gap-1.5 font-semibold ${className}`}>
+      <Icon size={size === "lg" ? 28 : 22} strokeWidth={2.75} aria-hidden />
+      <span className="text-sm">
+        {label}
+        {showDelta && <span className="ml-1 font-normal tabular-nums">{fmtDelta(delta)}★</span>}
+      </span>
     </span>
   );
 }
@@ -115,15 +119,16 @@ function PodiumCard({ rank, driver, priorLabel }: { rank: number; driver: Driver
           </div>
           <div className="mt-1 truncate text-lg font-semibold">{driver.name}</div>
         </div>
-        <TrendBadge trend={driver.trend} delta={driver.delta} />
+        <TrendArrow trend={driver.trend} delta={driver.delta} size="lg" />
       </div>
-      <div className="mt-3 flex items-baseline gap-2">
-        <span className="text-3xl font-semibold">{fmtAvg(driver.current.avg)}</span>
+      <div className="mt-3 flex items-baseline gap-3">
+        <span className="text-3xl font-semibold tabular-nums">{driver.current.points} <span className="text-sm font-normal text-muted-foreground">pts</span></span>
+        <span className="text-base font-semibold tabular-nums">{fmtAvg(driver.current.avg)}</span>
         <Stars avg={driver.current.avg} />
       </div>
       <div className="mt-1 text-xs text-muted-foreground">
         {driver.current.n} review{driver.current.n === 1 ? "" : "s"} · {driver.current.five} five-star
-        {driver.prior.avg != null && <> · {fmtAvg(driver.prior.avg)} {priorLabel}</>}
+        {driver.prior.avg != null && <> · {fmtAvg(driver.prior.avg)}★ {priorLabel}</>}
       </div>
       {comment && (
         <blockquote className="mt-3 border-l-2 border-border pl-3 text-sm">
@@ -156,7 +161,7 @@ function MoverList({ title, drivers, empty, direction }: { title: string; driver
                   {d.current.low > 0 && <> · {d.current.low} low</>}
                 </div>
               </div>
-              <span className={`shrink-0 font-semibold tabular-nums ${tone}`}>{fmtDelta(d.delta)}</span>
+              <span className={`inline-flex shrink-0 items-center gap-1 font-semibold tabular-nums ${tone}`}><Icon size={18} strokeWidth={2.75} aria-hidden />{fmtDelta(d.delta)}★</span>
             </li>
           ))}
         </ul>
@@ -266,13 +271,14 @@ export function PerformancePanel({ companyId, onGoToFeedback }: { companyId: str
                   <table className="w-full text-sm">
                     <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                       <tr className="border-b border-border">
-                        <th className="py-2 pr-3 font-medium">#</th>
+                        <th className="py-2 pr-3 font-medium">Rank</th>
                         <th className="py-2 pr-3 font-medium">Employee</th>
+                        <th className="py-2 pr-3 text-right font-medium">Score</th>
                         <th className="py-2 pr-3 text-right font-medium">Reviews</th>
-                        <th className="py-2 pr-3 text-right font-medium">Avg</th>
+                        <th className="py-2 pr-3 text-right font-medium">Avg ★</th>
                         <th className="py-2 pr-3 font-medium">Five-star</th>
                         <th className="py-2 pr-3 text-right font-medium">Low</th>
-                        <th className="py-2 pr-3 text-right font-medium">Prior avg</th>
+                        <th className="py-2 pr-3 text-right font-medium">Prior avg ★</th>
                         <th className="py-2 font-medium">Trend</th>
                       </tr>
                     </thead>
@@ -280,18 +286,21 @@ export function PerformancePanel({ companyId, onGoToFeedback }: { companyId: str
                       {report.drivers.map((d, i) => {
                         const quiet = d.current.n === 0;
                         return (
-                          <tr key={d.driverId} className={quiet ? "text-muted-foreground" : ""}>
-                            <td className="py-2 pr-3 tabular-nums">{quiet ? "—" : i + 1}</td>
-                            <td className="py-2 pr-3">
+                          <tr key={d.driverId} className={quiet ? "text-muted-foreground" : i === 0 ? "bg-secondary/5" : ""}>
+                            <td className="py-2.5 pr-3 text-lg font-bold tabular-nums">
+                              {quiet ? "—" : i === 0 ? <span className="inline-flex items-center gap-1"><Trophy size={18} className="text-secondary" aria-hidden />1</span> : i + 1}
+                            </td>
+                            <td className="py-2.5 pr-3">
                               <span className="font-medium">{d.name}</span>
                               {d.status !== "active" && <span className="ml-2 text-xs text-muted-foreground">({d.status})</span>}
                             </td>
-                            <td className="py-2 pr-3 text-right tabular-nums">{d.current.n}</td>
-                            <td className="py-2 pr-3 text-right tabular-nums">{fmtAvg(d.current.avg)}</td>
-                            <td className="py-2 pr-3"><FiveStarMeter pct={d.current.fiveStarPct} /></td>
-                            <td className={`py-2 pr-3 text-right tabular-nums ${d.current.low > 0 ? "text-destructive" : ""}`}>{d.current.n ? d.current.low : "—"}</td>
-                            <td className="py-2 pr-3 text-right tabular-nums">{fmtAvg(d.prior.avg)}</td>
-                            <td className="py-2"><TrendBadge trend={d.trend} delta={d.delta} /></td>
+                            <td className="py-2.5 pr-3 text-right text-base font-bold tabular-nums">{quiet ? "—" : d.current.points}</td>
+                            <td className="py-2.5 pr-3 text-right tabular-nums">{d.current.n}</td>
+                            <td className="py-2.5 pr-3 text-right tabular-nums">{fmtAvg(d.current.avg)}</td>
+                            <td className="py-2.5 pr-3"><FiveStarMeter pct={d.current.fiveStarPct} /></td>
+                            <td className={`py-2.5 pr-3 text-right tabular-nums ${d.current.low > 0 ? "font-semibold text-destructive" : ""}`}>{d.current.n ? d.current.low : "—"}</td>
+                            <td className="py-2.5 pr-3 text-right tabular-nums">{fmtAvg(d.prior.avg)}</td>
+                            <td className="py-2.5"><TrendArrow trend={d.trend} delta={d.delta} /></td>
                           </tr>
                         );
                       })}
@@ -299,7 +308,8 @@ export function PerformancePanel({ companyId, onGoToFeedback }: { companyId: str
                   </table>
                 </div>
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Ranked by average rating, weighted so one lucky review doesn't outrank a consistent performer. Trends compare the average to {meta.priorLabel} and need at least 3 reviews. Low = 1–2★ reviews.
+                  <span className="font-medium text-foreground">Score:</span> 5★ = +2 · 4★ = +1 · 3★ = 0 · 2★ = −2 · 1★ = −3 per review, so more happy customers means a higher rank and one bad job isn't erased by one good one.
+                  {" "}<span className="font-medium text-foreground">Trend:</span> change in average rating vs {meta.priorLabel} (needs 3+ reviews; ±0.25★ to count as up or down). Low = 1–2★ reviews.
                 </p>
               </section>
             </>

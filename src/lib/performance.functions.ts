@@ -20,10 +20,10 @@ export type Trend = "up" | "down" | "steady" | "new" | "quiet";
 const MIN_REVIEWS_FOR_TREND = 3;
 // Average must move at least this much (in stars) to count as a trend.
 const TREND_THRESHOLD = 0.25;
-// Ranking uses a shrunk average: a driver with one 5★ review shouldn't outrank
-// someone holding 4.9 over 20 reviews. Each driver's average is pulled toward
-// the company average by this many "phantom" reviews.
-const RANK_PRIOR_WEIGHT = 3;
+// Leaderboard points per review. Rewards volume of happy customers, not just
+// a high average: fourteen 5★ + one 4★ beats five 5★. Low ratings cost more
+// than a 5★ earns so one bad job isn't erased by one good one.
+export const POINTS_BY_STAR = { 1: -3, 2: -2, 3: 0, 4: 1, 5: 2 } as const;
 
 type Bucket = {
   n: number;
@@ -31,11 +31,12 @@ type Bucket = {
   five: number;
   low: number; // 1–2 stars
   flagged: number;
+  points: number;
   dist: [number, number, number, number, number]; // index 0 = 1★
 };
 
 function emptyBucket(): Bucket {
-  return { n: 0, sum: 0, five: 0, low: 0, flagged: 0, dist: [0, 0, 0, 0, 0] };
+  return { n: 0, sum: 0, five: 0, low: 0, flagged: 0, points: 0, dist: [0, 0, 0, 0, 0] };
 }
 
 function add(b: Bucket, stars: number, flagged: boolean) {
@@ -44,6 +45,7 @@ function add(b: Bucket, stars: number, flagged: boolean) {
   if (stars === 5) b.five += 1;
   if (stars <= 2) b.low += 1;
   if (flagged) b.flagged += 1;
+  b.points += POINTS_BY_STAR[stars as 1 | 2 | 3 | 4 | 5] ?? 0;
   b.dist[stars - 1] += 1;
 }
 
@@ -55,6 +57,7 @@ function summarize(b: Bucket) {
     fiveStarPct: b.n ? (b.five / b.n) * 100 : null,
     low: b.low,
     flagged: b.flagged,
+    points: b.points,
     dist: b.dist,
   };
 }
@@ -144,11 +147,9 @@ export const getDriverPerformance = createServerFn({ method: "POST" })
       }
     }
 
-    const companyAvg = company.current.n ? company.current.sum / company.current.n : 4.5;
     const result = (drivers ?? []).map((d) => {
       const entry = perDriver.get(d.id)!;
       const { trend, delta } = classify(entry.current, entry.prior);
-      const score = (entry.current.sum + RANK_PRIOR_WEIGHT * companyAvg) / (entry.current.n + RANK_PRIOR_WEIGHT);
       return {
         driverId: d.id,
         name: d.display_name,
@@ -158,18 +159,23 @@ export const getDriverPerformance = createServerFn({ method: "POST" })
         prior: summarize(entry.prior),
         delta,
         trend,
-        score,
         comments: entry.comments,
       };
     });
 
-    // Leaderboard: anyone with reviews this period, best first. Drivers with
-    // no reviews sink to the bottom so the report never rewards silence.
+    // Leaderboard: most points first; ties go to the higher average, then
+    // more reviews. Drivers with no reviews sink to the bottom so the report
+    // never rewards silence.
     result.sort((a, b) => {
       if (a.current.n === 0 && b.current.n === 0) return a.name.localeCompare(b.name);
       if (a.current.n === 0) return 1;
       if (b.current.n === 0) return -1;
-      return b.score - a.score || b.current.n - a.current.n || a.name.localeCompare(b.name);
+      return (
+        b.current.points - a.current.points ||
+        (b.current.avg ?? 0) - (a.current.avg ?? 0) ||
+        b.current.n - a.current.n ||
+        a.name.localeCompare(b.name)
+      );
     });
 
     const companyTrend = classify(company.current, company.prior);

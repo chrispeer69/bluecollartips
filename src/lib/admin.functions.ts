@@ -61,16 +61,21 @@ export const getAdminDashboard = createServerFn({ method: "POST" })
         .select(ADMIN_DRIVER_FIELDS)
         .eq("company_id", companyId)
         .order("created_at", { ascending: false }),
-      // Include the driver name dispatch sent with the job (from the review
-      // link) so unattributed reviews show who they were meant for.
+      // The 200 most recent reviews, plus any unassigned ones that have already
+      // aged out of that window so they can still be attributed. Include the
+      // driver name dispatch sent with the job (from the review link) so
+      // unattributed reviews show who they were meant for.
       import("@/db/client.server").then(({ sql }) => sql()`
         SELECT r.id, r.stars, r.feedback, r.customer_name, r.driver_id, r.created_at, r.flagged,
                rc.dispatch_driver_name
-        FROM ratings r
+        FROM (
+          (SELECT id FROM ratings WHERE company_id = ${companyId} ORDER BY created_at DESC LIMIT 200)
+          UNION
+          (SELECT id FROM ratings WHERE company_id = ${companyId} AND driver_id IS NULL ORDER BY created_at DESC LIMIT 100)
+        ) picked
+        JOIN ratings r ON r.id = picked.id
         LEFT JOIN review_contexts rc ON rc.id = r.review_context_id
-        WHERE r.company_id = ${companyId}
         ORDER BY r.created_at DESC
-        LIMIT 200
       `.then((rows) => ({ data: rows as unknown as Record<string, any>[] }))),
       db
         .from("tips")

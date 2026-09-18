@@ -95,6 +95,7 @@ function AdminDashboard() {
   const { support: supportTicketId } = Route.useSearch();
   const [page, setPage] = useState<AdminPage>(supportTicketId ? "support" : "overview");
   const [composeSupport, setComposeSupport] = useState(0);
+  const [feedbackFilter, setFeedbackFilter] = useState<FeedbackFilter>("all");
   const [inviteInfo, setInviteInfo] = useState<{ label: string; url: string; code: string } | null>(null);
 
   function showInvite(label: string, code: string) {
@@ -361,6 +362,8 @@ function AdminDashboard() {
             drivers={data.drivers}
             companyName={data.company?.name ?? "Company"}
             editable={page === "feedback"}
+            filter={page === "feedback" ? feedbackFilter : "all"}
+            onFilterChange={setFeedbackFilter}
             onAssign={async (ratingId, driverId) => {
               await assignReview({ data: { ratingId, driverId } });
               await load(companyId);
@@ -369,7 +372,13 @@ function AdminDashboard() {
         </Section>}
 
         {page === "performance" && (
-          <PerformancePanel companyId={data.company.id} onGoToFeedback={() => setPage("feedback")} />
+          <PerformancePanel
+            companyId={data.company.id}
+            onGoToFeedback={() => {
+              setFeedbackFilter("unassigned");
+              setPage("feedback");
+            }}
+          />
         )}
 
         {page === "feedback" && <Section title="Attribute ratings from your dispatch export">
@@ -797,6 +806,7 @@ function BrandingForm({
 }
 
 const COMPANY_OPTION = "__company__";
+type FeedbackFilter = "all" | "unassigned" | "low";
 
 // Best-guess employee for a name dispatch sent: exact name, then first+last
 // tokens, only when it points at one person.
@@ -819,27 +829,84 @@ function FeedbackList({
   drivers,
   companyName = "Company",
   editable = false,
+  filter = "all",
+  onFilterChange,
   onAssign,
 }: {
   ratings: Data["ratings"];
   drivers: Data["drivers"];
   companyName?: string;
   editable?: boolean;
+  filter?: FeedbackFilter;
+  onFilterChange?: (filter: FeedbackFilter) => void;
   onAssign?: (ratingId: string, driverId: string | null) => Promise<void>;
 }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   if (!ratings.length) return <div className="text-sm text-muted-foreground">No ratings yet.</div>;
   const byId = new Map(drivers.map((d) => [d.id, d.display_name]));
   const assignable = [...drivers].sort((a, b) => a.display_name.localeCompare(b.display_name));
+  const unassignedCount = ratings.filter((r) => !r.driver_id).length;
+  const lowCount = ratings.filter((r) => r.stars <= 2).length;
+  // The overview shows a short recent list; the feedback page can filter and
+  // then sees everything that matches, so an unassigned review is never hidden
+  // behind newer ones.
+  const filtered =
+    filter === "unassigned" ? ratings.filter((r) => !r.driver_id)
+    : filter === "low" ? ratings.filter((r) => r.stars <= 2)
+    : ratings;
+  const visible = editable && filter !== "all" ? filtered.slice(0, 100) : filtered.slice(0, 30);
+  const chips: Array<{ id: FeedbackFilter; label: string; count?: number }> = [
+    { id: "all", label: "All" },
+    { id: "unassigned", label: "Needs an employee", count: unassignedCount },
+    { id: "low", label: "Low ratings", count: lowCount },
+  ];
   return (
+    <>
+    {editable && onFilterChange && (
+      <div className="mb-3 flex flex-wrap items-center gap-2" role="tablist" aria-label="Filter reviews">
+        {chips.map((chip) => {
+          const active = filter === chip.id;
+          const attention = chip.id === "unassigned" && (chip.count ?? 0) > 0 && !active;
+          return (
+            <button
+              key={chip.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => onFilterChange(chip.id)}
+              className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                active ? "border-primary bg-primary text-primary-foreground"
+                : attention ? "border-amber-300 bg-amber-50 text-amber-800"
+                : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {chip.label}{chip.count != null && ` (${chip.count})`}
+            </button>
+          );
+        })}
+        {filter !== "all" && (
+          <span className="text-xs text-muted-foreground">
+            Showing {visible.length} of {filtered.length}
+          </span>
+        )}
+      </div>
+    )}
+    {visible.length === 0 ? (
+      <div className="text-sm text-muted-foreground">
+        {filter === "unassigned" ? "Every review is assigned to an employee." : filter === "low" ? "No low ratings." : "No ratings yet."}
+      </div>
+    ) : (
     <ul className="divide-y divide-border">
-      {ratings.slice(0, 30).map((r) => (
+      {visible.map((r) => (
         <li key={r.id} className="py-3 text-sm">
           <div className="flex items-center justify-between">
             <div>
               <span className="text-secondary">{"★".repeat(r.stars)}</span>
               <span className="text-muted-foreground">{"★".repeat(5 - r.stars)}</span>
               <span className="ml-2 text-xs text-muted-foreground">{String(byId.get(r.driver_id) ?? companyName)}</span>
+              {!r.driver_id && (
+                <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-800">needs an employee</span>
+              )}
               {r.flagged && (
                 <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-xs text-destructive">low rating</span>
               )}
@@ -897,6 +964,8 @@ function FeedbackList({
         </li>
       ))}
     </ul>
+    )}
+    </>
   );
 }
 

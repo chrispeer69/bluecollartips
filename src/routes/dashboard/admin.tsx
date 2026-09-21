@@ -37,6 +37,7 @@ import { Building2, CreditCard, LayoutDashboard, LifeBuoy, MessageSquareText, Se
 import { HelpCenter, SupportInbox, TenantSupportPanel } from "@/components/SupportCenter";
 import { DispatchImportPanel } from "@/components/DispatchImportPanel";
 import { PerformancePanel } from "@/components/PerformancePanel";
+import { ReviewPrintPanel } from "@/components/ReviewPrintPanel";
 import { reconciliationOverview } from "@/lib/reconciliation.functions";
 
 export const Route = createFileRoute("/dashboard/admin")({
@@ -381,6 +382,10 @@ function AdminDashboard() {
           />
         )}
 
+        {page === "feedback" && <Section title="Print reviews for handouts & performance reviews">
+          <ReviewPrintPanel companyId={data.company.id} drivers={data.drivers} />
+        </Section>}
+
         {page === "feedback" && <Section title="Attribute ratings from your dispatch export">
           <DispatchImportPanel companyId={data.company.id} onApplied={() => load(companyId)} />
         </Section>}
@@ -664,6 +669,7 @@ function DriverRoster({
           driverName={qrFor.name}
           url={qrFor.url}
           logoUrl={companyLogo}
+          companyId={companyId}
           onClose={() => { setQrFor(null); setQrDriverId(null); }}
         />
       )}
@@ -671,7 +677,7 @@ function DriverRoster({
   );
 }
 
-function DriverQRModal({ driverId, driverName, url, logoUrl, onClose }: { driverId: string; driverName: string; url: string; logoUrl?: string | null; onClose: () => void }) {
+function DriverQRModal({ driverId, driverName, url, logoUrl, companyId, onClose }: { driverId: string; driverName: string; url: string; logoUrl?: string | null; companyId?: string | null; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   const download = () => {
     const canvas = document.getElementById("admin-driver-qr") as HTMLCanvasElement | null;
@@ -733,6 +739,15 @@ function DriverQRModal({ driverId, driverName, url, logoUrl, onClose }: { driver
             >
               Print payout statement
             </a>
+            {companyId && (
+              <a
+                href={`/print/reviews?companyId=${companyId}&driverId=${driverId}&autoprint=0`}
+                target="_blank" rel="noopener noreferrer"
+                className="rounded-md border border-border px-3 py-2 text-sm"
+              >
+                Print reviews
+              </a>
+            )}
           </div>
           <p className="text-center text-xs text-muted-foreground">
             Print, email, or text this link. Use the SMS panel below to send through the platform

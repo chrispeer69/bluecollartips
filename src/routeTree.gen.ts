@@ -24,6 +24,7 @@ import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe
 import { Route as GuidesFicaTipCreditRouteImport } from './routes/guides.fica-tip-credit'
 import { Route as GuidesTipPoolingRouteImport } from './routes/guides.tip-pooling'
 import { Route as JoinCodeRouteImport } from './routes/join.$code'
+import { Route as PrintReviewsRouteImport } from './routes/print.reviews'
 import { Route as CompanySlugDDriverSlugRouteImport } from './routes/$companySlug/d/$driverSlug'
 import { Route as ApiAuthGoogleRouteImport } from './routes/api/auth/google'
 import { Route as PrintEmployeeIdRouteImport } from './routes/print.employee.$id'
@@ -106,6 +107,11 @@ const JoinCodeRoute = JoinCodeRouteImport.update({
   path: '/join/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrintReviewsRoute = PrintReviewsRouteImport.update({
+  id: '/print/reviews',
+  path: '/print/reviews',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CompanySlugDDriverSlugRoute = CompanySlugDDriverSlugRouteImport.update({
   id: '/$companySlug/d/$driverSlug',
   path: '/$companySlug/d/$driverSlug',
@@ -151,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/guides/fica-tip-credit': typeof GuidesFicaTipCreditRoute
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
+  '/print/reviews': typeof PrintReviewsRoute
   '/$companySlug/': typeof CompanySlugIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
@@ -174,6 +181,7 @@ export interface FileRoutesByTo {
   '/guides/fica-tip-credit': typeof GuidesFicaTipCreditRoute
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
+  '/print/reviews': typeof PrintReviewsRoute
   '/$companySlug': typeof CompanySlugIndexRoute
   '/dashboard': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
@@ -198,6 +206,7 @@ export interface FileRoutesById {
   '/guides/fica-tip-credit': typeof GuidesFicaTipCreditRoute
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
+  '/print/reviews': typeof PrintReviewsRoute
   '/$companySlug/': typeof CompanySlugIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
@@ -223,6 +232,7 @@ export interface FileRouteTypes {
     | '/guides/fica-tip-credit'
     | '/guides/tip-pooling'
     | '/join/$code'
+    | '/print/reviews'
     | '/$companySlug/'
     | '/dashboard/'
     | '/$companySlug/d/$driverSlug'
@@ -246,6 +256,7 @@ export interface FileRouteTypes {
     | '/guides/fica-tip-credit'
     | '/guides/tip-pooling'
     | '/join/$code'
+    | '/print/reviews'
     | '/$companySlug'
     | '/dashboard'
     | '/$companySlug/d/$driverSlug'
@@ -269,6 +280,7 @@ export interface FileRouteTypes {
     | '/guides/fica-tip-credit'
     | '/guides/tip-pooling'
     | '/join/$code'
+    | '/print/reviews'
     | '/$companySlug/'
     | '/dashboard/'
     | '/$companySlug/d/$driverSlug'
@@ -293,6 +305,7 @@ export interface RootRouteChildren {
   GuidesFicaTipCreditRoute: typeof GuidesFicaTipCreditRoute
   GuidesTipPoolingRoute: typeof GuidesTipPoolingRoute
   JoinCodeRoute: typeof JoinCodeRoute
+  PrintReviewsRoute: typeof PrintReviewsRoute
   CompanySlugIndexRoute: typeof CompanySlugIndexRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   CompanySlugDDriverSlugRoute: typeof CompanySlugDDriverSlugRoute
@@ -409,6 +422,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JoinCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/print/reviews': {
+      id: '/print/reviews'
+      path: '/print/reviews'
+      fullPath: '/print/reviews'
+      preLoaderRoute: typeof PrintReviewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/$companySlug/d/$driverSlug': {
       id: '/$companySlug/d/$driverSlug'
       path: '/$companySlug/d/$driverSlug'
@@ -480,6 +500,7 @@ const rootRouteChildren: RootRouteChildren = {
   GuidesFicaTipCreditRoute: GuidesFicaTipCreditRoute,
   GuidesTipPoolingRoute: GuidesTipPoolingRoute,
   JoinCodeRoute: JoinCodeRoute,
+  PrintReviewsRoute: PrintReviewsRoute,
   CompanySlugIndexRoute: CompanySlugIndexRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   CompanySlugDDriverSlugRoute: CompanySlugDDriverSlugRoute,

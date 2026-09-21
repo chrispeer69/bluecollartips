@@ -226,6 +226,19 @@ function DriverDashboard() {
 
         {page === "overview" && <Section title="Recent ratings & feedback">
           <RatingsList ratings={data.ratings} />
+          {data.ratings.length > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+              <a
+                href={`/print/reviews?companyId=${data.driver.company_id}&driverId=${data.driver.id}&autoprint=0`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-md border border-border px-3 py-2 text-sm"
+              >
+                Print my reviews
+              </a>
+              <span className="text-xs text-muted-foreground">Opens a printable sheet of every review; save it as a PDF from the print dialog.</span>
+            </div>
+          )}
         </Section>}
 
         {page === "tips" && data.flags.length > 0 && (

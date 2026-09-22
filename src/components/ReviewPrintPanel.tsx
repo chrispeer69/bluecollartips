@@ -59,13 +59,18 @@ export function ReviewPrintPanel({
   companyId,
   drivers,
   initialDriverId = null,
+  lockedDriverId = null,
+  intro,
 }: {
   companyId: string;
   drivers: Array<{ id: string; display_name: string; status?: string }>;
   initialDriverId?: string | null;
+  /** Employees printing their own reviews: no employee picker, always themselves. */
+  lockedDriverId?: string | null;
+  intro?: string;
 }) {
   const fetchReport = useServerFn(getReviewReport);
-  const [driverId, setDriverId] = useState<string>(initialDriverId ?? ALL_EMPLOYEES);
+  const [driverId, setDriverId] = useState<string>(lockedDriverId ?? initialDriverId ?? ALL_EMPLOYEES);
   const [preset, setPreset] = useState<Preset>("last_month");
   const [custom, setCustom] = useState({ from: ymd(addDays(new Date(), -30)), to: ymd(new Date()) });
   const [minStars, setMinStars] = useState<string>(ANY_STARS);
@@ -79,7 +84,7 @@ export function ReviewPrintPanel({
 
   const sorted = useMemo(() => [...drivers].sort((a, b) => a.display_name.localeCompare(b.display_name)), [drivers]);
   const range = presetRange(preset, custom);
-  const allMode = driverId === ALL_EMPLOYEES;
+  const allMode = !lockedDriverId && driverId === ALL_EMPLOYEES;
 
   const params = () => {
     const q = new URLSearchParams({ companyId });
@@ -132,13 +137,12 @@ export function ReviewPrintPanel({
   return (
     <div className="space-y-4 text-sm">
       <p className="text-muted-foreground">
-        Pull an employee's customer reviews for a week, a month, or any range and print them as a handout, a
-        performance-review packet, or a break-room sheet. Choose “All employees” to print the whole team with a
-        page for each person.
+        {intro ??
+          "Pull an employee's customer reviews for a week, a month, or any range and print them as a handout, a performance-review packet, or a break-room sheet. Choose “All employees” to print the whole team with a page for each person."}
       </p>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <label>
+        {!lockedDriverId && <label>
           <span className="text-xs text-muted-foreground">Employee</span>
           <Select value={driverId} onValueChange={(v) => { setDriverId(v); setPreview(null); }}>
             <SelectTrigger className="mt-1" aria-label="Employee"><SelectValue /></SelectTrigger>
@@ -151,7 +155,7 @@ export function ReviewPrintPanel({
               ))}
             </SelectContent>
           </Select>
-        </label>
+        </label>}
         <label>
           <span className="text-xs text-muted-foreground">Date range</span>
           <Select value={preset} onValueChange={(v) => { setPreset(v as Preset); setPreview(null); }}>

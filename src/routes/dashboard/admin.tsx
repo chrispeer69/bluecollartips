@@ -211,6 +211,7 @@ function AdminDashboard() {
       pageTitle={pageTitle}
       active={page}
       items={visibleNav}
+      mobileTabs={isPlatform ? undefined : (["overview", "employees", "feedback", "payments"] as CompanyPage[] as any)}
       onChange={setPage}
       onSignOut={signOut(navigate)}
       workspace={

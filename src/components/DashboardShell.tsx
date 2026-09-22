@@ -103,6 +103,7 @@ export function DashboardShell<T extends string>({
   active,
   items,
   workspace,
+  mobileTabs,
   onChange,
   onSignOut,
   children,
@@ -113,12 +114,18 @@ export function DashboardShell<T extends string>({
   active: T;
   items: DashboardNavItem<T>[];
   workspace?: ReactNode;
+  /** Ids shown in the phone tab bar, in order. Defaults to the first four. */
+  mobileTabs?: T[];
   onChange: (id: T) => void;
   onSignOut: () => void | Promise<void>;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const choose = (id: T) => { onChange(id); setOpen(false); };
+  const tabIds = mobileTabs ?? items.slice(0, 4).map((item) => item.id);
+  const tabs = tabIds
+    .map((id) => items.find((item) => item.id === id))
+    .filter((item): item is DashboardNavItem<T> => Boolean(item));
   const sidebar = (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
@@ -169,10 +176,45 @@ export function DashboardShell<T extends string>({
             <h1 className="truncate text-lg font-semibold">{pageTitle}</h1>
           </div>
         </header>
-        <main className="p-4 sm:p-6">
+        <main className="p-4 pb-28 sm:p-6 lg:pb-6">
           <div className="mx-auto max-w-7xl space-y-5">{children}</div>
         </main>
       </div>
+      {tabs.length > 1 && (
+        <nav
+          aria-label="Sections"
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card lg:hidden"
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        >
+          <div className="flex">
+            {tabs.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => choose(item.id)}
+                aria-current={active === item.id ? "page" : undefined}
+                className={`relative flex min-h-[3.75rem] flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] ${
+                  active === item.id ? "font-semibold text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                <item.icon size={20} className={active === item.id ? "text-secondary" : ""} />
+                <span className="max-w-full truncate leading-none">{item.label}</span>
+                {!!item.badge && (
+                  <span className="absolute right-1/2 top-1.5 translate-x-4 rounded-full bg-destructive px-1.5 text-[10px] leading-4 text-white">
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+            <button
+              onClick={() => setOpen(true)}
+              className="flex min-h-[3.75rem] flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] text-muted-foreground"
+            >
+              <Menu size={20} />
+              <span className="leading-none">More</span>
+            </button>
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

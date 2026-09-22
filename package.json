@@ -16,7 +16,7 @@
     "db:seed": "node scripts/seed.mjs",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose stop postgres",
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --experimental-transform-types --disable-warning=ExperimentalWarning --test tests/*.test.mjs",
     "test:workspaces": "node --test tests/employee-workspaces.test.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."

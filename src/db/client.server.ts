@@ -27,6 +27,14 @@ const relations: Record<string, Record<string, { table: string; local: string; r
   ratings: { drivers: { table: "drivers", local: "driver_id", remote: "id" }, companies: { table: "companies", local: "company_id", remote: "id" } },
   tips: { drivers: { table: "drivers", local: "driver_id", remote: "id" }, companies: { table: "companies", local: "company_id", remote: "id" }, ratings: { table: "ratings", local: "rating_id", remote: "id" } },
   user_roles: { companies: { table: "companies", local: "company_id", remote: "id" } },
+  // The invite landing page brands itself from the inviting company, and the
+  // admin's pending-requests list needs the requester behind each join request.
+  invites: { companies: { table: "companies", local: "company_id", remote: "id" } },
+  join_requests: {
+    users: { table: "users", local: "user_id", remote: "id" },
+    invites: { table: "invites", local: "invite_id", remote: "id" },
+    companies: { table: "companies", local: "company_id", remote: "id" },
+  },
 };
 
 function splitSelect(value: string) {
@@ -95,6 +103,15 @@ class Query implements PromiseLike<any> {
     return extra ? db`where ${combined} and ${extra}` : db`where ${combined}`;
   }
 
+  /** Foreign-key columns the selected embeds need in order to resolve. */
+  private relationLocalKeys() {
+    return splitSelect(this.columns)
+      .filter((c) => c.includes("("))
+      .map((spec) => spec.match(/^(\w+)(?:!\w+)?\(/)?.[1])
+      .map((name) => (name ? relations[this.table]?.[name]?.local : undefined))
+      .filter((local): local is string => Boolean(local));
+  }
+
   private async addRelations(rows: Row[]) {
     const nested = splitSelect(this.columns).filter((c) => c.includes("("));
     for (const spec of nested) {
@@ -125,7 +142,15 @@ class Query implements PromiseLike<any> {
           return { data: null, error: null, count: result[0].count };
         }
         const plain = splitSelect(this.columns).filter((c) => !c.includes("("));
-        const cols = plain.includes("*") || !plain.length ? db`*` : db(plain.map((c) => safe(c.split(":").pop()!)));
+        const selectAll = plain.includes("*") || !plain.length;
+        let cols = db`*`;
+        if (!selectAll) {
+          const wanted = plain.map((c) => safe(c.split(":").pop()!));
+          // An embed resolves through its foreign key, so select that key even
+          // when the caller only asked for the embedded columns.
+          for (const key of this.relationLocalKeys()) if (!wanted.includes(key)) wanted.push(key);
+          cols = db(wanted) as any;
+        }
         const order = this.orders.length ? db`order by ${this.orders.map((o) => db`${db(o.column)} ${o.ascending ? db`asc` : db`desc`}`).reduce((a, b) => db`${a}, ${b}`)}` : db``;
         const limit = this.rowLimit ? db`limit ${this.rowLimit}` : db``;
         rows = await db`select ${cols} from ${table} ${where} ${order} ${limit}`;

@@ -379,6 +379,40 @@ export const requestCompanyWalletPayout = createServerFn({ method: "POST" })
     });
   });
 
+/**
+ * Every withdrawal an employee has requested, so they can see where their money
+ * is without asking an admin. Account details stay encrypted and are never
+ * returned; only the method and the nickname the employee chose.
+ */
+export const getDriverPayoutHistory = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({ driverId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireDriverAccess(context.userId, data.driverId);
+    const { sql } = await import("@/db/client.server");
+    const database = sql();
+    const requests = await database`
+      SELECT pr.id, pr.amount_cents, pr.status, pr.requested_at, pr.reviewed_at, pr.paid_at,
+             pr.payment_method, pr.payment_reference, pr.admin_note,
+             COALESCE(pr.requested_payout_method, d.payout_method) AS payout_method,
+             COALESCE(pr.requested_payout_account_name, d.payout_account_name) AS payout_account_name
+      FROM payout_requests pr
+      JOIN drivers d ON d.id = pr.driver_id
+      WHERE pr.driver_id = ${data.driverId}
+      ORDER BY pr.requested_at DESC
+      LIMIT 200
+    `;
+    const totals = requests.reduce(
+      (acc: { paidCents: number; pendingCents: number }, r: any) => {
+        if (r.status === "paid") acc.paidCents += Number(r.amount_cents);
+        else if (OPEN_PAYOUT_STATUSES.includes(r.status)) acc.pendingCents += Number(r.amount_cents);
+        return acc;
+      },
+      { paidCents: 0, pendingCents: 0 },
+    );
+    return { requests: requests as unknown as Record<string, any>[], ...totals };
+  });
+
 export const getPlatformWallet = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .handler(async ({ context }) => {

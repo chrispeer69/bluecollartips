@@ -33,11 +33,12 @@ import {
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
 import { PayoutDestinationForm, formatPayoutDetails, payoutMethodLabel } from "@/components/PayoutDestinationForm";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, CreditCard, LayoutDashboard, LifeBuoy, MessageSquareText, Settings, ShieldCheck, Trophy, Users } from "lucide-react";
+import { Building2, Crown, CreditCard, LayoutDashboard, LifeBuoy, MessageSquareText, Settings, ShieldCheck, Trophy, Users } from "lucide-react";
 import { HelpCenter, SupportInbox, TenantSupportPanel } from "@/components/SupportCenter";
 import { DispatchImportPanel } from "@/components/DispatchImportPanel";
 import { PerformancePanel } from "@/components/PerformancePanel";
 import { ReviewPrintPanel } from "@/components/ReviewPrintPanel";
+import { VipCustomersPanel } from "@/components/VipCustomersPanel";
 import { reconciliationOverview } from "@/lib/reconciliation.functions";
 import { ProfilePhotoUploader } from "@/components/ProfilePhotoUploader";
 
@@ -59,13 +60,14 @@ export const Route = createFileRoute("/dashboard/admin")({
 });
 
 type Data = any;
-type CompanyPage = "overview" | "employees" | "feedback" | "performance" | "payments" | "settings" | "support";
+type CompanyPage = "overview" | "employees" | "feedback" | "vip" | "performance" | "payments" | "settings" | "support";
 type PlatformPage = "platformOverview" | "platformOrganizations" | "platformUsers" | "platformPayments" | "platformSupport" | "platformSettings";
 type AdminPage = CompanyPage | PlatformPage;
 const adminNav: DashboardNavItem<AdminPage>[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, group: "Workspace" },
   { id: "employees", label: "Employees", icon: Users, group: "Manage" },
   { id: "feedback", label: "Ratings & feedback", icon: MessageSquareText },
+  { id: "vip", label: "VIP customers", icon: Crown },
   { id: "performance", label: "Employee performance", icon: Trophy },
   { id: "payments", label: "Tips & payments", icon: CreditCard, group: "Money" },
   { id: "settings", label: "Company settings", icon: Settings, group: "Configure" },
@@ -373,6 +375,10 @@ function AdminDashboard() {
               await load(companyId);
             }}
           />
+        </Section>}
+
+        {page === "vip" && <Section title="VIP customers — follow up to Convini registration">
+          <VipCustomersPanel companyId={data.company.id} companySlug={data.company.slug} />
         </Section>}
 
         {page === "performance" && (

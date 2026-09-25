@@ -2,6 +2,7 @@ import { createFileRoute, useParams } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getPublicDriver, submitRating } from "@/lib/public.functions";
+import { trackGoogleClick } from "@/lib/vip.functions";
 import {
   CUSTOMER_TIP_PRESETS,
   DEFAULT_CUSTOMER_TIP_CENTS,
@@ -42,6 +43,7 @@ function TipPage() {
   const { t: reviewToken, tip: tipMode, r: submittedRatingId } = Route.useSearch();
   const getDriver = useServerFn(getPublicDriver);
   const submit = useServerFn(submitRating);
+  const trackGoogle = useServerFn(trackGoogleClick);
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<Awaited<ReturnType<typeof getPublicDriver>> | null>(null);
@@ -145,6 +147,7 @@ function TipPage() {
         reviewText={feedback}
         redirectUrl={positiveRedirectUrl}
         driverName={driver.display_name}
+        onGoogleClick={ratingId ? () => trackGoogle({ data: { ratingId } }) : undefined}
       />
     );
   }

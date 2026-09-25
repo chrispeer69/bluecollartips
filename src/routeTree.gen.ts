@@ -21,15 +21,18 @@ import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as DashboardAdminRouteImport } from './routes/dashboard/admin'
 import { Route as DashboardDriverRouteImport } from './routes/dashboard/driver'
 import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
+import { Route as GoConviniRouteImport } from './routes/go.convini'
 import { Route as GuidesFicaTipCreditRouteImport } from './routes/guides.fica-tip-credit'
 import { Route as GuidesTipPoolingRouteImport } from './routes/guides.tip-pooling'
 import { Route as JoinCodeRouteImport } from './routes/join.$code'
 import { Route as PrintReviewsRouteImport } from './routes/print.reviews'
+import { Route as PrintVipRouteImport } from './routes/print.vip'
 import { Route as CompanySlugDDriverSlugRouteImport } from './routes/$companySlug/d/$driverSlug'
 import { Route as ApiAuthGoogleRouteImport } from './routes/api/auth/google'
 import { Route as PrintEmployeeIdRouteImport } from './routes/print.employee.$id'
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth/google/callback'
 import { Route as ApiPublicWebhooksGhlRouteImport } from './routes/api/public/webhooks/ghl'
+import { Route as ApiPublicWebhooksGhlEventsRouteImport } from './routes/api/public/webhooks/ghl-events'
 import { Route as ApiPublicWebhooksStripeRouteImport } from './routes/api/public/webhooks/stripe'
 
 const IndexRoute = IndexRouteImport.update({
@@ -92,6 +95,11 @@ const EmailUnsubscribeRoute = EmailUnsubscribeRouteImport.update({
   path: '/email/unsubscribe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GoConviniRoute = GoConviniRouteImport.update({
+  id: '/go/convini',
+  path: '/go/convini',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GuidesFicaTipCreditRoute = GuidesFicaTipCreditRouteImport.update({
   id: '/guides/fica-tip-credit',
   path: '/guides/fica-tip-credit',
@@ -110,6 +118,11 @@ const JoinCodeRoute = JoinCodeRouteImport.update({
 const PrintReviewsRoute = PrintReviewsRouteImport.update({
   id: '/print/reviews',
   path: '/print/reviews',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrintVipRoute = PrintVipRouteImport.update({
+  id: '/print/vip',
+  path: '/print/vip',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CompanySlugDDriverSlugRoute = CompanySlugDDriverSlugRouteImport.update({
@@ -137,6 +150,12 @@ const ApiPublicWebhooksGhlRoute = ApiPublicWebhooksGhlRouteImport.update({
   path: '/api/public/webhooks/ghl',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicWebhooksGhlEventsRoute =
+  ApiPublicWebhooksGhlEventsRouteImport.update({
+    id: '/api/public/webhooks/ghl-events',
+    path: '/api/public/webhooks/ghl-events',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicWebhooksStripeRoute = ApiPublicWebhooksStripeRouteImport.update({
   id: '/api/public/webhooks/stripe',
   path: '/api/public/webhooks/stripe',
@@ -154,10 +173,12 @@ export interface FileRoutesByFullPath {
   '/dashboard/admin': typeof DashboardAdminRoute
   '/dashboard/driver': typeof DashboardDriverRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
+  '/go/convini': typeof GoConviniRoute
   '/guides/fica-tip-credit': typeof GuidesFicaTipCreditRoute
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
   '/print/reviews': typeof PrintReviewsRoute
+  '/print/vip': typeof PrintVipRoute
   '/$companySlug/': typeof CompanySlugIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
@@ -165,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/public/webhooks/ghl': typeof ApiPublicWebhooksGhlRoute
+  '/api/public/webhooks/ghl-events': typeof ApiPublicWebhooksGhlEventsRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
 }
 export interface FileRoutesByTo {
@@ -178,10 +200,12 @@ export interface FileRoutesByTo {
   '/dashboard/admin': typeof DashboardAdminRoute
   '/dashboard/driver': typeof DashboardDriverRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
+  '/go/convini': typeof GoConviniRoute
   '/guides/fica-tip-credit': typeof GuidesFicaTipCreditRoute
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
   '/print/reviews': typeof PrintReviewsRoute
+  '/print/vip': typeof PrintVipRoute
   '/$companySlug': typeof CompanySlugIndexRoute
   '/dashboard': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
@@ -189,6 +213,7 @@ export interface FileRoutesByTo {
   '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/public/webhooks/ghl': typeof ApiPublicWebhooksGhlRoute
+  '/api/public/webhooks/ghl-events': typeof ApiPublicWebhooksGhlEventsRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
 }
 export interface FileRoutesById {
@@ -203,10 +228,12 @@ export interface FileRoutesById {
   '/dashboard/admin': typeof DashboardAdminRoute
   '/dashboard/driver': typeof DashboardDriverRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
+  '/go/convini': typeof GoConviniRoute
   '/guides/fica-tip-credit': typeof GuidesFicaTipCreditRoute
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
   '/print/reviews': typeof PrintReviewsRoute
+  '/print/vip': typeof PrintVipRoute
   '/$companySlug/': typeof CompanySlugIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
@@ -214,6 +241,7 @@ export interface FileRoutesById {
   '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/public/webhooks/ghl': typeof ApiPublicWebhooksGhlRoute
+  '/api/public/webhooks/ghl-events': typeof ApiPublicWebhooksGhlEventsRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
 }
 export interface FileRouteTypes {
@@ -229,10 +257,12 @@ export interface FileRouteTypes {
     | '/dashboard/admin'
     | '/dashboard/driver'
     | '/email/unsubscribe'
+    | '/go/convini'
     | '/guides/fica-tip-credit'
     | '/guides/tip-pooling'
     | '/join/$code'
     | '/print/reviews'
+    | '/print/vip'
     | '/$companySlug/'
     | '/dashboard/'
     | '/$companySlug/d/$driverSlug'
@@ -240,6 +270,7 @@ export interface FileRouteTypes {
     | '/print/employee/$id'
     | '/api/auth/google/callback'
     | '/api/public/webhooks/ghl'
+    | '/api/public/webhooks/ghl-events'
     | '/api/public/webhooks/stripe'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -253,10 +284,12 @@ export interface FileRouteTypes {
     | '/dashboard/admin'
     | '/dashboard/driver'
     | '/email/unsubscribe'
+    | '/go/convini'
     | '/guides/fica-tip-credit'
     | '/guides/tip-pooling'
     | '/join/$code'
     | '/print/reviews'
+    | '/print/vip'
     | '/$companySlug'
     | '/dashboard'
     | '/$companySlug/d/$driverSlug'
@@ -264,6 +297,7 @@ export interface FileRouteTypes {
     | '/print/employee/$id'
     | '/api/auth/google/callback'
     | '/api/public/webhooks/ghl'
+    | '/api/public/webhooks/ghl-events'
     | '/api/public/webhooks/stripe'
   id:
     | '__root__'
@@ -277,10 +311,12 @@ export interface FileRouteTypes {
     | '/dashboard/admin'
     | '/dashboard/driver'
     | '/email/unsubscribe'
+    | '/go/convini'
     | '/guides/fica-tip-credit'
     | '/guides/tip-pooling'
     | '/join/$code'
     | '/print/reviews'
+    | '/print/vip'
     | '/$companySlug/'
     | '/dashboard/'
     | '/$companySlug/d/$driverSlug'
@@ -288,6 +324,7 @@ export interface FileRouteTypes {
     | '/print/employee/$id'
     | '/api/auth/google/callback'
     | '/api/public/webhooks/ghl'
+    | '/api/public/webhooks/ghl-events'
     | '/api/public/webhooks/stripe'
   fileRoutesById: FileRoutesById
 }
@@ -302,16 +339,19 @@ export interface RootRouteChildren {
   DashboardAdminRoute: typeof DashboardAdminRoute
   DashboardDriverRoute: typeof DashboardDriverRoute
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
+  GoConviniRoute: typeof GoConviniRoute
   GuidesFicaTipCreditRoute: typeof GuidesFicaTipCreditRoute
   GuidesTipPoolingRoute: typeof GuidesTipPoolingRoute
   JoinCodeRoute: typeof JoinCodeRoute
   PrintReviewsRoute: typeof PrintReviewsRoute
+  PrintVipRoute: typeof PrintVipRoute
   CompanySlugIndexRoute: typeof CompanySlugIndexRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   CompanySlugDDriverSlugRoute: typeof CompanySlugDDriverSlugRoute
   ApiAuthGoogleRoute: typeof ApiAuthGoogleRouteWithChildren
   PrintEmployeeIdRoute: typeof PrintEmployeeIdRoute
   ApiPublicWebhooksGhlRoute: typeof ApiPublicWebhooksGhlRoute
+  ApiPublicWebhooksGhlEventsRoute: typeof ApiPublicWebhooksGhlEventsRoute
   ApiPublicWebhooksStripeRoute: typeof ApiPublicWebhooksStripeRoute
 }
 
@@ -401,6 +441,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmailUnsubscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/go/convini': {
+      id: '/go/convini'
+      path: '/go/convini'
+      fullPath: '/go/convini'
+      preLoaderRoute: typeof GoConviniRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/guides/fica-tip-credit': {
       id: '/guides/fica-tip-credit'
       path: '/guides/fica-tip-credit'
@@ -427,6 +474,13 @@ declare module '@tanstack/react-router' {
       path: '/print/reviews'
       fullPath: '/print/reviews'
       preLoaderRoute: typeof PrintReviewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/print/vip': {
+      id: '/print/vip'
+      path: '/print/vip'
+      fullPath: '/print/vip'
+      preLoaderRoute: typeof PrintVipRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$companySlug/d/$driverSlug': {
@@ -464,6 +518,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWebhooksGhlRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/webhooks/ghl-events': {
+      id: '/api/public/webhooks/ghl-events'
+      path: '/api/public/webhooks/ghl-events'
+      fullPath: '/api/public/webhooks/ghl-events'
+      preLoaderRoute: typeof ApiPublicWebhooksGhlEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/webhooks/stripe': {
       id: '/api/public/webhooks/stripe'
       path: '/api/public/webhooks/stripe'
@@ -497,16 +558,19 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardAdminRoute: DashboardAdminRoute,
   DashboardDriverRoute: DashboardDriverRoute,
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
+  GoConviniRoute: GoConviniRoute,
   GuidesFicaTipCreditRoute: GuidesFicaTipCreditRoute,
   GuidesTipPoolingRoute: GuidesTipPoolingRoute,
   JoinCodeRoute: JoinCodeRoute,
   PrintReviewsRoute: PrintReviewsRoute,
+  PrintVipRoute: PrintVipRoute,
   CompanySlugIndexRoute: CompanySlugIndexRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   CompanySlugDDriverSlugRoute: CompanySlugDDriverSlugRoute,
   ApiAuthGoogleRoute: ApiAuthGoogleRouteWithChildren,
   PrintEmployeeIdRoute: PrintEmployeeIdRoute,
   ApiPublicWebhooksGhlRoute: ApiPublicWebhooksGhlRoute,
+  ApiPublicWebhooksGhlEventsRoute: ApiPublicWebhooksGhlEventsRoute,
   ApiPublicWebhooksStripeRoute: ApiPublicWebhooksStripeRoute,
 }
 export const routeTree = rootRouteImport

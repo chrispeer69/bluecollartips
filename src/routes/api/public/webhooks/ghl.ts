@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { timingSafeEqual } from "crypto";
+import { verifyGhlSecret } from "@/lib/webhook-auth.server";
 import { hashReviewToken, newReviewToken } from "@/lib/review-webhooks.server";
 import { matchDriver, type DriverCandidate } from "@/lib/driver-match";
 
@@ -43,21 +43,6 @@ function json(status: number, data: unknown) {
   });
 }
 
-function verifySecret(request: Request): boolean {
-  const expected = process.env.GHL_WEBHOOK_SECRET;
-  if (!expected) return false;
-  const provided =
-    request.headers.get("x-webhook-secret") ||
-    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
-    "";
-  if (!provided || provided.length !== expected.length) return false;
-  try {
-    return timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
-  } catch {
-    return false;
-  }
-}
-
 function validEmail(value: string | undefined): string | null {
   if (!value) return null;
   const email = value.trim();
@@ -69,7 +54,7 @@ export const Route = createFileRoute("/api/public/webhooks/ghl")({
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: CORS }),
       POST: async ({ request }) => {
-        if (!verifySecret(request)) return json(401, { error: "Invalid or missing webhook secret" });
+        if (!verifyGhlSecret(request)) return json(401, { error: "Invalid or missing webhook secret" });
 
         let payload: unknown;
         try {

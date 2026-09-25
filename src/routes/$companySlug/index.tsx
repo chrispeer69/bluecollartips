@@ -2,6 +2,7 @@ import { createFileRoute, useParams } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getPublicCompany, submitCompanyRating } from "@/lib/public.functions";
+import { trackGoogleClick } from "@/lib/vip.functions";
 import { StripeCardPanel } from "@/components/StripeCardPanel";
 import { PRESET_TIPS, TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib/constants";
 import { Check, Copy } from "lucide-react";
@@ -35,6 +36,8 @@ function CompanyReviewPage() {
   const { t: reviewToken } = Route.useSearch();
   const getCompany = useServerFn(getPublicCompany);
   const submit = useServerFn(submitCompanyRating);
+  const trackGoogle = useServerFn(trackGoogleClick);
+  const [ratingId, setRatingId] = useState<string | null>(null);
   const [company, setCompany] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [stars, setStars] = useState(0);
@@ -116,6 +119,7 @@ function CompanyReviewPage() {
         stars={stars}
         reviewText={feedback}
         redirectUrl={positiveRedirectUrl}
+        onGoogleClick={ratingId ? () => trackGoogle({ data: { ratingId } }) : undefined}
       />
     );
   }
@@ -154,6 +158,7 @@ function CompanyReviewPage() {
       try {
         const result = await submitRating();
         setPositiveRedirectUrl(result.redirectUrl ?? null);
+        setRatingId(result.ratingId ?? null);
         setDone(true);
       } catch (err) { setError(err instanceof Error ? err.message : "Could not submit"); } finally { setBusy(false); }
     }}>
@@ -247,6 +252,7 @@ function CompanyReviewPage() {
                 try {
                   const result = await submitRating();
                   setPositiveRedirectUrl(result.redirectUrl ?? null);
+        setRatingId(result.ratingId ?? null);
                 } catch { /* The payment is still safely recorded by Stripe's webhook. */ }
               }
               setDone(true);

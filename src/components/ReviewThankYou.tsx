@@ -9,6 +9,7 @@ export function ReviewThankYou({
   reviewText,
   redirectUrl,
   driverName,
+  onGoogleClick,
 }: {
   companyName: string;
   companyLogoUrl?: string | null;
@@ -17,6 +18,8 @@ export function ReviewThankYou({
   reviewText: string;
   redirectUrl?: string | null;
   driverName?: string | null;
+  /** Records the tap for the VIP follow-up report; never holds up the redirect for long. */
+  onGoogleClick?: () => Promise<unknown> | void;
 }) {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
@@ -40,7 +43,14 @@ export function ReviewThankYou({
 
   async function copyAndContinue() {
     const success = review ? await copyReview() : true;
-    if (success && redirectUrl) window.location.assign(redirectUrl);
+    if (!success || !redirectUrl) return;
+    if (onGoogleClick) {
+      await Promise.race([
+        Promise.resolve().then(onGoogleClick).catch(() => undefined),
+        new Promise((resolve) => setTimeout(resolve, 800)),
+      ]);
+    }
+    window.location.assign(redirectUrl);
   }
 
   return (

@@ -34,8 +34,28 @@ async function authenticatedUserId(request: Request): Promise<string | null> {
 function isSameOrigin(request: Request): boolean {
   const origin = request.headers.get("origin");
   if (!origin) return false;
+  const fetchSite = request.headers.get("sec-fetch-site")?.toLowerCase();
+  if (fetchSite && fetchSite !== "same-origin") return false;
   try {
-    return new URL(origin).origin === new URL(request.url).origin;
+    const allowedOrigins = new Set<string>([new URL(request.url).origin]);
+
+    for (const configuredUrl of [process.env.APP_PUBLIC_URL, process.env.APP_BASE_URL]) {
+      if (!configuredUrl?.trim()) continue;
+      allowedOrigins.add(new URL(configuredUrl.trim()).origin);
+    }
+
+    // Railway terminates TLS before forwarding the request to the app, so
+    // request.url may contain an internal HTTP origin. Reconstruct the public
+    // origin from the proxy headers instead of rejecting a legitimate upload.
+    const forwardedHost = request.headers.get("x-forwarded-host")?.split(",", 1)[0].trim();
+    const host = forwardedHost || request.headers.get("host")?.trim();
+    const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",", 1)[0].trim();
+    const protocol = forwardedProto || new URL(request.url).protocol.replace(":", "");
+    if (host && (protocol === "https" || protocol === "http")) {
+      allowedOrigins.add(new URL(`${protocol}://${host}`).origin);
+    }
+
+    return allowedOrigins.has(new URL(origin).origin);
   } catch {
     return false;
   }

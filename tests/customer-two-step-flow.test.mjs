@@ -190,6 +190,9 @@ test("profile picture uploads are cropped, bounded, authorized, and rate limited
   assert.match(photoUploader, /OUTPUT_SIZE = 512/);
   assert.match(photoUploader, /image\/jpeg/);
   assert.match(photoServer, /isSameOrigin/);
+  assert.match(photoServer, /APP_PUBLIC_URL/);
+  assert.match(photoServer, /x-forwarded-host/);
+  assert.match(photoServer, /sec-fetch-site/);
   assert.match(photoServer, /canEditDriver/);
   assert.match(photoServer, /MAX_UPLOADS_PER_HOUR/);
   assert.match(photoServer, /dimensions\.width !== 512/);

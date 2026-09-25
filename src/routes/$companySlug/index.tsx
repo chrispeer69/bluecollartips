@@ -4,6 +4,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { getPublicCompany, submitCompanyRating } from "@/lib/public.functions";
 import { StripeCardPanel } from "@/components/StripeCardPanel";
 import { PRESET_TIPS, TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib/constants";
+import { Check, Copy } from "lucide-react";
+import { ReviewQualityPicker } from "@/components/ReviewQualityPicker";
+import { ReviewThankYou } from "@/components/ReviewThankYou";
+import {
+  REVIEW_QUALITIES,
+  composeReviewSentence,
+} from "@/lib/review-suggestions";
 
 // Company-level rating page: reached when dispatch could not match a driver,
 // or from the company's general QR/link. Mirrors the driver page's design so
@@ -23,12 +30,6 @@ function firstName(fullName: string): string {
   return fullName.trim().split(/\s+/)[0] || "";
 }
 
-const SUGGESTED_FEEDBACK = [
-  "My driver did a fantastic job!",
-  "Fast, friendly and professional.",
-  "Went above and beyond to help me.",
-];
-
 function CompanyReviewPage() {
   const { companySlug } = useParams({ from: "/$companySlug/" });
   const { t: reviewToken } = Route.useSearch();
@@ -39,6 +40,8 @@ function CompanyReviewPage() {
   const [stars, setStars] = useState(0);
   const [hoverStars, setHoverStars] = useState(0);
   const [feedback, setFeedback] = useState("");
+  const [selectedQualities, setSelectedQualities] = useState<string[]>([]);
+  const [reviewCopied, setReviewCopied] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -48,6 +51,7 @@ function CompanyReviewPage() {
   const [tipCents, setTipCents] = useState<number | null>(null);
   const [customTip, setCustomTip] = useState("");
   const [customTipOpen, setCustomTipOpen] = useState(false);
+  const [positiveRedirectUrl, setPositiveRedirectUrl] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +77,24 @@ function CompanyReviewPage() {
   const finalTipCents = tipCents ?? (Number.isFinite(customTipCents) ? customTipCents : 0);
   const tipValid = finalTipCents === 0 || (finalTipCents >= TIP_MIN_CENTS && finalTipCents <= TIP_MAX_CENTS);
   const emailOk = !customerEmail.trim() || EMAIL_RE.test(customerEmail.trim());
+  function toggleQuality(id: string) {
+    const next = selectedQualities.includes(id)
+      ? selectedQualities.filter((qualityId) => qualityId !== id)
+      : [...selectedQualities, id];
+    setSelectedQualities(next);
+    setFeedback(composeReviewSentence("My driver", next));
+    setReviewCopied(false);
+  }
+
+  async function copyFeedbackForReview() {
+    const copied = await copyReviewText(feedback);
+    if (!copied) {
+      setError("Could not copy automatically. Press and hold your feedback to copy it.");
+      return;
+    }
+    setError(null);
+    setReviewCopied(true);
+  }
 
   if (loading) return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading…</div>;
   if (!company) {
@@ -87,13 +109,14 @@ function CompanyReviewPage() {
   }
   if (done) {
     return (
-      <div className="min-h-screen px-6 py-10 text-center" style={{ background: brand.primary, color: "white" }}>
-        <div className="mx-auto max-w-md">
-          {company.logo_url ? <img src={company.logo_url} alt={company.name} className="mx-auto h-16" /> : <div className="text-sm uppercase tracking-widest opacity-80">{company.name}</div>}
-          <h1 className="display mt-10 text-3xl font-bold">Thank you!</h1>
-          <p className="mt-3 text-base opacity-90">Your support helps the {company.name} team keep raising the bar.</p>
-        </div>
-      </div>
+      <ReviewThankYou
+        companyName={company.name}
+        companyLogoUrl={company.logo_url}
+        brandColor={brand.primary}
+        stars={stars}
+        reviewText={feedback}
+        redirectUrl={positiveRedirectUrl}
+      />
     );
   }
 
@@ -112,9 +135,12 @@ function CompanyReviewPage() {
   return <div className="min-h-screen bg-background pb-16">
     <header className="px-6 py-8 text-center text-white" style={{ background: brand.primary }}>
       {company.logo_url ? <img src={company.logo_url} alt={company.name} className="mx-auto h-12" /> : <div className="text-sm uppercase tracking-widest opacity-80">{company.name}</div>}
-      <p className="mx-auto mt-5 max-w-sm text-sm leading-snug opacity-90">
-        {knownName ? `${firstName(customerName)}, we` : "We"} can not thank you enough for choosing {company.name}
-      </p>
+      <div className="mx-auto mt-5 max-w-sm">
+        <p className="text-base font-semibold">Your feedback matters to us</p>
+        <p className="mt-1 text-sm leading-snug opacity-90">
+          {knownName ? `${firstName(customerName)}, your` : "Your"} review helps {company.name} improve the experience for every customer.
+        </p>
+      </div>
     </header>
 
     <form className="mx-auto max-w-md px-5 pt-6" onSubmit={async (e) => {
@@ -127,7 +153,7 @@ function CompanyReviewPage() {
       setBusy(true);
       try {
         const result = await submitRating();
-        if (result.redirectUrl) { window.location.assign(result.redirectUrl); return; }
+        setPositiveRedirectUrl(result.redirectUrl ?? null);
         setDone(true);
       } catch (err) { setError(err instanceof Error ? err.message : "Could not submit"); } finally { setBusy(false); }
     }}>
@@ -144,22 +170,29 @@ function CompanyReviewPage() {
           })}
         </div>
 
-        <label className="mt-5 block text-sm font-medium">Anything you'd like to share?</label>
-        <p className="mt-1 text-xs text-muted-foreground">Tap a suggestion or write your own.</p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {SUGGESTED_FEEDBACK.map((msg) => {
-            const selected = feedback === msg;
-            return (
-              <button type="button" key={msg} onClick={() => setFeedback(selected ? "" : msg)}
-                className="rounded-full border px-3 py-1.5 text-left text-xs font-medium transition-colors"
-                style={selected ? { background: brand.secondary, color: "white", borderColor: brand.secondary } : { borderColor: "var(--border)" }}>
-                {msg}
-              </button>
-            );
-          })}
+        <label className="mt-5 block text-sm font-medium">Tell us about your experience</label>
+        <div className="mt-2 inline-flex rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
+          Choose as many as apply
         </div>
-        <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} rows={3} maxLength={2000} placeholder="Optional"
+        <ReviewQualityPicker
+          qualities={REVIEW_QUALITIES}
+          selectedIds={selectedQualities}
+          onToggle={toggleQuality}
+          brandColor={brand.secondary}
+        />
+        <textarea value={feedback} onChange={(e) => { setFeedback(e.target.value); setReviewCopied(false); }} rows={3} maxLength={2000}
+          placeholder="Choose an option above or write your own review"
           className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+        {stars >= 4 && feedback.trim() && company.positive_redirect_url && (
+          <div className="mt-3 rounded-xl border border-cyan-200 bg-cyan-50 p-3 text-slate-900">
+            <button type="button" onClick={() => void copyFeedbackForReview()}
+              className="inline-flex items-center gap-2 rounded-lg border border-cyan-300 bg-cyan-200 px-4 py-2.5 text-sm font-bold text-cyan-950 shadow-sm transition-colors hover:bg-cyan-300">
+              {reviewCopied ? <Check className="h-5 w-5" aria-hidden="true" /> : <Copy className="h-5 w-5" aria-hidden="true" />}
+              {reviewCopied ? "Copied" : "Copy for public review"}
+            </button>
+            <p className="mt-2 text-xs text-cyan-900">After this step, we’ll open the public review page so you can paste your review there.</p>
+          </div>
+        )}
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           {!knownName && <Field label="Your name" value={customerName} setValue={setCustomerName} />}
@@ -213,7 +246,7 @@ function CompanyReviewPage() {
               if (stars) {
                 try {
                   const result = await submitRating();
-                  if (result.redirectUrl) { window.location.assign(result.redirectUrl); return; }
+                  setPositiveRedirectUrl(result.redirectUrl ?? null);
                 } catch { /* The payment is still safely recorded by Stripe's webhook. */ }
               }
               setDone(true);
@@ -251,4 +284,27 @@ function Field({ label, value, setValue, type = "text", placeholder, required }:
         className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
     </label>
   );
+}
+
+async function copyReviewText(value: string): Promise<boolean> {
+  const text = value.trim();
+  if (!text) return false;
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fall through for browsers that block the async Clipboard API.
+    }
+  }
+  const field = document.createElement("textarea");
+  field.value = text;
+  field.setAttribute("readonly", "");
+  field.style.position = "fixed";
+  field.style.opacity = "0";
+  document.body.appendChild(field);
+  field.select();
+  const copied = document.execCommand("copy");
+  field.remove();
+  return copied;
 }

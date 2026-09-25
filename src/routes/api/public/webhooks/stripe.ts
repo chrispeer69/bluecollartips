@@ -35,15 +35,20 @@ export const Route = createFileRoute("/api/public/webhooks/stripe")({
           const pi = event.data.object as {
             id: string;
             amount: number;
+            currency: string;
             created: number;
             metadata?: Record<string, string>;
             status: string;
           };
           try {
-            const { recordSuccessfulStripeTip } = await import("@/lib/stripe-tip-ledger.server");
+            const { deliverRecordedTipWebhook, recordSuccessfulStripeTip } = await import("@/lib/stripe-tip-ledger.server");
             const recorded = await recordSuccessfulStripeTip(db, pi);
             const driverId = recorded.driverId;
             const companyId = recorded.companyId;
+
+            if (recorded.recorded) {
+              await deliverRecordedTipWebhook(db, pi, recorded);
+            }
 
             // Notify the employee and send the customer a receipt.
             if (recorded.recorded && driverId) try {

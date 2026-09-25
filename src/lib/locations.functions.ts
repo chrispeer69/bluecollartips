@@ -97,31 +97,54 @@ export const updateReviewLinks = createServerFn({ method: "POST" })
       yelpUrl: httpUrl(500).optional().nullable(),
       facebookUrl: httpUrl(500).optional().nullable(),
       positiveRatingThreshold: z.number().int().min(1).max(5),
-      positiveSubmitAction: z.enum(["success_page", "redirect"]),
-      positiveRedirectUrl: httpUrl(1000).optional().nullable(),
+      positiveReviewDestination: z.enum(["none", "google", "yelp", "facebook", "custom"]),
+      customRedirectUrl: httpUrl(1000).optional().nullable(),
       reviewWebhookEnabled: z.boolean(),
       reviewWebhookUrl: httpUrl(1000).optional().nullable(),
+      tipWebhookEnabled: z.boolean(),
+      tipWebhookUrl: httpUrl(1000).optional().nullable(),
     }).superRefine((value, ctx) => {
-      if (value.positiveSubmitAction === "redirect" && !value.positiveRedirectUrl) {
-        ctx.addIssue({ code: "custom", path: ["positiveRedirectUrl"], message: "Redirect URL is required" });
+      const destinations = {
+        google: value.googleUrl,
+        yelp: value.yelpUrl,
+        facebook: value.facebookUrl,
+        custom: value.customRedirectUrl,
+      } as const;
+      if (value.positiveReviewDestination !== "none" && !destinations[value.positiveReviewDestination]) {
+        const path = value.positiveReviewDestination === "custom"
+          ? "customRedirectUrl"
+          : `${value.positiveReviewDestination}Url`;
+        ctx.addIssue({ code: "custom", path: [path], message: "Add a URL for the selected destination" });
       }
       if (value.reviewWebhookEnabled && !value.reviewWebhookUrl) {
         ctx.addIssue({ code: "custom", path: ["reviewWebhookUrl"], message: "Webhook URL is required" });
+      }
+      if (value.tipWebhookEnabled && !value.tipWebhookUrl) {
+        ctx.addIssue({ code: "custom", path: ["tipWebhookUrl"], message: "Tip webhook URL is required" });
       }
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
     await assertCompanyAdmin(context.userId, data.companyId);
     const { db } = await import("@/db/client.server");
+    const selectedRedirect = {
+      none: null,
+      google: data.googleUrl ?? null,
+      yelp: data.yelpUrl ?? null,
+      facebook: data.facebookUrl ?? null,
+      custom: data.customRedirectUrl ?? null,
+    }[data.positiveReviewDestination];
     const update: Record<string, unknown> = {
       google_review_url: data.googleUrl ?? null,
       yelp_review_url: data.yelpUrl ?? null,
       facebook_review_url: data.facebookUrl ?? null,
       positive_rating_threshold: data.positiveRatingThreshold,
-      positive_submit_action: data.positiveSubmitAction,
-      positive_redirect_url: data.positiveRedirectUrl ?? null,
+      positive_submit_action: selectedRedirect ? "redirect" : "success_page",
+      positive_redirect_url: selectedRedirect,
       review_webhook_enabled: data.reviewWebhookEnabled,
       review_webhook_url: data.reviewWebhookUrl ?? null,
+      tip_webhook_enabled: data.tipWebhookEnabled,
+      tip_webhook_url: data.tipWebhookUrl ?? null,
     };
     const { error } = await db
       .from("companies")

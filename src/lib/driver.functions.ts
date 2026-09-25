@@ -133,7 +133,6 @@ export const updateDriverProfile = createServerFn({ method: "POST" })
     driverId: z.string().uuid(),
     displayName: z.string().trim().min(1).max(80),
     phone: z.string().trim().max(40).optional().nullable(),
-    photoUrl: z.union([z.string().trim().url().max(1000), z.literal("")]).optional().nullable(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { driver } = await resolveAccessibleDriver(context.userId, data.driverId);
@@ -142,7 +141,6 @@ export const updateDriverProfile = createServerFn({ method: "POST" })
     const { error } = await db.from("drivers").update({
       display_name: data.displayName,
       phone: data.phone || null,
-      photo_url: data.photoUrl || null,
     }).eq("id", driver.id);
     if (error) throw new Error(error.message);
     if (driver.user_id === context.userId) {

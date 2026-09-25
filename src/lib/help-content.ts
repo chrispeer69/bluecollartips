@@ -27,7 +27,7 @@ export const HELP_SECTIONS: HelpSection[] = [
         body: `Here is the order that gets you live fastest.
 
 1. Company settings → Branding: upload your logo and pick your two brand colors. Customers see these on every rating and tip page.
-2. Company settings → Review syndication links: paste your Google, Yelp and Facebook review URLs. Happy customers are asked to post a public review right after they rate you.
+2. Company settings → Public review destinations: save your Google, Yelp and Facebook review URLs, then select the one positive customers should visit. For Google, use the "write a review" link from your Google Business Profile.
 3. Company settings → Tip distribution: choose how much of each tip (0–10%) the company keeps. The rest goes to the employee. Blue Collar Tips keeps a flat 10%.
 4. Employees → Add employee: enter each tech or driver's name, email and phone. Each one gets a personal QR code and tip link.
 5. Print the QR codes (Employees → QR) and put them on trucks, invoices or business cards.
@@ -43,7 +43,7 @@ You can do all of this from the Overview page links or the left navigation.`,
 
 They tap a star rating, optionally leave a comment (with one-tap suggested comments), and can leave a tip by card, Apple Pay or Google Pay. Their name and phone are pre-filled when the link came from dispatch, so most customers finish in under 30 seconds.
 
-After they submit, customers who rated at or above your "positive rating" threshold (default 4 stars) are invited to post a public review on Google, Yelp or Facebook.
+After the tip step, customers who rated at or above your "positive rating" threshold (default 4 stars) are sent to the one public-review URL configured by the company.
 
 Low ratings are flagged and appear under Ratings & feedback → Discrepancy flags so you can follow up before they turn into a public complaint.`,
       },
@@ -117,7 +117,7 @@ Ask Blue Collar Tips support for the webhook URL and secret for your company —
         id: "outbound-webhook",
         title: "Send new ratings to your CRM",
         audience: ["admin"],
-        body: `Under Company settings you can set a review webhook URL and secret. Every new rating is POSTed there (stars, comment, customer, employee, job ID) so your CRM or automation platform can follow up, tag the contact, or trigger a review request.`,
+        body: `Under Company settings you can keep the existing review webhook for review.submitted events and configure a separate tip webhook for tip.received events. The review workflow remains isolated. Tip events include the contact, employee, job ID, amount and payment time so a separate GHL workflow can stop pending follow-ups and update the contact.`,
       },
     ],
   },
@@ -199,9 +199,9 @@ To stop it happening: make sure employee names in Blue Collar Tips match your di
         id: "public-reviews",
         title: "Getting more Google reviews",
         audience: ["admin"],
-        body: `After a customer rates at or above your positive-rating threshold they see buttons to review you on Google, Yelp and Facebook. Make sure those URLs are set under Company settings → Review syndication links — for Google, use your "write a review" short link from Google Business Profile.
+        body: `After the tip step, a customer at or above your positive-rating threshold is sent to the destination selected under Company settings → Public review destinations. Google, Yelp and Facebook links remain saved, but the customer sees only the selected destination. For Google, use your direct "write a review" link from Google Business Profile.
 
-Ratings below the threshold are not sent to public review sites; they are flagged for you to handle privately.`,
+Ratings below the threshold are not redirected; they see a thank-you page and are flagged for you to handle privately.`,
       },
     ],
   },

@@ -15,6 +15,7 @@ import { LeaveWorkspacePanel } from "@/components/LeaveWorkspacePanel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Banknote, Building2, Landmark, LayoutDashboard, LifeBuoy, QrCode, Settings, WalletCards } from "lucide-react";
 import { HelpCenter, TenantSupportPanel } from "@/components/SupportCenter";
+import { ProfilePhotoUploader } from "@/components/ProfilePhotoUploader";
 
 type DriverPage = "overview" | "share" | "tips" | "earnings" | "payoutAccount" | "settings" | "support";
 const driverNav: DashboardNavItem<DriverPage>[] = [
@@ -874,7 +875,6 @@ function ProfileSettingsPanel({ driver, accountEmail, onSaved }: { driver: any; 
   const save = useServerFn(updateDriverProfile);
   const [displayName, setDisplayName] = useState(driver.display_name ?? "");
   const [phone, setPhone] = useState(driver.phone ?? "");
-  const [photoUrl, setPhotoUrl] = useState(driver.photo_url ?? "");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const company = Array.isArray(driver.companies) ? driver.companies[0] : driver.companies;
@@ -887,7 +887,7 @@ function ProfileSettingsPanel({ driver, accountEmail, onSaved }: { driver: any; 
         setMessage(null);
         try {
           await save({ data: {
-            driverId: driver.id, displayName, phone: phone || null, photoUrl: photoUrl || null,
+            driverId: driver.id, displayName, phone: phone || null,
           } });
           setMessage("Profile saved. Your QR code and link remain unchanged.");
           onSaved();
@@ -897,7 +897,15 @@ function ProfileSettingsPanel({ driver, accountEmail, onSaved }: { driver: any; 
       }}>
         <label className="text-sm">Display name<input className={fieldClass} value={displayName} onChange={(e) => setDisplayName(e.target.value)} required maxLength={80} /></label>
         <label className="text-sm">Phone<input className={fieldClass} value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={40} /></label>
-        <label className="text-sm sm:col-span-2">Profile photo URL<input className={fieldClass} type="url" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder="https://…" /></label>
+        <div className="sm:col-span-2">
+          <ProfilePhotoUploader
+            driverId={driver.id}
+            displayName={displayName || driver.display_name}
+            initialPhotoUrl={driver.photo_url}
+            onChanged={() => onSaved()}
+          />
+          <p className="mt-2 text-xs text-muted-foreground">Company admins and the profile owner can update this picture.</p>
+        </div>
         <div className="rounded-md border border-border bg-muted/50 p-3 text-sm">
           <div className="text-xs text-muted-foreground">Login email · unique account identifier</div>
           <div className="mt-1 break-all font-medium">{accountEmail ?? "Unavailable"}</div>

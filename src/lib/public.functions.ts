@@ -51,14 +51,23 @@ async function enforceCompanyRateLimit(companyId: string) {
   );
 }
 
-const PUBLIC_COMPANY_FIELDS = "id, name, slug, logo_url, primary_color, secondary_color, support_email, google_review_url, yelp_review_url, facebook_review_url, positive_rating_threshold, positive_submit_action, positive_redirect_url";
+const PUBLIC_COMPANY_FIELDS = "id, name, slug, logo_url, primary_color, secondary_color, support_email, positive_rating_threshold, positive_submit_action, positive_redirect_url";
 
-async function resolveReviewContext(db: any, token: string | null | undefined, companyId: string, driverId?: string | null) {
+async function resolveReviewContext(
+  db: any,
+  token: string | null | undefined,
+  companyId: string,
+  driverId?: string | null,
+  submittedRatingId?: string | null,
+) {
   if (!token) return null;
   const { data: context } = await db.from("review_contexts")
-    .select("id, driver_id, external_job_id, external_contact_id, customer_name, customer_phone, customer_email, expires_at, consumed_at")
+    .select("id, driver_id, external_job_id, external_contact_id, customer_name, customer_phone, customer_email, dispatch_driver_name, expires_at, consumed_at, rating_id")
     .eq("token_hash", hashReviewToken(token)).eq("company_id", companyId).maybeSingle();
-  if (!context || context.consumed_at || new Date(context.expires_at).getTime() <= Date.now()) {
+  const validSubmittedReview = Boolean(
+    submittedRatingId && context?.rating_id === submittedRatingId,
+  );
+  if (!context || (context.consumed_at && !validSubmittedReview) || new Date(context.expires_at).getTime() <= Date.now()) {
     throw new Error("This review link is invalid, expired, or has already been used.");
   }
   if (driverId && context.driver_id && context.driver_id !== driverId) {
@@ -84,7 +93,12 @@ export const getPublicCompany = createServerFn({ method: "GET" })
 
 export const getPublicDriver = createServerFn({ method: "GET" })
   .inputValidator((data) =>
-    z.object({ companySlug: z.string().min(1), driverSlug: z.string().min(1), reviewToken: z.string().trim().min(20).max(200).optional().nullable() }).parse(data),
+    z.object({
+      companySlug: z.string().min(1),
+      driverSlug: z.string().min(1),
+      reviewToken: z.string().trim().min(20).max(200).optional().nullable(),
+      submittedRatingId: z.string().uuid().optional().nullable(),
+    }).parse(data),
   )
   .handler(async ({ data }) => {
     const { db } = await import("@/db/client.server");
@@ -93,7 +107,13 @@ export const getPublicDriver = createServerFn({ method: "GET" })
       .select(PUBLIC_COMPANY_FIELDS)
       .eq("slug", data.companySlug)
       .maybeSingle();
-    if (!company) return { company: null, driver: null };
+    if (!company) return {
+      company: null,
+      driver: null,
+      reviewContact: null,
+      submittedReview: null,
+      tipAlreadyReceived: false,
+    };
     const { data: driver } = await db
       .from("drivers")
       .select("id, display_name, slug, photo_url, status")
@@ -101,12 +121,45 @@ export const getPublicDriver = createServerFn({ method: "GET" })
       .eq("slug", data.driverSlug)
       .eq("status", "active")
       .maybeSingle();
-    const context = driver ? await resolveReviewContext(db, data.reviewToken, company.id, driver.id) : null;
+    const context = driver
+      ? await resolveReviewContext(
+          db,
+          data.reviewToken,
+          company.id,
+          driver.id,
+          data.submittedRatingId,
+        )
+      : null;
+    let submittedReview: {
+      id: string;
+      stars: number;
+      feedback: string | null;
+      customer_name: string | null;
+      customer_phone: string | null;
+      customer_email: string | null;
+    } | null = null;
+    let tipAlreadyReceived = false;
+    if (context && data.submittedRatingId) {
+      const { data: rating } = await db.from("ratings")
+        .select("id, stars, feedback, customer_name, customer_phone, customer_email")
+        .eq("id", data.submittedRatingId)
+        .eq("company_id", company.id)
+        .eq("driver_id", driver.id)
+        .maybeSingle();
+      if (!rating) throw new Error("This tip link is not valid.");
+      submittedReview = rating;
+      const { data: paidTip } = await db.from("tips")
+        .select("id")
+        .eq("rating_id", rating.id)
+        .eq("verified", true)
+        .maybeSingle();
+      tipAlreadyReceived = Boolean(paidTip);
+    }
     return { company, driver, reviewContact: context ? {
       name: context.customer_name ?? null,
       phone: context.customer_phone ?? null,
       email: context.customer_email ?? null,
-    } : null };
+    } : null, submittedReview, tipAlreadyReceived };
   });
 
 export const submitRating = createServerFn({ method: "POST" })
@@ -138,7 +191,7 @@ export const submitRating = createServerFn({ method: "POST" })
     }
     const { data: driver } = await db
       .from("drivers")
-      .select("id, status")
+      .select("id, display_name, status")
       .eq("company_id", company.id)
       .eq("slug", data.driverSlug)
       .maybeSingle();
@@ -166,6 +219,11 @@ export const submitRating = createServerFn({ method: "POST" })
     if (rErr) throw rErr;
     if (reviewContext) await db.from("review_contexts").update({ consumed_at: new Date().toISOString(), rating_id: rating.id }).eq("id", reviewContext.id);
 
+    const appOrigin = (process.env.APP_PUBLIC_URL ?? "https://bluecollartips.app").replace(/\/$/, "");
+    const tipUrl = reviewContext && data.reviewToken && data.stars >= 4
+      ? `${appOrigin}/${encodeURIComponent(data.companySlug)}/d/${encodeURIComponent(data.driverSlug)}?${new URLSearchParams({ t: data.reviewToken, tip: "1", r: rating.id }).toString()}`
+      : null;
+
     // Stripe records online tips independently. This public endpoint records
     // only the rating; cash and external tips must be logged by an employee.
     try {
@@ -185,14 +243,15 @@ export const submitRating = createServerFn({ method: "POST" })
     await deliverReviewWebhook(db, company, {
       event: "review.submitted", ratingId: rating.id, companySlug: data.companySlug,
       jobId: reviewContext?.external_job_id ?? null, ghlContactId: reviewContext?.external_contact_id ?? null,
-      driverId: driver.id, driverSlug: data.driverSlug, stars: data.stars,
-      feedback: data.feedback ?? null, customerName: data.customerName ?? null,
+      driverId: driver.id, driverName: driver.display_name, driverSlug: data.driverSlug, stars: data.stars,
+      feedback: data.feedback ?? null, tipUrl, customerName: data.customerName ?? null,
       customerPhone: data.customerPhone ?? null, customerEmail: data.customerEmail ?? null,
       submittedAt: new Date().toISOString(),
     });
 
-    const redirectUrl = data.stars >= company.positive_rating_threshold &&
-      company.positive_submit_action === "redirect" ? company.positive_redirect_url : null;
+    const redirectUrl = data.stars >= company.positive_rating_threshold
+      ? company.positive_redirect_url
+      : null;
     return { ok: true, ratingId: rating.id, redirectUrl };
   });
 
@@ -229,11 +288,15 @@ export const submitCompanyRating = createServerFn({ method: "POST" })
     await deliverReviewWebhook(db, company, {
       event: "review.submitted", ratingId: rating.id, companySlug: data.companySlug,
       jobId: reviewContext?.external_job_id ?? null, ghlContactId: reviewContext?.external_contact_id ?? null,
-      driverId: null, driverSlug: null, stars: data.stars, feedback: data.feedback ?? null,
+      driverId: null, driverName: reviewContext?.dispatch_driver_name ?? null, driverSlug: null,
+      // Company-level pages do not have a verified driver to pay. Do not send
+      // a follow-up payment link until an admin has attributed the review.
+      stars: data.stars, feedback: data.feedback ?? null, tipUrl: null,
       customerName: data.customerName ?? null, customerPhone: data.customerPhone ?? null,
       customerEmail: data.customerEmail ?? null, submittedAt: new Date().toISOString(),
     });
-    const redirectUrl = data.stars >= company.positive_rating_threshold &&
-      company.positive_submit_action === "redirect" ? company.positive_redirect_url : null;
+    const redirectUrl = data.stars >= company.positive_rating_threshold
+      ? company.positive_redirect_url
+      : null;
     return { ok: true, ratingId: rating.id, redirectUrl };
   });

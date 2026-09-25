@@ -1,12 +1,28 @@
 import { createFileRoute, useParams } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getPublicDriver, submitRating } from "@/lib/public.functions";
-import { PRESET_TIPS, TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib/constants";
+import {
+  CUSTOMER_TIP_PRESETS,
+  DEFAULT_CUSTOMER_TIP_CENTS,
+  TIP_MAX_CENTS,
+  TIP_MIN_CENTS,
+  dollars,
+} from "@/lib/constants";
 import { StripeCardPanel } from "@/components/StripeCardPanel";
+import { ReviewQualityPicker } from "@/components/ReviewQualityPicker";
+import { ReviewThankYou } from "@/components/ReviewThankYou";
+import {
+  REVIEW_QUALITIES,
+  composeReviewSentence,
+} from "@/lib/review-suggestions";
 
 export const Route = createFileRoute("/$companySlug/d/$driverSlug")({
-  validateSearch: (search: Record<string, unknown>) => ({ t: typeof search.t === "string" ? search.t : undefined }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    t: typeof search.t === "string" ? search.t : undefined,
+    tip: search.tip === "1" ? "1" as const : undefined,
+    r: typeof search.r === "string" ? search.r : undefined,
+  }),
   head: ({ params }) => ({
     meta: [
       { title: "Rate your service — Blue Collar Tips" },
@@ -23,7 +39,7 @@ export const Route = createFileRoute("/$companySlug/d/$driverSlug")({
 
 function TipPage() {
   const { companySlug, driverSlug } = useParams({ from: "/$companySlug/d/$driverSlug" });
-  const { t: reviewToken } = Route.useSearch();
+  const { t: reviewToken, tip: tipMode, r: submittedRatingId } = Route.useSearch();
   const getDriver = useServerFn(getPublicDriver);
   const submit = useServerFn(submitRating);
 
@@ -32,12 +48,16 @@ function TipPage() {
   const [stars, setStars] = useState(0);
   const [hoverStars, setHoverStars] = useState(0);
   const [feedback, setFeedback] = useState("");
+  const [selectedQualities, setSelectedQualities] = useState<string[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   // Name/phone already known from the tracked review link — don't ask again.
   const [knownName, setKnownName] = useState(false);
   const [knownPhone, setKnownPhone] = useState(false);
+  const [step, setStep] = useState<"review" | "tip">("review");
+  const [ratingId, setRatingId] = useState<string | null>(null);
+  const [positiveRedirectUrl, setPositiveRedirectUrl] = useState<string | null>(null);
   const [tipCents, setTipCents] = useState<number | null>(null);
   const [customTip, setCustomTip] = useState("");
   const [customTipOpen, setCustomTipOpen] = useState(false);
@@ -46,7 +66,14 @@ function TipPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getDriver({ data: { companySlug, driverSlug, reviewToken } })
+    getDriver({
+      data: {
+        companySlug,
+        driverSlug,
+        reviewToken,
+        submittedRatingId: tipMode === "1" ? submittedRatingId : null,
+      },
+    })
       .then((result) => {
         setData(result);
         if (result.reviewContact) {
@@ -59,15 +86,36 @@ function TipPage() {
           const email = result.reviewContact.email ?? "";
           setCustomerEmail(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "");
         }
+        if (tipMode === "1" && result.submittedReview) {
+          setStars(result.submittedReview.stars);
+          setFeedback(result.submittedReview.feedback ?? "");
+          setCustomerName(result.submittedReview.customer_name ?? result.reviewContact?.name ?? "");
+          setCustomerPhone(result.submittedReview.customer_phone ?? result.reviewContact?.phone ?? "");
+          setCustomerEmail(result.submittedReview.customer_email ?? result.reviewContact?.email ?? "");
+          setRatingId(result.submittedReview.id);
+          setPositiveRedirectUrl(result.company?.positive_redirect_url ?? null);
+          setTipCents(DEFAULT_CUSTOMER_TIP_CENTS);
+          setStep("tip");
+          setDone(result.tipAlreadyReceived);
+        }
       })
       .finally(() => setLoading(false));
-  }, [companySlug, driverSlug, getDriver, reviewToken]);
+  }, [companySlug, driverSlug, getDriver, reviewToken, submittedRatingId, tipMode]);
 
   const brand = useMemo(() => {
     const primary = data?.company?.primary_color || "#0b2545";
     const secondary = data?.company?.secondary_color || "#f59e0b";
     return { primary, secondary };
   }, [data]);
+  function toggleQuality(id: string) {
+    const next = selectedQualities.includes(id)
+      ? selectedQualities.filter((qualityId) => qualityId !== id)
+      : [...selectedQualities, id];
+    setSelectedQualities(next);
+    setFeedback(
+      composeReviewSentence(firstName(data?.driver?.display_name ?? "Our driver"), next),
+    );
+  }
 
   if (loading) {
     return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading…</div>;
@@ -89,65 +137,15 @@ function TipPage() {
 
   if (done) {
     return (
-      <div
-        className="min-h-screen px-6 py-10 text-center"
-        style={{ background: brand.primary, color: "white" }}
-      >
-        <div className="mx-auto max-w-md">
-          {company.logo_url ? (
-            <img src={company.logo_url} alt={company.name} className="mx-auto h-16" />
-          ) : (
-            <div className="text-sm uppercase tracking-widest opacity-80">{company.name}</div>
-          )}
-          <h1 className="display mt-10 text-3xl font-bold">Thank you!</h1>
-          <p className="mt-3 text-base opacity-90">
-            Your support helps {driver.display_name} and the {company.name} team keep raising the
-            bar.
-          </p>
-          {stars >= company.positive_rating_threshold && (company.google_review_url || company.yelp_review_url || company.facebook_review_url) && (
-            <div className="mt-8 rounded-lg bg-white/10 p-4 text-left">
-              <div className="text-center text-sm opacity-90">
-                Loved us? Share a review — it takes 30 seconds and means the world:
-              </div>
-              <div className="mt-3 flex flex-wrap justify-center gap-2">
-                {company.google_review_url && (
-                  <a
-                    href={company.google_review_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-md bg-white px-4 py-2 text-sm font-semibold"
-                    style={{ color: brand.primary }}
-                  >
-                    Review on Google
-                  </a>
-                )}
-                {company.yelp_review_url && (
-                  <a
-                    href={company.yelp_review_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-md bg-white px-4 py-2 text-sm font-semibold"
-                    style={{ color: brand.primary }}
-                  >
-                    Review on Yelp
-                  </a>
-                )}
-                {company.facebook_review_url && (
-                  <a
-                    href={company.facebook_review_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-md bg-white px-4 py-2 text-sm font-semibold"
-                    style={{ color: brand.primary }}
-                  >
-                    Review on Facebook
-                  </a>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      <ReviewThankYou
+        companyName={company.name}
+        companyLogoUrl={company.logo_url}
+        brandColor={brand.primary}
+        stars={stars}
+        reviewText={feedback}
+        redirectUrl={positiveRedirectUrl}
+        driverName={driver.display_name}
+      />
     );
   }
 
@@ -175,14 +173,6 @@ function TipPage() {
       setError("Please enter a valid email address.");
       return;
     }
-    if (!tipValid) {
-      setError(`Tip must be between ${dollars(TIP_MIN_CENTS)} and ${dollars(TIP_MAX_CENTS)}.`);
-      return;
-    }
-    if (finalTipCents > 0) {
-      setError("Use the secure payment button above to finish your tip.");
-      return;
-    }
     setSubmitting(true);
     try {
       const result = await submit({
@@ -197,16 +187,23 @@ function TipPage() {
           reviewToken,
         },
       });
-      if (result.redirectUrl) {
-        window.location.assign(result.redirectUrl);
-        return;
+      setRatingId(result.ratingId);
+      setPositiveRedirectUrl(result.redirectUrl ?? null);
+      if (stars >= 4) {
+        setTipCents(DEFAULT_CUSTOMER_TIP_CENTS);
+        setStep("tip");
+      } else {
+        setDone(true);
       }
-      setDone(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not submit");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function finishTipStep() {
+    setDone(true);
   }
 
   return (
@@ -221,28 +218,29 @@ function TipPage() {
           <div className="text-sm uppercase tracking-widest opacity-80">{company.name}</div>
         )}
         <div className="mt-6 flex items-center justify-center gap-3">
-          {driver.photo_url && (
-            <img
-              src={driver.photo_url}
-              alt={driver.display_name}
-              className="h-12 w-12 rounded-full object-cover ring-2 ring-white/40"
-            />
-          )}
+          <DriverAvatar
+            photoUrl={driver.photo_url}
+            name={driver.display_name}
+            className="h-12 w-12 ring-2 ring-white/40"
+          />
           <div className="text-left">
             <div className="text-xs uppercase tracking-wider opacity-80">Your driver</div>
             <div className="text-lg font-semibold">{driver.display_name}</div>
           </div>
         </div>
-        <p className="mx-auto mt-5 max-w-sm text-sm leading-snug opacity-90">
-          {knownName ? `${firstName(customerName)}, we` : "We"} can not thank you enough for choosing{" "}
-          {company.name}
-        </p>
+        <div className="mx-auto mt-5 max-w-sm">
+          <p className="text-base font-semibold">Your feedback matters to us</p>
+          <p className="mt-1 text-sm leading-snug opacity-90">
+            {knownName ? `${firstName(customerName)}, your` : "Your"} review helps {company.name}
+            improve the experience for every customer.
+          </p>
+        </div>
       </header>
 
       <form onSubmit={onSubmit} className="mx-auto max-w-md px-5 pt-6">
         <h1 className="sr-only">Rate your service{driver ? ` with ${driver.display_name}` : ""}</h1>
-        <section className="rounded-xl border border-border bg-card p-5">
-          <h2 className="text-base font-semibold">How did the driver do?</h2>
+        {step === "review" && <section className="rounded-xl border border-border bg-card p-5">
+          <h2 className="text-base font-semibold">How was your service with {firstName(driver.display_name)}?</h2>
           <div
             className="mt-3 flex justify-between"
             onMouseLeave={() => setHoverStars(0)}
@@ -265,35 +263,23 @@ function TipPage() {
             })}
           </div>
 
-          <label className="mt-5 block text-sm font-medium">Anything you'd like to share?</label>
-          <p className="mt-1 text-xs text-muted-foreground">Tap a suggestion or write your own.</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {suggestedFeedback(driver.display_name).map((msg) => {
-              const selected = feedback === msg;
-              return (
-                <button
-                  type="button"
-                  key={msg}
-                  onClick={() => setFeedback(selected ? "" : msg)}
-                  className="rounded-full border px-3 py-1.5 text-left text-xs font-medium transition-colors"
-                  style={
-                    selected
-                      ? { background: brand.secondary, color: "white", borderColor: brand.secondary }
-                      : { borderColor: "var(--border)" }
-                  }
-                >
-                  {msg}
-                </button>
-              );
-            })}
+          <label className="mt-5 block text-sm font-medium">Tell us about your experience</label>
+          <div className="mt-2 inline-flex rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
+            Choose as many as apply
           </div>
+          <ReviewQualityPicker
+            qualities={REVIEW_QUALITIES}
+            selectedIds={selectedQualities}
+            onToggle={toggleQuality}
+            brandColor={brand.secondary}
+          />
           <textarea
             className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             rows={3}
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
             maxLength={2000}
-            placeholder="Optional"
+            placeholder="Choose an option above or write your own review"
           />
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -335,17 +321,42 @@ function TipPage() {
               />
             </div>
           </div>
-        </section>
+        </section>}
 
-        <section
+        {step === "tip" && <section
           className="mt-5 rounded-xl border-2 bg-card p-5"
           style={{ borderColor: SKY, boxShadow: `0 0 0 4px ${SKY}22` }}
         >
-          <h2 className="text-lg font-bold" style={{ color: SKY }}>
-            Leave {firstName(driver.display_name)} a tip
-          </h2>
+          <div className="text-center">
+            <h2 className="text-xl font-bold" style={{ color: SKY }}>{firstName(driver.display_name)} would love your support</h2>
+            <p className="mt-1 text-sm text-muted-foreground">A tip is optional and goes directly to {firstName(driver.display_name)}.</p>
+          </div>
+          <div className="mt-5 flex items-center gap-4 rounded-xl bg-muted/40 p-4">
+            <DriverAvatar
+              photoUrl={driver.photo_url}
+              name={driver.display_name}
+              className="h-24 w-24 border-2 shadow-sm"
+              style={{ borderColor: SKY }}
+            />
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">Your driver</div>
+              <div className="text-xl font-bold" style={{ color: SKY }}>{driver.display_name}</div>
+              <div className="mt-1 text-sm text-muted-foreground">Leave an optional tip directly for {firstName(driver.display_name)}.</div>
+            </div>
+          </div>
+          {feedback.trim() ? (
+            <div className="mt-4 rounded-xl border border-cyan-200 bg-cyan-50 p-4 text-slate-900">
+              <div className="text-xs font-bold uppercase tracking-wider text-cyan-900">Your feedback</div>
+              <p className="max-h-40 overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed">{feedback.trim()}</p>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-lg bg-muted/60 p-3 text-sm">
+              Thanks for giving {firstName(driver.display_name)} {stars} stars.
+            </div>
+          )}
+          <h2 className="mt-4 text-lg font-bold" style={{ color: SKY }}>Choose a tip amount</h2>
           <div className="mt-3 grid grid-cols-4 gap-2">
-            {PRESET_TIPS.map((c) => {
+            {CUSTOMER_TIP_PRESETS.map((c) => {
               const selected = tipCents === c;
               return (
                 <button
@@ -415,38 +426,24 @@ function TipPage() {
                   driverSlug={driverSlug}
                   amountCents={finalTipCents}
                   customerName={customerName || null}
-                customerPhone={customerPhone || null}
-                customerEmail={customerEmail || null}
-                stars={stars || null}
+                  customerPhone={customerPhone || null}
+                  customerEmail={customerEmail || null}
+                  stars={stars || null}
+                  ratingId={ratingId}
                   brandColor={brand.primary}
-                  onPaid={async () => {
-                    if (stars) {
-                      try {
-                        const result = await submit({
-                          data: {
-                            companySlug,
-                            driverSlug,
-                            stars,
-                            feedback: feedback.trim() || null,
-                            customerName: customerName.trim() || null,
-                            customerPhone: customerPhone.trim() || null,
-                            customerEmail: customerEmail.trim() || null,
-                            reviewToken,
-                          },
-                        });
-                        if (result.redirectUrl) {
-                          window.location.assign(result.redirectUrl);
-                          return;
-                        }
-                      } catch { /* rating optional after payment */ }
-                    }
-                    setDone(true);
-                  }}
+                  onPaid={finishTipStep}
                 />
               )}
             </>
           )}
-        </section>
+          <button
+            type="button"
+            onClick={finishTipStep}
+            className="mt-4 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            Continue without a tip
+          </button>
+        </section>}
 
         {error && (
           <div className="mt-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -454,7 +451,7 @@ function TipPage() {
           </div>
         )}
 
-        {finalTipCents === 0 && (
+        {step === "review" && (
           <button
             type="submit"
             disabled={submitting}
@@ -463,7 +460,7 @@ function TipPage() {
             // tenants' primary is itself a blue that swallows sky text).
             style={{ borderColor: SKY, color: SKY }}
           >
-            {submitting ? "Submitting…" : "Submit Rating"}
+            {submitting ? "Saving…" : "Save review and continue"}
           </button>
         )}
 
@@ -490,11 +487,39 @@ function firstName(fullName: string): string {
   return fullName.trim().split(/\s+/)[0] || "";
 }
 
-function suggestedFeedback(driverName: string): string[] {
-  const name = firstName(driverName) || "Our driver";
-  return [
-    `${name} did a fantastic job!`,
-    `${name} was fast, friendly and professional.`,
-    `${name} went above and beyond to help me.`,
-  ];
+function DriverAvatar({
+  photoUrl,
+  name,
+  className = "",
+  style,
+}: {
+  photoUrl?: string | null;
+  name: string;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  if (photoUrl && !imageFailed) {
+    return (
+      <img
+        src={photoUrl}
+        alt={name}
+        onError={() => setImageFailed(true)}
+        className={`shrink-0 rounded-full object-cover ${className}`}
+        style={style}
+      />
+    );
+  }
+  return (
+    <div
+      role="img"
+      aria-label={`${name} profile photo placeholder`}
+      className={`grid shrink-0 place-items-center rounded-full bg-slate-200 text-slate-500 ${className}`}
+      style={style}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3/5 w-3/5 fill-current">
+        <path d="M12 12a4.25 4.25 0 1 0 0-8.5 4.25 4.25 0 0 0 0 8.5Zm0 2c-4.14 0-7.5 2.46-7.5 5.5 0 .55.45 1 1 1h13c.55 0 1-.45 1-1 0-3.04-3.36-5.5-7.5-5.5Z" />
+      </svg>
+    </div>
+  );
 }

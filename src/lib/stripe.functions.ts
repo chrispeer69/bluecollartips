@@ -95,6 +95,7 @@ export const createTipPaymentIntent = createServerFn({ method: "POST" })
         customerPhone: z.string().trim().max(40).optional().nullable(),
         customerEmail: z.string().trim().max(200).optional().nullable(),
         stars: z.number().int().min(1).max(5).optional().nullable(),
+        ratingId: z.string().uuid().optional().nullable(),
       })
       .parse(d),
   )
@@ -124,19 +125,25 @@ export const createTipPaymentIntent = createServerFn({ method: "POST" })
     if (data.driverSlug && (!driver || driver.status !== "active")) {
       throw new Error("Driver not available");
     }
+    if (data.ratingId) {
+      let ratingQuery = db
+        .from("ratings")
+        .select("id")
+        .eq("id", data.ratingId)
+        .eq("company_id", company.id);
+      ratingQuery = driver
+        ? ratingQuery.eq("driver_id", driver.id)
+        : ratingQuery.is("driver_id", null);
+      const { data: rating } = await ratingQuery.maybeSingle();
+      if (!rating) throw new Error("Rating does not belong to this tip page");
+    }
 
     const pi = await stripe.paymentIntents.create({
       amount: data.amountCents,
       currency: "usd",
-      // Every Dashboard-enabled method available in the US, listed explicitly
-      // so Stripe doesn't silently filter any out.
-      payment_method_types: [
-        "card",          // Visa/MC/Amex + Apple Pay & Google Pay wallets
-        "cashapp",       // Cash App Pay
-        "amazon_pay",    // Amazon Pay
-        "link",          // Stripe Link (one-click checkout)
-        "klarna",        // Klarna buy-now-pay-later
-      ],
+      // Stripe now decides from the methods enabled in the Dashboard. This
+      // keeps disabled methods (such as Klarna) out of the Payment Element.
+      automatic_payment_methods: { enabled: true },
       metadata: {
         company_id: company.id,
         driver_id: driver?.id ?? "",
@@ -144,6 +151,7 @@ export const createTipPaymentIntent = createServerFn({ method: "POST" })
         customer_phone: data.customerPhone ?? "",
         customer_email: data.customerEmail ?? "",
         stars: String(data.stars ?? ""),
+        rating_id: data.ratingId ?? "",
       },
     });
     return { clientSecret: pi.client_secret, paymentIntentId: pi.id };
@@ -176,13 +184,24 @@ export const finalizeTipPayment = createServerFn({ method: "POST" })
     if (pi.status !== "succeeded") throw new Error("Payment has not completed yet");
 
     const { db } = await import("@/db/client.server");
-    const { recordSuccessfulStripeTip } = await import("./stripe-tip-ledger.server");
-    await recordSuccessfulStripeTip(db, {
+    const { deliverRecordedTipWebhook, recordSuccessfulStripeTip } = await import("./stripe-tip-ledger.server");
+    const recorded = await recordSuccessfulStripeTip(db, {
       id: pi.id,
       amount: pi.amount,
+      currency: pi.currency,
       created: pi.created,
       metadata: pi.metadata,
       status: pi.status,
     });
+    if (recorded.recorded) {
+      await deliverRecordedTipWebhook(db, {
+        id: pi.id,
+        amount: pi.amount,
+        currency: pi.currency,
+        created: pi.created,
+        metadata: pi.metadata,
+        status: pi.status,
+      }, recorded);
+    }
     return { ok: true };
   });

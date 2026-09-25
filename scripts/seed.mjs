@@ -26,13 +26,16 @@ await db.begin(async (tx) => {
     insert into companies (
       name, slug, support_email, support_phone, primary_color, secondary_color,
       google_review_url, yelp_review_url, facebook_review_url,
+      positive_submit_action, positive_redirect_url,
       driver_pct, company_pct, platform_pct, thank_you_enabled
     ) values (
       'Blue Collar Demo Towing', 'blue-collar-demo', 'dispatch@bluecollardemo.local', '+1 555 010 1000',
       '#0F2A44', '#F97316', 'https://g.page/r/demo/review', 'https://yelp.com/biz/demo',
-      'https://facebook.com/demo/reviews', 80, 10, 10, true
+      'https://facebook.com/demo/reviews', 'redirect', 'https://g.page/r/demo/review', 80, 10, 10, true
     ) on conflict (slug) do update set
-      name = excluded.name, support_email = excluded.support_email, support_phone = excluded.support_phone
+      name = excluded.name, support_email = excluded.support_email, support_phone = excluded.support_phone,
+      positive_submit_action = excluded.positive_submit_action,
+      positive_redirect_url = excluded.positive_redirect_url
     returning id
   `;
 

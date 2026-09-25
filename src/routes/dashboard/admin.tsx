@@ -39,6 +39,7 @@ import { DispatchImportPanel } from "@/components/DispatchImportPanel";
 import { PerformancePanel } from "@/components/PerformancePanel";
 import { ReviewPrintPanel } from "@/components/ReviewPrintPanel";
 import { reconciliationOverview } from "@/lib/reconciliation.functions";
+import { ProfilePhotoUploader } from "@/components/ProfilePhotoUploader";
 
 export const Route = createFileRoute("/dashboard/admin")({
   // ?support=<ticketId> deep-links from support emails straight to a ticket.
@@ -338,7 +339,7 @@ function AdminDashboard() {
           <LocationsPanel companyId={data.company.id} />
         </Section>}
 
-        {page === "settings" && <Section title="Review syndication links (Google / Yelp / Facebook)">
+        {page === "settings" && <Section title="Public review destinations">
           <ReviewLinksPanel
             companyId={data.company.id}
             companySlug={data.company.slug}
@@ -348,10 +349,11 @@ function AdminDashboard() {
               yelp: data.company.yelp_review_url ?? "",
               facebook: data.company.facebook_review_url ?? "",
               threshold: data.company.positive_rating_threshold ?? 4,
-              action: data.company.positive_submit_action ?? "success_page",
               redirectUrl: data.company.positive_redirect_url ?? "",
               webhookEnabled: data.company.review_webhook_enabled ?? false,
               webhookUrl: data.company.review_webhook_url ?? "",
+              tipWebhookEnabled: data.company.tip_webhook_enabled ?? false,
+              tipWebhookUrl: data.company.tip_webhook_url ?? "",
             }}
             onSaved={() => load(companyId)}
           />
@@ -627,6 +629,7 @@ function DriverRoster({
                     </button>
                   </div>
                   {expanded && <div id={`employee-details-${d.id}`} className="space-y-5 border-t border-border bg-muted/20 p-4 sm:p-5">
+                    <EmployeePhotoEditor driver={d} onSaved={onLocationChanged} />
                     <div className="grid gap-4 sm:grid-cols-2">
                       <label className="space-y-2 text-xs font-medium">Status
                         <Select value={d.status} onValueChange={(value) => runEmployeeAction(() => onStatus(d.id, value as "pending" | "active" | "deactivated"))}>
@@ -674,6 +677,17 @@ function DriverRoster({
         />
       )}
     </>
+  );
+}
+
+function EmployeePhotoEditor({ driver, onSaved }: { driver: any; onSaved: () => void }) {
+  return (
+    <ProfilePhotoUploader
+      driverId={driver.id}
+      displayName={driver.display_name}
+      initialPhotoUrl={driver.photo_url}
+      onChanged={() => onSaved()}
+    />
   );
 }
 
@@ -2239,7 +2253,7 @@ function ReviewLinksPanel({
   companyId: string;
   companySlug: string;
   companyLogo?: string | null;
-  initial: { google: string; yelp: string; facebook: string; threshold: number; action: "success_page" | "redirect"; redirectUrl: string; webhookEnabled: boolean; webhookUrl: string };
+  initial: { google: string; yelp: string; facebook: string; threshold: number; redirectUrl: string; webhookEnabled: boolean; webhookUrl: string; tipWebhookEnabled: boolean; tipWebhookUrl: string };
   onSaved: () => void;
 }) {
   const save = useServerFn(updateReviewLinks);
@@ -2247,10 +2261,22 @@ function ReviewLinksPanel({
   const [yelp, setYelp] = useState(initial.yelp);
   const [facebook, setFacebook] = useState(initial.facebook);
   const [threshold, setThreshold] = useState(initial.threshold);
-  const [action, setAction] = useState(initial.action);
-  const [redirectUrl, setRedirectUrl] = useState(initial.redirectUrl);
+  const [destination, setDestination] = useState<"none" | "google" | "yelp" | "facebook" | "custom">(() => {
+    if (!initial.redirectUrl) return "none";
+    if (initial.redirectUrl === initial.google) return "google";
+    if (initial.redirectUrl === initial.yelp) return "yelp";
+    if (initial.redirectUrl === initial.facebook) return "facebook";
+    return "custom";
+  });
+  const [customRedirectUrl, setCustomRedirectUrl] = useState(
+    initial.redirectUrl && ![initial.google, initial.yelp, initial.facebook].includes(initial.redirectUrl)
+      ? initial.redirectUrl
+      : "",
+  );
   const [webhookEnabled, setWebhookEnabled] = useState(initial.webhookEnabled);
   const [webhookUrl, setWebhookUrl] = useState(initial.webhookUrl);
+  const [tipWebhookEnabled, setTipWebhookEnabled] = useState(initial.tipWebhookEnabled);
+  const [tipWebhookUrl, setTipWebhookUrl] = useState(initial.tipWebhookUrl);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const companyUrl = typeof window !== "undefined" ? `${window.location.origin}/${companySlug}` : `/${companySlug}`;
@@ -2276,10 +2302,12 @@ function ReviewLinksPanel({
               yelpUrl: yelp.trim() || null,
               facebookUrl: facebook.trim() || null,
               positiveRatingThreshold: threshold,
-              positiveSubmitAction: action,
-              positiveRedirectUrl: redirectUrl.trim() || null,
+              positiveReviewDestination: destination,
+              customRedirectUrl: customRedirectUrl.trim() || null,
               reviewWebhookEnabled: webhookEnabled,
               reviewWebhookUrl: webhookUrl.trim() || null,
+              tipWebhookEnabled,
+              tipWebhookUrl: tipWebhookUrl.trim() || null,
             },
           });
           setMsg("Saved ✓");
@@ -2298,22 +2326,45 @@ function ReviewLinksPanel({
           <SelectContent><SelectItem value="4">4 stars and above</SelectItem><SelectItem value="5">5 stars only</SelectItem></SelectContent>
         </Select>
       </label>
-      <label className="text-sm">After a positive submission
-        <Select value={action} onValueChange={(value) => setAction(value as "success_page" | "redirect")}>
+      <label className="text-sm">Redirect positive reviews to
+        <Select value={destination} onValueChange={(value) => setDestination(value as typeof destination)}>
           <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="success_page">Show success page</SelectItem><SelectItem value="redirect">Redirect to a link</SelectItem></SelectContent>
+          <SelectContent>
+            <SelectItem value="google">Google</SelectItem>
+            <SelectItem value="yelp">Yelp</SelectItem>
+            <SelectItem value="facebook">Facebook</SelectItem>
+            <SelectItem value="custom">Custom URL</SelectItem>
+            <SelectItem value="none">Thank-you page only</SelectItem>
+          </SelectContent>
         </Select>
       </label>
-      {action === "redirect" && <div className="sm:col-span-2"><Input label="Redirect URL" value={redirectUrl} onChange={setRedirectUrl} placeholder="https://g.page/r/…/review" required /></div>}
+      {destination === "custom" && (
+        <div className="sm:col-span-2">
+          <Input label="Custom redirect URL" value={customRedirectUrl} onChange={setCustomRedirectUrl} placeholder="https://…" required />
+        </div>
+      )}
+      <p className="sm:col-span-2 text-xs text-muted-foreground">
+        All links stay saved. Customers see only the destination selected above after the tip step.
+      </p>
       <div className="sm:col-span-2 rounded-lg border border-border p-4">
         <label className="flex items-center gap-2 text-sm font-medium">
           <input type="checkbox" checked={webhookEnabled} onChange={(e) => setWebhookEnabled(e.target.checked)} />
-          Send submitted ratings to this company’s webhook
+          Send submitted reviews to this company’s webhook
         </label>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Input label="Submission webhook URL" value={webhookUrl} onChange={setWebhookUrl} placeholder="https://services.leadconnectorhq.com/hooks/…" required={webhookEnabled} />
+          <Input label="GHL inbound webhook URL" value={webhookUrl} onChange={setWebhookUrl} placeholder="https://services.leadconnectorhq.com/hooks/…" required={webhookEnabled} />
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">Requests include an HMAC-SHA256 signature managed by the server environment. Webhooks remain off until enabled.</p>
+        <p className="mt-2 text-xs text-muted-foreground">This existing URL receives only <code>review.submitted</code>. Requests include an HMAC-SHA256 signature managed by the server environment.</p>
+      </div>
+      <div className="sm:col-span-2 rounded-lg border border-border p-4">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={tipWebhookEnabled} onChange={(e) => setTipWebhookEnabled(e.target.checked)} />
+          Send successful tips to a separate webhook
+        </label>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Input label="GHL tip inbound webhook URL" value={tipWebhookUrl} onChange={setTipWebhookUrl} placeholder="https://services.leadconnectorhq.com/hooks/…" required={tipWebhookEnabled} />
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">This URL receives only <code>tip.received</code>, including the contact, driver, job number, amount, payment time, and original review. It cannot trigger the existing review workflow.</p>
       </div>
       <div className="sm:col-span-2 rounded-lg border border-border p-4">
         <div className="font-medium">Default company QR and feedback link</div>
@@ -2331,10 +2382,10 @@ function ReviewLinksPanel({
       </div>
       <div className="sm:col-span-2 flex items-center gap-3">
         <button disabled={busy} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">
-          {busy ? "Saving…" : "Save review links"}
+          {busy ? "Saving…" : "Save review settings"}
         </button>
         {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
-        <span className="text-xs text-muted-foreground">Positive customers follow the action configured above.</span>
+        <span className="text-xs text-muted-foreground">Only customers who meet the threshold will be redirected.</span>
       </div>
     </form>
   );

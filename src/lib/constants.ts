@@ -2,6 +2,8 @@ export const TIP_MIN_CENTS = 100; // $1
 export const TIP_MAX_CENTS = 50000; // $500
 
 export const PRESET_TIPS = [500, 1000, 2000];
+export const CUSTOMER_TIP_PRESETS = [1000, 2000, 3000];
+export const DEFAULT_CUSTOMER_TIP_CENTS = 2000;
 
 export function dollars(cents: number): string {
   return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });

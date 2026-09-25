@@ -30,6 +30,7 @@ type Props = {
   customerPhone?: string | null;
   customerEmail?: string | null;
   stars?: number | null;
+  ratingId?: string | null;
   brandColor: string;
   onPaid: () => void;
 };
@@ -58,6 +59,7 @@ export function StripeCardPanel(props: Props) {
         customerPhone: props.customerPhone ?? null,
         customerEmail: props.customerEmail ?? null,
         stars: props.stars ?? null,
+        ratingId: props.ratingId ?? null,
       },
     })
       .then((r) => {
@@ -65,7 +67,7 @@ export function StripeCardPanel(props: Props) {
         setPaymentIntentId(r.paymentIntentId);
       })
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : "Online payment is not available"));
-  }, [pk, props.amountCents, props.companySlug, props.driverSlug, props.customerName, props.customerPhone, props.customerEmail, props.stars, createPi]);
+  }, [pk, props.amountCents, props.companySlug, props.driverSlug, props.customerName, props.customerPhone, props.customerEmail, props.stars, props.ratingId, createPi]);
 
   const stripePromise = useMemo<Promise<Stripe | null> | null>(
     () => (pk ? loadStripe(pk) : null),

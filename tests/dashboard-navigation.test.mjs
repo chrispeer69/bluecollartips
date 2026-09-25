@@ -124,7 +124,7 @@ test("platform user administration exposes memberships and filters", () => {
 });
 
 test("unique review links carry saved customer identity into payments", () => {
-  assert.match(publicFunctions, /external_contact_id, customer_name, customer_phone, customer_email, expires_at/);
+  assert.match(publicFunctions, /external_contact_id, customer_name, customer_phone, customer_email, dispatch_driver_name, expires_at/);
   assert.match(publicFunctions, /name: context\.customer_name \?\? null/);
 });
 

@@ -20,7 +20,7 @@ dist-ssr
 *.backup
 *.dump
 *.sql.gz
-
+scripts/seed-production.mjs
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

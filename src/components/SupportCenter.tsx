@@ -12,6 +12,7 @@ import {
   type TicketStatus,
 } from "@/lib/support.functions";
 import { searchHelp } from "@/lib/help-content";
+import { prepareImage } from "@/lib/image-attach";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Audience = "admin" | "employee";
@@ -79,7 +80,7 @@ const btnGhost = "rounded-md border border-border px-3 py-1.5 text-xs";
 // Help center (static articles, searchable)
 // ---------------------------------------------------------------------------
 
-function ArticleBody({ text }: { text: string }) {
+export function ArticleBody({ text }: { text: string }) {
   const blocks = text.split(/\n\s*\n/);
   return (
     <div className="space-y-2 text-sm leading-relaxed">
@@ -224,11 +225,22 @@ export function TicketThread({ ticketId, platform, onBack, onChanged }: { ticket
   const [detail, setDetail] = useState<TicketDetail | null>(null);
   const [body, setBody] = useState("");
   const [internal, setInternal] = useState(false);
+  const [pictures, setPictures] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
     setDetail(await get({ data: { ticketId } }));
+  }
+  async function addPictures(files: File[]) {
+    for (const file of files.filter((f) => f.type.startsWith("image/"))) {
+      try {
+        const { dataUrl } = await prepareImage(file);
+        setPictures((p) => (p.length >= 4 ? p : [...p, dataUrl]));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not attach that picture");
+      }
+    }
   }
   useEffect(() => {
     load().catch((err) => setError(err instanceof Error ? err.message : "Could not load ticket"));
@@ -282,7 +294,22 @@ export function TicketThread({ ticketId, platform, onBack, onChanged }: { ticket
               </span>
               <span>{when(m.createdAt)}</span>
             </div>
-            <div className="whitespace-pre-wrap">{m.body}</div>
+            {m.body && <div className="whitespace-pre-wrap">{m.body}</div>}
+            {m.attachments.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {m.attachments.map((src) => (
+                  <a key={src} href={src} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-md border border-border">
+                    <img src={src} alt="Screenshot" loading="lazy" className="h-32 w-auto max-w-[16rem] bg-white object-contain" />
+                  </a>
+                ))}
+              </div>
+            )}
+            {platform && m.pageUrl && <div className="mt-1 text-[11px] text-muted-foreground">Sent from {m.pageUrl}{m.clientInfo ? ` · ${m.clientInfo}` : ""}</div>}
+            {m.authorKind === "platform" && !m.internal && platform && (
+              <div className="mt-1 text-right text-[11px] text-muted-foreground">
+                {t.tenantLastReadAt && new Date(t.tenantLastReadAt) >= new Date(m.createdAt) ? "Seen by tenant" : "Not seen yet"}
+              </div>
+            )}
           </li>
         ))}
       </ol>
@@ -291,10 +318,11 @@ export function TicketThread({ ticketId, platform, onBack, onChanged }: { ticket
         className="space-y-2 rounded-lg border border-border bg-muted/30 p-3"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!body.trim()) return;
+          if (!body.trim() && !pictures.length) return;
           run(async () => {
-            await reply({ data: { ticketId, body, internal } });
+            await reply({ data: { ticketId, body, internal, attachments: pictures.map((dataBase64) => ({ dataBase64 })) } });
             setBody("");
+            setPictures([]);
             setInternal(false);
           });
         }}
@@ -302,13 +330,30 @@ export function TicketThread({ ticketId, platform, onBack, onChanged }: { ticket
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
+          onPaste={(e) => {
+            const files = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
+            if (files.length) { e.preventDefault(); void addPictures(files); }
+          }}
           rows={4}
           maxLength={10000}
           className={inputCls}
           placeholder={isClosed ? "Reply to reopen this ticket…" : platform ? "Reply to the tenant…" : "Reply to Blue Collar Tips…"}
         />
         <div className="flex flex-wrap items-center gap-3">
-          <button type="submit" disabled={busy || !body.trim()} className={btnPrimary}>{busy ? "Sending…" : internal ? "Save internal note" : "Send reply"}</button>
+          {pictures.length > 0 && (
+            <span className="flex gap-1">
+              {pictures.map((src, i) => (
+                <button key={i} type="button" title="Remove" onClick={() => setPictures((p) => p.filter((_, j) => j !== i))}>
+                  <img src={src} alt="Attachment" className="h-10 w-10 rounded border border-border object-cover" />
+                </button>
+              ))}
+            </span>
+          )}
+          <label className={`${btnGhost} cursor-pointer`}>
+            Attach screenshot
+            <input type="file" accept="image/*" multiple hidden onChange={(e) => { void addPictures(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
+          </label>
+          <button type="submit" disabled={busy || (!body.trim() && !pictures.length)} className={btnPrimary}>{busy ? "Sending…" : internal ? "Save internal note" : "Send reply"}</button>
           {platform && (
             <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} /> Internal note (tenant can't see)
@@ -351,7 +396,8 @@ function TicketList({ tickets, platform, onOpen }: { tickets: TicketRow[]; platf
           <button type="button" onClick={() => onOpen(t.id)} className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 py-3 text-left hover:bg-muted/30">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">{t.subject}</span>
+                {t.unread && <span className="h-2 w-2 rounded-full bg-red-600" aria-label="New reply" />}
+                <span className={t.unread ? "font-semibold" : "font-medium"}>{t.subject}</span>
                 <StatusPill status={t.status} platform={platform} />
                 {t.priority !== "normal" && <span className={`text-xs capitalize ${PRIORITY_TONE[t.priority]}`}>{t.priority}</span>}
               </div>

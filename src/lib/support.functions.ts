@@ -61,10 +61,12 @@ async function loadTicket(ticketId: string) {
   const { sql } = await import("@/db/client.server");
   const [ticket] = await sql()`
     SELECT t.*, c.name AS company_name, c.slug AS company_slug,
-           u.full_name AS creator_name, u.email AS creator_email
+           u.full_name AS creator_name, u.email AS creator_email,
+           a.full_name AS assigned_name
     FROM support_tickets t
     JOIN companies c ON c.id = t.company_id
     JOIN users u ON u.id = t.created_by
+    LEFT JOIN users a ON a.id = t.assigned_to
     WHERE t.id = ${ticketId}
   `;
   return ticket ?? null;
@@ -122,7 +124,25 @@ const ticketSummary = (t: any) => ({
   resolvedAt: t.resolved_at ? String(t.resolved_at) : null,
   messageCount: Number(t.message_count ?? 0),
   lastMessagePreview: t.last_message_preview ?? null,
+  assignedName: t.assigned_name ?? null,
+  tenantLastReadAt: t.tenant_last_read_at ? String(t.tenant_last_read_at) : null,
+  platformLastReadAt: t.platform_last_read_at ? String(t.platform_last_read_at) : null,
+  // Set by list queries: a reply from the other side the viewer hasn't opened.
+  unread: Boolean(t.unread),
 });
+
+const firstName = (name: string | null | undefined) => (name ?? "").trim().split(/\s+/)[0] || null;
+
+/** First line of the first message, for tickets started from the chat widget. */
+export function subjectFromMessage(body: string, hasPictures: boolean) {
+  const line = body.trim().split(/\r?\n/).find((l) => l.trim())?.trim() ?? "";
+  if (!line) return hasPictures ? "Screenshot" : "Support request";
+  return line.length > 80 ? `${line.slice(0, 77).trimEnd()}…` : line;
+}
+
+const pageUrlField = z.string().trim().max(500).optional().nullable();
+const clientInfoField = z.string().trim().max(300).optional().nullable();
+const attachmentsField = z.array(z.object({ dataBase64: z.string().max(4_300_000) })).max(4).optional();
 
 /** Tickets the caller may see. Company scope for tenants; platform-wide for super admins. */
 export const listSupportTickets = createServerFn({ method: "POST" })
@@ -158,13 +178,22 @@ export const listSupportTickets = createServerFn({ method: "POST" })
           ? database`AND t.status IN ('open', 'waiting_on_platform', 'waiting_on_tenant')`
           : database`AND t.status = ${data.status}`;
 
+    // Unread = the other side posted after this side last opened the ticket.
+    const otherSide = isSuper ? "tenant" : "platform";
     const rows = await database`
       SELECT t.*, c.name AS company_name, u.full_name AS creator_name, u.email AS creator_email,
+             a.full_name AS assigned_name,
              (SELECT COUNT(*) FROM support_messages m WHERE m.ticket_id = t.id AND m.internal = false)::int AS message_count,
-             (SELECT LEFT(m.body, 140) FROM support_messages m WHERE m.ticket_id = t.id AND m.internal = false ORDER BY m.created_at DESC LIMIT 1) AS last_message_preview
+             (SELECT LEFT(COALESCE(NULLIF(m.body, ''), '📷 Screenshot'), 140) FROM support_messages m WHERE m.ticket_id = t.id AND m.internal = false AND m.author_kind <> 'system' ORDER BY m.created_at DESC LIMIT 1) AS last_message_preview,
+             EXISTS (
+               SELECT 1 FROM support_messages m
+               WHERE m.ticket_id = t.id AND m.internal = false AND m.author_kind = ${otherSide}
+                 AND m.created_at > COALESCE(${otherSide === "tenant" ? database`t.platform_last_read_at` : database`t.tenant_last_read_at`}, '-infinity'::timestamptz)
+             ) AS unread
       FROM support_tickets t
       JOIN companies c ON c.id = t.company_id
       JOIN users u ON u.id = t.created_by
+      LEFT JOIN users a ON a.id = t.assigned_to
       WHERE 1 = 1
         ${companyFilter ? database`AND t.company_id IN ${database(companyFilter)}` : database``}
         ${creatorOnly ? database`AND t.created_by = ${context.userId}` : database``}
@@ -198,30 +227,52 @@ export const listSupportTickets = createServerFn({ method: "POST" })
 
 export const getSupportTicket = createServerFn({ method: "POST" })
   .middleware([requireAuth])
-  .inputValidator((d) => z.object({ ticketId: z.string().uuid() }).parse(d))
+  .inputValidator((d) => z.object({
+    ticketId: z.string().uuid(),
+    // Opening a ticket counts as reading it (drives "Seen" and unread badges).
+    markRead: z.boolean().default(true),
+  }).parse(d))
   .handler(async ({ data, context }) => {
-    const ticket = await loadTicket(data.ticketId);
+    const { sql } = await import("@/db/client.server");
+    let ticket = await loadTicket(data.ticketId);
     if (!ticket) throw new Error("Ticket not found");
     const access = await ticketAccess(context.userId, ticket);
     if (!access.canView) throw new Error("Forbidden");
-    const { sql } = await import("@/db/client.server");
+    if (data.markRead) {
+      if (access.isSuper) await sql()`UPDATE support_tickets SET platform_last_read_at = NOW() WHERE id = ${ticket.id}`;
+      else await sql()`UPDATE support_tickets SET tenant_last_read_at = NOW() WHERE id = ${ticket.id}`;
+      ticket = (await loadTicket(data.ticketId)) ?? ticket;
+    }
     const messages = await sql()`
-      SELECT m.id, m.author_kind, m.internal, m.body, m.created_at, u.full_name AS author_name
+      SELECT m.id, m.author_kind, m.internal, m.body, m.created_at, m.page_url, m.client_info, u.full_name AS author_name
       FROM support_messages m
       LEFT JOIN users u ON u.id = m.author_id
       WHERE m.ticket_id = ${ticket.id}
         ${access.isSuper ? sql()`` : sql()`AND m.internal = false`}
       ORDER BY m.created_at ASC
     `;
+    const attachments = await sql()`
+      SELECT a.id, a.message_id FROM support_attachments a
+      JOIN support_messages m ON m.id = a.message_id
+      WHERE a.ticket_id = ${ticket.id} ${access.isSuper ? sql()`` : sql()`AND m.internal = false`}
+      ORDER BY a.created_at ASC
+    `;
+    const byMessage = new Map<string, string[]>();
+    for (const a of attachments as any[]) byMessage.set(a.message_id, [...(byMessage.get(a.message_id) ?? []), a.id]);
     return {
       ticket: ticketSummary(ticket),
       messages: messages.map((m: any) => ({
         id: m.id,
         authorKind: m.author_kind as "tenant" | "platform" | "system",
         authorName: m.author_name ?? (m.author_kind === "platform" ? "Blue Collar Tips" : "System"),
+        authorFirstName: firstName(m.author_name),
         internal: Boolean(m.internal),
-        body: m.body,
+        body: m.body as string,
         createdAt: String(m.created_at),
+        attachments: (byMessage.get(m.id) ?? []).map((id) => `/api/support-attachments/${id}`),
+        // Platform staff see where the tenant was when they wrote in.
+        pageUrl: access.isSuper ? (m.page_url ?? null) : null,
+        clientInfo: access.isSuper ? (m.client_info ?? null) : null,
       })),
       viewer: { isSuper: access.isSuper, isAdmin: access.isAdmin, isCreator: access.isCreator },
     };
@@ -232,28 +283,39 @@ export const createSupportTicket = createServerFn({ method: "POST" })
   .inputValidator((d) =>
     z.object({
       companyId: z.string().uuid(),
-      subject: z.string().trim().min(3).max(200),
+      // Optional: tickets started from the chat widget take their first line.
+      subject: z.string().trim().min(3).max(200).optional(),
       category: z.enum(TICKET_CATEGORIES.map((c) => c[0]) as [TicketCategory, ...TicketCategory[]]).default("other"),
       priority: z.enum(TICKET_PRIORITIES).default("normal"),
-      body: z.string().trim().min(5).max(10000),
+      body: z.string().trim().max(10000).default(""),
+      attachments: attachmentsField,
+      pageUrl: pageUrlField,
+      clientInfo: clientInfoField,
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const a = await accessFor(context.userId, data.companyId);
     if (!a.isSuper && !a.isAdmin && !a.isEmployee) throw new Error("Forbidden");
+    const { decodeAttachments, assertCanPost, insertAttachments } = await import("@/lib/support-attachments.server");
+    const files = decodeAttachments(data.attachments);
+    if (!data.body && !files.length) throw new Error("Type a message or attach a screenshot.");
+    await assertCanPost(context.userId, files.length);
+    const subject = data.subject ?? subjectFromMessage(data.body, files.length > 0);
     const role = a.isAdmin ? "company_admin" : a.isEmployee ? "employee" : "super_admin";
     const { sql } = await import("@/db/client.server");
     const database = sql();
     const ticket = await database.begin(async (tx) => {
       const [t] = await tx`
-        INSERT INTO support_tickets (company_id, created_by, created_by_role, subject, category, priority, status)
-        VALUES (${data.companyId}, ${context.userId}, ${role}, ${data.subject}, ${data.category}, ${data.priority}, 'waiting_on_platform')
+        INSERT INTO support_tickets (company_id, created_by, created_by_role, subject, category, priority, status, tenant_last_read_at)
+        VALUES (${data.companyId}, ${context.userId}, ${role}, ${subject}, ${data.category}, ${data.priority}, 'waiting_on_platform', NOW())
         RETURNING id
       `;
-      await tx`
-        INSERT INTO support_messages (ticket_id, author_id, author_kind, body)
-        VALUES (${t.id}, ${context.userId}, 'tenant', ${data.body})
+      const [m] = await tx`
+        INSERT INTO support_messages (ticket_id, author_id, author_kind, body, page_url, client_info)
+        VALUES (${t.id}, ${context.userId}, 'tenant', ${data.body}, ${data.pageUrl ?? null}, ${data.clientInfo ?? null})
+        RETURNING id
       `;
+      await insertAttachments(tx, { ticketId: t.id, messageId: m.id, userId: context.userId, files });
       return t;
     });
 
@@ -262,11 +324,13 @@ export const createSupportTicket = createServerFn({ method: "POST" })
     for (const to of await platformInboxEmails()) {
       await notify(
         to,
-        `[Support] ${full.company_name}: ${data.subject}`,
+        `[Support] ${full.company_name}: ${subject}`,
         [
           `${full.creator_name} (${role.replace("_", " ")}) at ${full.company_name} opened a ${data.priority} priority ticket.`,
           `Category: ${TICKET_CATEGORIES.find((c) => c[0] === data.category)?.[1] ?? data.category}`,
-          data.body,
+          ...(data.body ? [data.body] : []),
+          ...(files.length ? [`${files.length} screenshot${files.length === 1 ? "" : "s"} attached.`] : []),
+          ...(data.pageUrl ? [`Sent from: ${data.pageUrl}`] : []),
         ],
         link,
       );
@@ -279,11 +343,14 @@ export const replySupportTicket = createServerFn({ method: "POST" })
   .inputValidator((d) =>
     z.object({
       ticketId: z.string().uuid(),
-      body: z.string().trim().min(1).max(10000),
+      body: z.string().trim().max(10000).default(""),
       // Super admins only: a note the tenant never sees.
       internal: z.boolean().default(false),
       // Optional status to set alongside the reply.
       status: z.enum(TICKET_STATUSES).optional(),
+      attachments: attachmentsField,
+      pageUrl: pageUrlField,
+      clientInfo: clientInfoField,
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -292,6 +359,10 @@ export const replySupportTicket = createServerFn({ method: "POST" })
     const access = await ticketAccess(context.userId, ticket);
     if (!access.canView) throw new Error("Forbidden");
     if (data.internal && !access.isSuper) throw new Error("Only platform staff can add internal notes");
+    const { decodeAttachments, assertCanPost, insertAttachments } = await import("@/lib/support-attachments.server");
+    const files = decodeAttachments(data.attachments);
+    if (!data.body && !files.length) throw new Error("Type a message or attach a screenshot.");
+    await assertCanPost(context.userId, files.length);
 
     const kind = access.isSuper ? "platform" : "tenant";
     // A reply flips who the ball is with (and reopens a closed ticket), unless
@@ -302,35 +373,52 @@ export const replySupportTicket = createServerFn({ method: "POST" })
     const { sql } = await import("@/db/client.server");
     const database = sql();
     await database.begin(async (tx) => {
-      await tx`
-        INSERT INTO support_messages (ticket_id, author_id, author_kind, internal, body)
-        VALUES (${ticket.id}, ${context.userId}, ${kind}, ${data.internal}, ${data.body})
+      // The first platform reply "joins" the conversation, like a chat agent.
+      if (kind === "platform" && !data.internal && !ticket.assigned_to) {
+        const [me] = await tx`SELECT full_name FROM users WHERE id = ${context.userId}`;
+        await tx`
+          INSERT INTO support_messages (ticket_id, author_id, author_kind, body, created_at)
+          VALUES (${ticket.id}, ${context.userId}, 'system', ${`${firstName(me?.full_name) ?? "Blue Collar Tips"} joined the conversation`}, NOW() - interval '1 millisecond')
+        `;
+      }
+      const [m] = await tx`
+        INSERT INTO support_messages (ticket_id, author_id, author_kind, internal, body, page_url, client_info)
+        VALUES (${ticket.id}, ${context.userId}, ${kind}, ${data.internal}, ${data.body}, ${data.pageUrl ?? null}, ${data.clientInfo ?? null})
+        RETURNING id
       `;
+      await insertAttachments(tx, { ticketId: ticket.id, messageId: m.id, userId: context.userId, files });
       await tx`
         UPDATE support_tickets
         SET status = ${nextStatus},
             last_message_at = CASE WHEN ${data.internal} THEN last_message_at ELSE NOW() END,
             resolved_at = CASE WHEN ${nextStatus} IN ('resolved', 'closed') THEN COALESCE(resolved_at, NOW()) ELSE NULL END,
-            assigned_to = CASE WHEN ${kind} = 'platform' THEN COALESCE(assigned_to, ${context.userId}) ELSE assigned_to END,
+            assigned_to = CASE WHEN ${kind} = 'platform' AND NOT ${data.internal} THEN COALESCE(assigned_to, ${context.userId}) ELSE assigned_to END,
+            platform_last_read_at = CASE WHEN ${kind} = 'platform' THEN NOW() ELSE platform_last_read_at END,
+            tenant_last_read_at = CASE WHEN ${kind} = 'tenant' THEN NOW() ELSE tenant_last_read_at END,
             updated_at = NOW()
         WHERE id = ${ticket.id}
       `;
     });
 
     if (!data.internal) {
+      const pictures = files.length ? [`${files.length} screenshot${files.length === 1 ? "" : "s"} attached.`] : [];
       if (kind === "platform") {
+        // Employees don't have the admin dashboard; their chat bubble opens the thread.
+        const tenantLink = ticket.created_by_role === "employee"
+          ? `${APP_BASE_URL}/dashboard/driver?chat=${ticket.id}`
+          : `${APP_BASE_URL}/dashboard/admin?support=${ticket.id}`;
         await notify(
           ticket.creator_email,
           `Re: ${ticket.subject}`,
-          [`Blue Collar Tips replied to your support ticket "${ticket.subject}":`, data.body],
-          `${APP_BASE_URL}/dashboard/admin?support=${ticket.id}`,
+          [`Blue Collar Tips replied to your support ticket "${ticket.subject}":`, ...(data.body ? [data.body] : []), ...pictures],
+          tenantLink,
         );
       } else {
         for (const to of await platformInboxEmails()) {
           await notify(
             to,
             `[Support] ${ticket.company_name}: ${ticket.subject}`,
-            [`New reply from ${ticket.company_name}:`, data.body],
+            [`New reply from ${ticket.company_name}:`, ...(data.body ? [data.body] : []), ...pictures, ...(data.pageUrl ? [`Sent from: ${data.pageUrl}`] : [])],
             `${APP_BASE_URL}/dashboard/admin?support=${ticket.id}`,
           );
         }
@@ -376,4 +464,54 @@ export const setSupportTicketStatus = createServerFn({ method: "POST" })
       `;
     });
     return { ok: true };
+  });
+
+/**
+ * Everything the floating chat widget needs for its home screen: the caller's
+ * own conversations for this company, what's unread, and who answers.
+ */
+export const getSupportChat = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const a = await accessFor(context.userId, data.companyId);
+    if (!a.isSuper && !a.isAdmin && !a.isEmployee) throw new Error("Forbidden");
+    const { sql } = await import("@/db/client.server");
+    const database = sql();
+    const [me] = await database`SELECT full_name, email FROM users WHERE id = ${context.userId}`;
+    const rows = await database`
+      SELECT t.*, c.name AS company_name, u.full_name AS creator_name, u.email AS creator_email,
+             a.full_name AS assigned_name,
+             (SELECT COUNT(*) FROM support_messages m WHERE m.ticket_id = t.id AND m.internal = false)::int AS message_count,
+             (SELECT LEFT(COALESCE(NULLIF(m.body, ''), '📷 Screenshot'), 140) FROM support_messages m
+                WHERE m.ticket_id = t.id AND m.internal = false AND m.author_kind <> 'system'
+                ORDER BY m.created_at DESC LIMIT 1) AS last_message_preview,
+             EXISTS (
+               SELECT 1 FROM support_messages m
+               WHERE m.ticket_id = t.id AND m.internal = false AND m.author_kind = 'platform'
+                 AND m.created_at > COALESCE(t.tenant_last_read_at, '-infinity'::timestamptz)
+             ) AS unread
+      FROM support_tickets t
+      JOIN companies c ON c.id = t.company_id
+      JOIN users u ON u.id = t.created_by
+      LEFT JOIN users a ON a.id = t.assigned_to
+      WHERE t.company_id = ${data.companyId} AND t.created_by = ${context.userId}
+      ORDER BY t.last_message_at DESC
+      LIMIT 30
+    `;
+    // The people who actually answer, for the "our team" avatars.
+    const team = await database`
+      SELECT u.full_name, MAX(m.created_at) AS last_reply
+      FROM support_messages m JOIN users u ON u.id = m.author_id
+      WHERE m.author_kind = 'platform' AND m.internal = false
+      GROUP BY u.full_name ORDER BY last_reply DESC LIMIT 3
+    `;
+    const tickets = rows.map(ticketSummary);
+    return {
+      me: { firstName: firstName(me?.full_name), email: (me?.email ?? null) as string | null },
+      tickets,
+      unreadCount: tickets.filter((t) => t.unread).length,
+      team: team.map((t: any) => firstName(t.full_name)).filter(Boolean) as string[],
+      replyTime: process.env.SUPPORT_REPLY_TIME?.trim() || "A few hours",
+    };
   });

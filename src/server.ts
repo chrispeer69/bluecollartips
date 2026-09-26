@@ -3,6 +3,7 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { handleProfilePhotoRequest } from "./lib/profile-photo.server";
+import { handleSupportAttachmentRequest } from "./lib/support-attachments.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -73,6 +74,9 @@ export default {
 
       const profilePhotoResponse = await handleProfilePhotoRequest(request);
       if (profilePhotoResponse) return profilePhotoResponse;
+
+      const supportAttachmentResponse = await handleSupportAttachmentRequest(request);
+      if (supportAttachmentResponse) return supportAttachmentResponse;
 
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);

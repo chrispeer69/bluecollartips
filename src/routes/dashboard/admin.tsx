@@ -38,6 +38,7 @@ import { HelpCenter, SupportInbox, TenantSupportPanel } from "@/components/Suppo
 import { DispatchImportPanel } from "@/components/DispatchImportPanel";
 import { PerformancePanel } from "@/components/PerformancePanel";
 import { ReviewPrintPanel } from "@/components/ReviewPrintPanel";
+import { SupportChatWidget } from "@/components/SupportChatWidget";
 import { VipCustomersPanel } from "@/components/VipCustomersPanel";
 import { reconciliationOverview } from "@/lib/reconciliation.functions";
 import { ProfilePhotoUploader } from "@/components/ProfilePhotoUploader";
@@ -478,6 +479,8 @@ function AdminDashboard() {
             <PlatformPanel view={page as PlatformPage} />
           </Section>
         )}
+      {/* Super admins answer from the Support inbox instead of chatting with themselves. */}
+      {!isPlatform && !data.isSuper && <SupportChatWidget companyId={data.company.id} audience="admin" />}
     </DashboardShell>
   );
 }

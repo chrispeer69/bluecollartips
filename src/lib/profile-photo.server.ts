@@ -18,7 +18,7 @@ function sessionToken(request: Request): string | null {
   return null;
 }
 
-async function authenticatedUserId(request: Request): Promise<string | null> {
+export async function authenticatedUserId(request: Request): Promise<string | null> {
   const token = sessionToken(request);
   if (!token) return null;
   const tokenHash = createHash("sha256").update(token).digest("hex");

@@ -15,6 +15,7 @@ import { LeaveWorkspacePanel } from "@/components/LeaveWorkspacePanel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Banknote, Building2, Landmark, LayoutDashboard, LifeBuoy, MessageSquareText, QrCode, Settings, WalletCards } from "lucide-react";
 import { HelpCenter, TenantSupportPanel } from "@/components/SupportCenter";
+import { SupportChatWidget } from "@/components/SupportChatWidget";
 import { ProfilePhotoUploader } from "@/components/ProfilePhotoUploader";
 import { MyReviewsPanel } from "@/components/MyReviewsPanel";
 import { PayoutHistoryPanel } from "@/components/PayoutHistoryPanel";
@@ -271,6 +272,7 @@ function DriverDashboard() {
             </ul>
           </Section>
         )}
+      {!data.viewingAsAdmin && <SupportChatWidget companyId={data.driver.company_id} audience="employee" />}
     </DashboardShell>
   );
 }

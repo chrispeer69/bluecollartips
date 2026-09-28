@@ -213,6 +213,8 @@ export const submitRating = createServerFn({ method: "POST" })
         customer_email: data.customerEmail ?? null,
         flagged: data.stars <= 2,
         review_context_id: reviewContext?.id ?? null,
+        // The rating form shows the public-review notice before submit.
+        public_ok: true,
       })
       .select("id")
       .single();
@@ -282,6 +284,8 @@ export const submitCompanyRating = createServerFn({ method: "POST" })
       customer_phone: data.customerPhone ?? null, customer_email: data.customerEmail ?? null,
       flagged: data.stars <= 2,
       review_context_id: reviewContext?.id ?? null,
+      // The rating form shows the public-review notice before submit.
+      public_ok: true,
     }).select("id").single();
     if (error) throw error;
     if (reviewContext) await db.from("review_contexts").update({ consumed_at: new Date().toISOString(), rating_id: rating.id }).eq("id", reviewContext.id);

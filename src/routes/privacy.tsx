@@ -96,6 +96,17 @@ function PrivacyPage() {
             </p>
           </section>
           <section>
+            <h2 className="text-base font-semibold text-foreground">Public reviews</h2>
+            <p className="mt-2">
+              A company may show its customers' reviews on its own website. A published review shows
+              the star rating, the written comment, the date, the employee's first name and last
+              initial, and the customer's first name and last initial only. Phone numbers and email
+              addresses are never published. Reviews submitted before September 28, 2026 are shown
+              as a star rating only, without the comment or name. To have your review removed from
+              public display, email us.
+            </p>
+          </section>
+          <section>
             <h2 className="text-base font-semibold text-foreground">Retention and your rights</h2>
             <p className="mt-2">
               Ratings and tip records are retained while the company's account is active and as long

@@ -271,6 +271,7 @@ function CompanyReviewPage() {
         </button>
       )}
 
+      <p className="mt-4 text-center text-xs text-muted-foreground">Your star rating and comment may be shown on this company's website with your first name and last initial only. Your phone number and email are never shown.</p>
       <p className="mt-6 text-center text-xs text-muted-foreground">Powered by Blue Collar Tips</p>
       <p className="mt-2 flex justify-center gap-3 text-xs text-muted-foreground">
         <a href="/privacy" className="underline">Privacy</a>

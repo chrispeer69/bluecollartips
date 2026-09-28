@@ -31,6 +31,7 @@ import { Route as CompanySlugDDriverSlugRouteImport } from './routes/$companySlu
 import { Route as ApiAuthGoogleRouteImport } from './routes/api/auth/google'
 import { Route as PrintEmployeeIdRouteImport } from './routes/print.employee.$id'
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth/google/callback'
+import { Route as ApiPublicReviewsCompanySlugRouteImport } from './routes/api/public/reviews.$companySlug'
 import { Route as ApiPublicWebhooksGhlRouteImport } from './routes/api/public/webhooks/ghl'
 import { Route as ApiPublicWebhooksGhlEventsRouteImport } from './routes/api/public/webhooks/ghl-events'
 import { Route as ApiPublicWebhooksStripeRouteImport } from './routes/api/public/webhooks/stripe'
@@ -145,6 +146,12 @@ const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
   path: '/callback',
   getParentRoute: () => ApiAuthGoogleRoute,
 } as any)
+const ApiPublicReviewsCompanySlugRoute =
+  ApiPublicReviewsCompanySlugRouteImport.update({
+    id: '/api/public/reviews/$companySlug',
+    path: '/api/public/reviews/$companySlug',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicWebhooksGhlRoute = ApiPublicWebhooksGhlRouteImport.update({
   id: '/api/public/webhooks/ghl',
   path: '/api/public/webhooks/ghl',
@@ -185,6 +192,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/public/reviews/$companySlug': typeof ApiPublicReviewsCompanySlugRoute
   '/api/public/webhooks/ghl': typeof ApiPublicWebhooksGhlRoute
   '/api/public/webhooks/ghl-events': typeof ApiPublicWebhooksGhlEventsRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
@@ -212,6 +220,7 @@ export interface FileRoutesByTo {
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/public/reviews/$companySlug': typeof ApiPublicReviewsCompanySlugRoute
   '/api/public/webhooks/ghl': typeof ApiPublicWebhooksGhlRoute
   '/api/public/webhooks/ghl-events': typeof ApiPublicWebhooksGhlEventsRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
@@ -240,6 +249,7 @@ export interface FileRoutesById {
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/public/reviews/$companySlug': typeof ApiPublicReviewsCompanySlugRoute
   '/api/public/webhooks/ghl': typeof ApiPublicWebhooksGhlRoute
   '/api/public/webhooks/ghl-events': typeof ApiPublicWebhooksGhlEventsRoute
   '/api/public/webhooks/stripe': typeof ApiPublicWebhooksStripeRoute
@@ -269,6 +279,7 @@ export interface FileRouteTypes {
     | '/api/auth/google'
     | '/print/employee/$id'
     | '/api/auth/google/callback'
+    | '/api/public/reviews/$companySlug'
     | '/api/public/webhooks/ghl'
     | '/api/public/webhooks/ghl-events'
     | '/api/public/webhooks/stripe'
@@ -296,6 +307,7 @@ export interface FileRouteTypes {
     | '/api/auth/google'
     | '/print/employee/$id'
     | '/api/auth/google/callback'
+    | '/api/public/reviews/$companySlug'
     | '/api/public/webhooks/ghl'
     | '/api/public/webhooks/ghl-events'
     | '/api/public/webhooks/stripe'
@@ -323,6 +335,7 @@ export interface FileRouteTypes {
     | '/api/auth/google'
     | '/print/employee/$id'
     | '/api/auth/google/callback'
+    | '/api/public/reviews/$companySlug'
     | '/api/public/webhooks/ghl'
     | '/api/public/webhooks/ghl-events'
     | '/api/public/webhooks/stripe'
@@ -350,6 +363,7 @@ export interface RootRouteChildren {
   CompanySlugDDriverSlugRoute: typeof CompanySlugDDriverSlugRoute
   ApiAuthGoogleRoute: typeof ApiAuthGoogleRouteWithChildren
   PrintEmployeeIdRoute: typeof PrintEmployeeIdRoute
+  ApiPublicReviewsCompanySlugRoute: typeof ApiPublicReviewsCompanySlugRoute
   ApiPublicWebhooksGhlRoute: typeof ApiPublicWebhooksGhlRoute
   ApiPublicWebhooksGhlEventsRoute: typeof ApiPublicWebhooksGhlEventsRoute
   ApiPublicWebhooksStripeRoute: typeof ApiPublicWebhooksStripeRoute
@@ -511,6 +525,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthGoogleCallbackRouteImport
       parentRoute: typeof ApiAuthGoogleRoute
     }
+    '/api/public/reviews/$companySlug': {
+      id: '/api/public/reviews/$companySlug'
+      path: '/api/public/reviews/$companySlug'
+      fullPath: '/api/public/reviews/$companySlug'
+      preLoaderRoute: typeof ApiPublicReviewsCompanySlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/webhooks/ghl': {
       id: '/api/public/webhooks/ghl'
       path: '/api/public/webhooks/ghl'
@@ -569,6 +590,7 @@ const rootRouteChildren: RootRouteChildren = {
   CompanySlugDDriverSlugRoute: CompanySlugDDriverSlugRoute,
   ApiAuthGoogleRoute: ApiAuthGoogleRouteWithChildren,
   PrintEmployeeIdRoute: PrintEmployeeIdRoute,
+  ApiPublicReviewsCompanySlugRoute: ApiPublicReviewsCompanySlugRoute,
   ApiPublicWebhooksGhlRoute: ApiPublicWebhooksGhlRoute,
   ApiPublicWebhooksGhlEventsRoute: ApiPublicWebhooksGhlEventsRoute,
   ApiPublicWebhooksStripeRoute: ApiPublicWebhooksStripeRoute,

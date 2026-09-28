@@ -4,7 +4,7 @@ import postgres from "postgres";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { assignVipCustomer, assignVipDay, listVipStaff, logVipCall, recordVipEvent, resolveVipJob, vipCallHistory, vipDayAssignments, vipDueCount, vipNextStep, vipReportRows } from "../src/lib/vip-report.server.ts";
-import { followupState } from "../src/lib/vip.ts";
+import { followupProgress, followupState } from "../src/lib/vip.ts";
 
 try { process.loadEnvFile?.(".env"); } catch (error) {
   if (error?.code !== "ENOENT") throw error;
@@ -219,6 +219,13 @@ test("vip follow-up calls: log a call, schedule the next one, and find it when d
     assert.equal(followupState("2026-10-05", "2026-10-05"), "due");
     assert.equal(followupState("2026-10-05", "2026-10-07"), "overdue");
     assert.equal(followupState(null, "2026-10-07"), null);
+
+    // Red until the first call, yellow after one, green (done) after two.
+    assert.equal(followupProgress(0), "needs_first");
+    assert.equal(followupProgress(1), "followed_once");
+    assert.equal(followupProgress(2), "done");
+    assert.equal(followupProgress(all["TB-4001"].call_count), "done");
+    assert.equal(followupProgress(all["TB-4002"].call_count), "followed_once");
   });
 });
 

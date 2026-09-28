@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { assignVipFollowupCustomer, assignVipFollowupDay, getVipReport, logVipFollowupCall, saveVipFollowupStaff, setVipNextFollowup, updateVipFollowup } from "@/lib/vip.functions";
-import { followupState, todayYmd, vipNextStep, type FollowupState, type VipReportRow, type VipStage } from "@/lib/vip";
+import { followupProgress, followupState, todayYmd, vipNextStep, type FollowupProgress, type FollowupState, type VipReportRow, type VipStage } from "@/lib/vip";
 import { dollars } from "@/lib/constants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -90,12 +90,20 @@ export function vipScoreboard(rows: VipReportRow[]) {
 }
 
 const FOLLOWUP_ORDER: Record<string, number> = { overdue: 0, due: 1 };
+const PROGRESS_ORDER: Record<FollowupProgress, number> = { needs_first: 0, followed_once: 1, done: 2 };
+
+export const PROGRESS_STYLE: Record<FollowupProgress, { label: string; card: string; badge: string; print: string }> = {
+  needs_first: { label: "Needs 1st follow-up", card: "border-red-400 bg-red-50 dark:border-red-700 dark:bg-red-950/30", badge: "bg-red-600 text-white", print: "#fde2e2" },
+  followed_once: { label: "1st follow-up done · 1 more", card: "border-amber-400 bg-amber-50 dark:border-amber-600 dark:bg-amber-950/30", badge: "bg-amber-400 text-amber-950", print: "#fdf3c4" },
+  done: { label: "Done ✓ no more calls", card: "border-green-500 bg-green-50 dark:border-green-700 dark:bg-green-950/30", badge: "bg-green-600 text-white", print: "#dcf5e3" },
+};
 
 export function sortVipRows(rows: VipReportRow[]) {
   const today = todayYmd();
   const due = (r: VipReportRow) => FOLLOWUP_ORDER[followupState(r.next_followup_on, today) ?? ""] ?? 2;
   return [...rows].sort((a, b) =>
     due(a) - due(b)
+    || PROGRESS_ORDER[followupProgress(a.call_count)] - PROGRESS_ORDER[followupProgress(b.call_count)]
     || STAGE_ORDER[vipNextStep(a).stage] - STAGE_ORDER[vipNextStep(b).stage]
     || b.reviewed_at.localeCompare(a.reviewed_at));
 }
@@ -343,6 +351,14 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-2 text-xs">
+        {(Object.keys(PROGRESS_STYLE) as FollowupProgress[]).map((p) => (
+          <span key={p} className={`rounded-full px-3 py-1 font-semibold ${PROGRESS_STYLE[p].badge}`}>
+            {PROGRESS_STYLE[p].label}: {filterByAssignee(report?.rows ?? [], who).filter((r) => followupProgress(r.call_count) === p).length}
+          </span>
+        ))}
+      </div>
+
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
         <Tile label="Responded" value={summary.customers} />
         <Tile label="Tipped" value={`${summary.tipped}`} sub={summary.tipCents ? dollars(summary.tipCents) : undefined} />
@@ -439,6 +455,7 @@ function VipRow({ row, companyId, staff, calls, onSaved }: { row: VipReportRow; 
   const setNext = useServerFn(setVipNextFollowup);
   const [logging, setLogging] = useState(false);
   const followup = followupState(row.next_followup_on);
+  const progress = followupProgress(row.call_count);
   const assignCustomer = useServerFn(assignVipFollowupCustomer);
   const next = vipNextStep(row);
   const [editing, setEditing] = useState(false);
@@ -495,9 +512,10 @@ function VipRow({ row, companyId, staff, calls, onSaved }: { row: VipReportRow; 
   const phoneHref = row.customer_phone ? `tel:${row.customer_phone.replace(/[^\d+]/g, "")}` : null;
 
   return (
-    <li className="rounded-xl border border-border bg-card p-4">
+    <li className={`rounded-xl border-2 p-4 ${PROGRESS_STYLE[progress].card}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
+          <span className={`mb-1 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${PROGRESS_STYLE[progress].badge}`}>{PROGRESS_STYLE[progress].label}</span>
           <div className="text-base font-semibold">{row.customer_name || "Customer"}</div>
           <div className="text-sm text-muted-foreground">
             {phoneHref ? <a href={phoneHref} className="underline">{row.customer_phone}</a> : "No phone"}
@@ -624,6 +642,7 @@ function VipRow({ row, companyId, staff, calls, onSaved }: { row: VipReportRow; 
         <LogCallForm
           companyId={companyId}
           jobId={row.job_id}
+          callCount={row.call_count}
           onDone={async () => { setLogging(false); await onSaved(); }}
         />
       )}
@@ -732,7 +751,9 @@ const FOLLOW_UP_CHOICES: Array<{ id: string; label: string; days: number | null 
   { id: "date", label: "Pick a date", days: null },
 ];
 
-function LogCallForm({ companyId, jobId, onDone }: { companyId: string; jobId: string; onDone: () => Promise<void> }) {
+function LogCallForm({ companyId, jobId, callCount, onDone }: { companyId: string; jobId: string; callCount: number; onDone: () => Promise<void> }) {
+  // The second follow-up call finishes the customer (green): nothing more to schedule.
+  const finishing = callCount >= 1;
   const logCall = useServerFn(logVipFollowupCall);
   const [note, setNote] = useState("");
   const [choice, setChoice] = useState("7");
@@ -740,7 +761,7 @@ function LogCallForm({ companyId, jobId, onDone }: { companyId: string; jobId: s
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const nextOn = choice === "none" ? null : choice === "date" ? date || null : ymd(addDays(new Date(), Number(choice)));
+  const nextOn = finishing || choice === "none" ? null : choice === "date" ? date || null : ymd(addDays(new Date(), Number(choice)));
 
   return (
     <form
@@ -770,6 +791,11 @@ function LogCallForm({ companyId, jobId, onDone }: { companyId: string; jobId: s
         placeholder="e.g. Very happy. Will download Convini and leave a Google review."
         className="block w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
       />
+      {finishing ? (
+        <p className="rounded-md bg-green-600 px-3 py-2 text-xs font-semibold text-white">
+          This is the 2nd follow-up call. Saving it marks this customer done (green), with no more calls scheduled.
+        </p>
+      ) : (
       <fieldset>
         <legend className="text-xs text-muted-foreground">Follow up next</legend>
         <div className="mt-1 flex flex-wrap gap-1.5">
@@ -792,8 +818,9 @@ function LogCallForm({ companyId, jobId, onDone }: { companyId: string; jobId: s
           {nextOn ? <>They'll show up under <b>Follow-ups due</b> on {new Date(`${nextOn}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}.</> : "No further call scheduled."}
         </p>
       </fieldset>
+      )}
       <div className="flex items-center gap-2">
-        <button type="submit" disabled={busy} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">Save call</button>
+        <button type="submit" disabled={busy} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{finishing ? "Save call & mark done" : "Save call"}</button>
         {err && <span className="text-xs text-red-600">{err}</span>}
       </div>
     </form>

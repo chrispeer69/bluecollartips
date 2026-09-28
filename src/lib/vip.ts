@@ -78,3 +78,14 @@ function vipStageStep(row: Pick<VipReportRow, "stars" | "google_posted_at" | "co
   if (row.convini_link_sent_at) return { stage: "link_sent", action: `Got the link, hasn't opened it — resend or call.${google}` };
   return { stage: "no_link", action: `Convini link not sent yet — send it.${google}` };
 }
+
+/**
+ * Follow-up progress by logged calls: red = needs the first call, yellow = one
+ * call done (one more to go), green = two calls done, finished.
+ */
+export type FollowupProgress = "needs_first" | "followed_once" | "done";
+export const FOLLOWUP_CALLS_TO_FINISH = 2;
+export function followupProgress(callCount: number): FollowupProgress {
+  if (callCount >= FOLLOWUP_CALLS_TO_FINISH) return "done";
+  return callCount >= 1 ? "followed_once" : "needs_first";
+}

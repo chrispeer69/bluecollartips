@@ -3,9 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getVipReport } from "@/lib/vip.functions";
-import { vipNextStep } from "@/lib/vip";
+import { followupProgress, vipNextStep } from "@/lib/vip";
 import { dollars } from "@/lib/constants";
-import { STAGE_FILTERS, UNASSIGNED, filterByAssignee, fmtWhen, followupLabel, sortVipRows, summarizeVip } from "@/components/VipCustomersPanel";
+import { PROGRESS_STYLE, STAGE_FILTERS, UNASSIGNED, filterByAssignee, fmtWhen, followupLabel, sortVipRows, summarizeVip } from "@/components/VipCustomersPanel";
 
 const searchSchema = z.object({
   companyId: z.string().uuid(),
@@ -125,8 +125,9 @@ function PrintVipPage() {
               {rows.map((r) => {
                 const next = vipNextStep(r);
                 return (
-                  <tr key={r.rating_id} className="avoid-break border-b border-gray-300 align-top">
+                  <tr key={r.rating_id} className="avoid-break border-b border-gray-300 align-top" style={{ background: PROGRESS_STYLE[followupProgress(r.call_count)].print }}>
                     <td className="p-1.5">
+                      <div className="text-[10px] font-bold uppercase">{PROGRESS_STYLE[followupProgress(r.call_count)].label}</div>
                       <div className="font-semibold">{r.customer_name || "Customer"}</div>
                       <div>{r.customer_phone || "No phone"}</div>
                       {r.customer_email && <div className="break-all text-gray-600">{r.customer_email}</div>}

@@ -524,6 +524,20 @@ function VipRow({ row, companyId, staff, calls, onSaved }: { row: VipReportRow; 
         </div>
       </div>
 
+      {(row.contacted_at || row.notes) && (
+        <div className="mt-3 rounded-md border-2 border-red-600 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500 dark:bg-red-950/40 dark:text-red-300">
+          {row.contacted_at && (
+            <div>
+              <span className="font-bold uppercase tracking-wide">Last contacted:</span>{" "}
+              <span className="font-semibold">{fmtWhen(calls[0]?.calledAt ?? row.contacted_at)}</span>
+              {calls[0]?.loggedBy ? <> · {calls[0].loggedBy}</> : null}
+            </div>
+          )}
+          {calls[0]?.note && <div className="mt-0.5 whitespace-pre-wrap font-semibold">“{calls[0].note}”</div>}
+          {row.notes && <div className="mt-0.5 whitespace-pre-wrap"><span className="font-bold">Notes:</span> {row.notes}</div>}
+        </div>
+      )}
+
       <div className="mt-3 rounded-md bg-muted/50 p-3 text-sm">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <span><span className="text-amber-500">{"★".repeat(row.stars)}</span><span className="text-muted-foreground/40">{"★".repeat(5 - row.stars)}</span></span>
@@ -567,12 +581,6 @@ function VipRow({ row, companyId, staff, calls, onSaved }: { row: VipReportRow; 
           >
             Clear
           </button>
-        </div>
-      )}
-      {(row.contacted_at || row.notes) && (
-        <div className="mt-2 text-xs text-muted-foreground">
-          {row.contacted_at && <>Last contacted {fmtWhen(row.contacted_at)}. </>}
-          {row.notes && <span className="whitespace-pre-wrap">Notes: {row.notes}</span>}
         </div>
       )}
       {calls.length > 0 && (

@@ -73,6 +73,7 @@ function PrintVipPage() {
           @page { size: letter landscape; margin: 0.4in; }
           .no-print { display: none !important; }
           .avoid-break { break-inside: avoid; page-break-inside: avoid; }
+          * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>
 
@@ -153,8 +154,13 @@ function PrintVipPage() {
                     <td className="p-1.5">
                       <div className="font-semibold">{next.action}</div>
                       {r.next_followup_on && <div className="mt-0.5">Next call: {followupLabel(r.next_followup_on)}</div>}
-                      {r.contacted_at && <div className="text-gray-600">Last call: {fmtWhen(r.contacted_at)}{r.call_count > 1 ? ` (${r.call_count} calls)` : ""}</div>}
-                      {r.notes && <div className="mt-0.5 whitespace-pre-wrap text-gray-700">Notes: {r.notes}</div>}
+                      {r.contacted_at && (
+                        <div className="mt-1 font-semibold" style={{ color: "#dc2626" }}>
+                          Last contacted: {fmtWhen(report.calls?.[r.job_id]?.[0]?.calledAt ?? r.contacted_at)}{r.call_count > 1 ? ` (${r.call_count} calls)` : ""}
+                          {report.calls?.[r.job_id]?.[0]?.note ? <div className="whitespace-pre-wrap">“{report.calls[r.job_id][0].note}”</div> : null}
+                        </div>
+                      )}
+                      {r.notes && <div className="mt-0.5 whitespace-pre-wrap font-semibold" style={{ color: "#dc2626" }}>Notes: {r.notes}</div>}
                       <div className="mt-2 border-b border-gray-400" />
                       <div className="mt-3 border-b border-gray-400" />
                     </td>

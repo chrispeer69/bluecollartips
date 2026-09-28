@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { firstNameLastInitial, publicFeedAllowed, toPublicReview, driverKey } from "../src/lib/public-reviews.ts";
+import { firstNameLastInitial, publicFeedAllowed, toPublicReview, driverKey, scrubContact } from "../src/lib/public-reviews.ts";
+
+test("comments lose contact details before going public", () => {
+  assert.equal(scrubContact("Call me at 614-555-0100 or pat@example.com"), "Call me at [phone removed] or [email removed]");
+  assert.equal(scrubContact("Great job (614) 555 0100 thanks"), "Great job [phone removed] thanks");
+  assert.equal(scrubContact("see www.example.com"), "see [link removed]");
+  assert.equal(scrubContact("Tim was great, 5 stars!"), "Tim was great, 5 stars!");
+});
 
 test("names are first name + last initial only", () => {
   assert.equal(firstNameLastInitial("Mike Rodriguez"), "Mike R.");

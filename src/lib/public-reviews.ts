@@ -11,6 +11,15 @@ export function firstNameLastInitial(name: string | null | undefined): string | 
   return last ? `${first} ${last.charAt(0).toUpperCase()}.` : first;
 }
 
+/** Removes contact details from a public comment: emails, phone numbers and web links. */
+export function scrubContact(text: string): string {
+  return text
+    .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, "[email removed]")
+    .replace(/(\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b/g, "[phone removed]")
+    .replace(/\bhttps?:\/\/\S+|\bwww\.\S+/gi, "[link removed]")
+    .trim();
+}
+
 /** Opaque, stable filter key for an employee (never exposes the slug, which holds the full name). */
 export function driverKey(slug: string): string {
   let h = 0x811c9dc5;
@@ -45,7 +54,7 @@ type Row = {
 
 export function toPublicReview(r: Row): PublicReview {
   const activeDriver = r.driver_slug && r.driver_status === "active";
-  const text = r.public_ok && r.feedback && r.feedback.trim() ? r.feedback.trim().slice(0, 2000) : null;
+  const text = r.public_ok && r.feedback && r.feedback.trim() ? scrubContact(r.feedback).slice(0, 2000) || null : null;
   return {
     id: r.id,
     stars: r.stars,

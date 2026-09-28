@@ -101,9 +101,8 @@ function PrivacyPage() {
               A company may show its customers' reviews on its own website. A published review shows
               the star rating, the written comment, the date, the employee's first name and last
               initial, and the customer's first name and last initial only. Phone numbers and email
-              addresses are never published. Reviews submitted before September 28, 2026 are shown
-              as a star rating only, without the comment or name. To have your review removed from
-              public display, email us.
+              addresses are never published, and any contact details typed into a comment are
+              removed. To have your review removed from public display, email us.
             </p>
           </section>
           <section>

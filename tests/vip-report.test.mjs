@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import postgres from "postgres";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { recordVipEvent, resolveVipJob, vipNextStep, vipReportRows } from "../src/lib/vip-report.server.ts";
+import { assignVipCustomer, assignVipDay, listVipStaff, recordVipEvent, resolveVipJob, vipDayAssignments, vipNextStep, vipReportRows } from "../src/lib/vip-report.server.ts";
 
 try { process.loadEnvFile?.(".env"); } catch (error) {
   if (error?.code !== "ENOENT") throw error;
@@ -134,6 +134,56 @@ test("vip events: resolve by contact id or phone, keep first timestamps, count r
   });
 });
 
+test("vip assignments: a day goes to one person, a customer can be reassigned, days are Eastern", async () => {
+  await inRollback(async (tx) => {
+    const s = await seed(tx);
+    const [hannah] = await tx`insert into vip_followup_staff (company_id, name, sort_order) values (${s.company.id}, 'Hannah', 1) returning id`;
+    const [lisa] = await tx`insert into vip_followup_staff (company_id, name, sort_order) values (${s.company.id}, 'Lisa', 2) returning id`;
+    const [outsider] = await tx`insert into vip_followup_staff (company_id, name) values (${s.other.id}, 'Zoe') returning id`;
+    await tx`insert into vip_followup_staff (company_id, name, active, sort_order) values (${s.company.id}, 'Old Timer', false, 3)`;
+    await assert.rejects(tx.savepoint((sp) => sp`insert into vip_followup_staff (company_id, name) values (${s.company.id}, ' hannah ')`), /vip_followup_staff_name_idx/);
+
+    // 11:30 PM Eastern on Sep 24 is already Sep 25 in UTC; it still counts as Sep 24.
+    const late = new Date("2026-09-25T03:30:00Z");
+    const next = new Date("2026-09-25T14:00:00Z");
+    const c1 = await s.context(s.company.id, s.ana.id, "TB-3001");
+    const c2 = await s.context(s.company.id, s.ana.id, "TB-3002");
+    const c3 = await s.context(s.company.id, s.ana.id, "TB-3003");
+    await s.rating(s.company.id, s.ana.id, c1, 5, late);
+    await s.rating(s.company.id, s.ana.id, c2, 4, late);
+    await s.rating(s.company.id, s.ana.id, c3, 5, next);
+
+    await assignVipDay(tx, { companyId: s.company.id, day: "2026-09-24", staffId: hannah.id, userId: null });
+    await assert.rejects(assignVipDay(tx, { companyId: s.company.id, day: "2026-09-25", staffId: outsider.id, userId: null }), /Unknown follow-up person/);
+    await assignVipCustomer(tx, { companyId: s.company.id, jobId: "TB-3002", staffId: lisa.id, userId: null });
+    await assert.rejects(assignVipCustomer(tx, { companyId: s.company.id, jobId: "TB-3001", staffId: outsider.id, userId: null }), /Unknown follow-up person/);
+
+    const rows = Object.fromEntries((await vipReportRows(tx, { companyId: s.company.id })).map((r) => [r.job_id, r]));
+    assert.equal(rows["TB-3001"].review_day, "2026-09-24");
+    assert.equal(rows["TB-3001"].assignee_name, "Hannah");
+    assert.equal(rows["TB-3001"].assignee_source, "day");
+    assert.equal(rows["TB-3002"].assignee_name, "Lisa");
+    assert.equal(rows["TB-3002"].assignee_source, "customer");
+    assert.equal(rows["TB-3003"].review_day, "2026-09-25");
+    assert.equal(rows["TB-3003"].assignee_id, null);
+
+    // Send the customer back to the day's person, then hand the day to Lisa.
+    await assignVipCustomer(tx, { companyId: s.company.id, jobId: "TB-3002", staffId: null, userId: null });
+    await assignVipDay(tx, { companyId: s.company.id, day: "2026-09-24", staffId: lisa.id, userId: null });
+    const after = Object.fromEntries((await vipReportRows(tx, { companyId: s.company.id })).map((r) => [r.job_id, r]));
+    assert.equal(after["TB-3001"].assignee_name, "Lisa");
+    assert.equal(after["TB-3002"].assignee_name, "Lisa");
+    assert.equal(after["TB-3002"].assignee_source, "day");
+
+    assert.deepEqual(await vipDayAssignments(tx, s.company.id, "2026-09-20", "2026-09-30"), { "2026-09-24": lisa.id });
+    await assignVipDay(tx, { companyId: s.company.id, day: "2026-09-24", staffId: null, userId: null });
+    assert.deepEqual(await vipDayAssignments(tx, s.company.id, "2026-09-20", "2026-09-30"), {});
+
+    const staff = await listVipStaff(tx, s.company.id);
+    assert.deepEqual(staff.map((p) => [p.name, p.active]), [["Hannah", true], ["Lisa", true], ["Old Timer", false]]);
+  });
+});
+
 test("vip wiring: public routes, admin checks and dashboard entry", async () => {
   const read = (p) => readFile(new URL(`../${p}`, import.meta.url), "utf8");
   const [events, go, fns, admin, thanks] = await Promise.all([
@@ -146,7 +196,8 @@ test("vip wiring: public routes, admin checks and dashboard entry", async () => 
   assert.match(events, /verifyGhlSecret\(request\)/);
   assert.match(go, /PREVIEW_BOT/);
   assert.match(go, /FROM review_contexts WHERE company_id/);
-  assert.equal((fns.match(/assertCompanyAdmin\(context\.userId/g) ?? []).length, 2);
+  // Every admin function (all but the public Google-tap tracker) checks the caller.
+  assert.equal((fns.match(/assertCompanyAdmin\(context\.userId/g) ?? []).length, 5);
   assert.match(admin, /page === "vip"/);
   assert.match(thanks, /onGoogleClick/);
 });

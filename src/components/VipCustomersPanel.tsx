@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { getVipReport, updateVipFollowup } from "@/lib/vip.functions";
+import { assignVipFollowupCustomer, assignVipFollowupDay, getVipReport, saveVipFollowupStaff, updateVipFollowup } from "@/lib/vip.functions";
 import { vipNextStep, type VipReportRow, type VipStage } from "@/lib/vip";
 import { dollars } from "@/lib/constants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -52,6 +52,41 @@ export function fmtWhen(iso: string | null | undefined) {
   return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
+export const UNASSIGNED = "__none__";
+
+/** Calendar days (YYYY-MM-DD) covered by the range, oldest first. */
+export function daysInRange(from: Date, to: Date, max = 31) {
+  const out: string[] = [];
+  for (let d = startOfDay(from); d <= to && out.length < max; d = addDays(d, 1)) out.push(ymd(d));
+  return out;
+}
+
+export function dayLabel(day: string) {
+  return new Date(`${day}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+export function filterByAssignee(rows: VipReportRow[], who: string) {
+  if (who === "all") return rows;
+  if (who === UNASSIGNED) return rows.filter((r) => !r.assignee_id);
+  return rows.filter((r) => r.assignee_id === who);
+}
+
+/** Per-person results: how many customers they own, called, and won. */
+export function vipScoreboard(rows: VipReportRow[]) {
+  const by = new Map<string, { key: string; name: string; assigned: number; called: number; registered: number; googlePosted: number; tipped: number; tipCents: number }>();
+  for (const r of rows) {
+    const key = r.assignee_id ?? UNASSIGNED;
+    const entry = by.get(key) ?? { key, name: r.assignee_name ?? "Unassigned", assigned: 0, called: 0, registered: 0, googlePosted: 0, tipped: 0, tipCents: 0 };
+    entry.assigned += 1;
+    if (r.contacted_at) entry.called += 1;
+    if (r.convini_registered_at) entry.registered += 1;
+    if (r.google_posted_at) entry.googlePosted += 1;
+    if (r.tip_count > 0) { entry.tipped += 1; entry.tipCents += r.tip_total_cents; }
+    by.set(key, entry);
+  }
+  return [...by.values()].sort((a, b) => (a.key === UNASSIGNED ? 1 : b.key === UNASSIGNED ? -1 : b.registered - a.registered || a.name.localeCompare(b.name)));
+}
+
 export function sortVipRows(rows: VipReportRow[]) {
   return [...rows].sort((a, b) =>
     STAGE_ORDER[vipNextStep(a).stage] - STAGE_ORDER[vipNextStep(b).stage]
@@ -90,28 +125,50 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
+  const [who, setWho] = useState<string>("all");
+  const [showNames, setShowNames] = useState(false);
+  const assignDay = useServerFn(assignVipFollowupDay);
 
   const range = useMemo(() => vipRange(preset, custom), [preset, custom]);
+  const days = useMemo(() => daysInRange(range.from, range.to), [range]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setReport(await fetchReport({ data: { companyId, from: range.from.toISOString(), to: range.to.toISOString() } }));
+      setReport(await fetchReport({ data: { companyId, from: range.from.toISOString(), to: range.to.toISOString(), fromDay: days[0], toDay: days[days.length - 1] } }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load VIP customers.");
     } finally {
       setLoading(false);
     }
-  }, [companyId, fetchReport, range]);
+  }, [companyId, fetchReport, range, days]);
 
   useEffect(() => { void load(); }, [load]);
 
   const rows = useMemo(() => {
-    const all = sortVipRows(report?.rows ?? []);
+    const all = sortVipRows(filterByAssignee(report?.rows ?? [], who));
     return stage === "all" ? all : all.filter((r) => vipNextStep(r).stage === stage);
-  }, [report, stage]);
-  const summary = useMemo(() => summarizeVip(report?.rows ?? []), [report]);
+  }, [report, stage, who]);
+  const summary = useMemo(() => summarizeVip(filterByAssignee(report?.rows ?? [], who)), [report, who]);
+  const board = useMemo(() => vipScoreboard(report?.rows ?? []), [report]);
+  const staff = report?.staff ?? [];
+  const activeStaff = staff.filter((p) => p.active);
+  const perDay = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const r of report?.rows ?? []) counts[r.review_day] = (counts[r.review_day] ?? 0) + 1;
+    return counts;
+  }, [report]);
+
+  async function setDayPerson(day: string, staffId: string) {
+    setError(null);
+    try {
+      await assignDay({ data: { companyId, day, staffId: staffId === UNASSIGNED ? null : staffId } });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save the assignment.");
+    }
+  }
 
   function openPrint() {
     const params = new URLSearchParams({
@@ -119,6 +176,7 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
       from: range.from.toISOString(),
       to: range.to.toISOString(),
       stage,
+      assignee: who,
       autoprint: "true",
     });
     window.open(`/print/vip?${params.toString()}`, "_blank", "noopener");
@@ -158,10 +216,93 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
             <SelectContent>{STAGE_FILTERS.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
           </Select>
         </label>
+        <label className="text-xs text-muted-foreground">
+          Assigned to
+          <Select value={who} onValueChange={setWho}>
+            <SelectTrigger className="mt-1 w-40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Everyone</SelectItem>
+              {staff.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}{p.active ? "" : " (inactive)"}</SelectItem>)}
+              <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+            </SelectContent>
+          </Select>
+        </label>
         <button type="button" onClick={openPrint} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
-          Print daily report
+          {who === "all" ? "Print daily report" : `Print ${who === UNASSIGNED ? "unassigned" : staff.find((p) => p.id === who)?.name ?? ""} list`}
         </button>
         <button type="button" onClick={() => void load()} className="rounded-md border border-border px-3 py-2 text-sm">Refresh</button>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-lg border border-border p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-sm font-semibold">Who follows up each day</div>
+            <button type="button" onClick={() => setShowNames((v) => !v)} className="text-xs underline">{showNames ? "Done" : "Edit names"}</button>
+          </div>
+          {showNames ? (
+            <StaffEditor companyId={companyId} staff={staff} onSaved={load} />
+          ) : (
+            <ul className="mt-2 divide-y divide-border">
+              {[...days].reverse().map((day) => {
+                const assigned = report?.dayAssignments?.[day] ?? UNASSIGNED;
+                return (
+                  <li key={day} className="flex items-center justify-between gap-3 py-1.5 text-sm">
+                    <span className="min-w-0">
+                      <span className="font-medium">{dayLabel(day)}</span>
+                      <span className="ml-2 text-xs text-muted-foreground">{perDay[day] ?? 0} customer{(perDay[day] ?? 0) === 1 ? "" : "s"}</span>
+                    </span>
+                    <Select value={assigned} onValueChange={(v) => void setDayPerson(day, v)}>
+                      <SelectTrigger className="h-8 w-40 text-xs" aria-label={`Assigned to for ${dayLabel(day)}`}><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={UNASSIGNED}>— Unassigned —</SelectItem>
+                        {staff.filter((p) => p.active || p.id === assigned).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </li>
+                );
+              })}
+              {activeStaff.length === 0 && <li className="py-2 text-xs text-muted-foreground">Add the people who make follow-up calls with “Edit names”.</li>}
+            </ul>
+          )}
+          {days.length >= 31 && <p className="mt-1 text-xs text-muted-foreground">Showing the first 31 days of this range.</p>}
+        </div>
+
+        <div className="rounded-lg border border-border p-3">
+          <div className="text-sm font-semibold">Scoreboard</div>
+          {board.length === 0 ? (
+            <p className="mt-2 text-xs text-muted-foreground">No customers in this range yet.</p>
+          ) : (
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full text-sm tabular-nums">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <th className="py-1 pr-2 font-medium">Person</th>
+                    <th className="px-2 py-1 text-right font-medium">Assigned</th>
+                    <th className="px-2 py-1 text-right font-medium">Called</th>
+                    <th className="px-2 py-1 text-right font-medium">Convini</th>
+                    <th className="px-2 py-1 text-right font-medium">Google</th>
+                    <th className="py-1 pl-2 text-right font-medium">Tips</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {board.map((b) => (
+                    <tr key={b.key} className={b.key === UNASSIGNED ? "text-muted-foreground" : ""}>
+                      <td className="py-1.5 pr-2">
+                        <button type="button" onClick={() => setWho(b.key)} className="font-medium underline-offset-2 hover:underline">{b.name}</button>
+                      </td>
+                      <td className="px-2 py-1.5 text-right">{b.assigned}</td>
+                      <td className="px-2 py-1.5 text-right">{b.called}<span className="text-xs text-muted-foreground"> / {b.assigned}</span></td>
+                      <td className="px-2 py-1.5 text-right font-semibold">{b.registered}</td>
+                      <td className="px-2 py-1.5 text-right">{b.googlePosted}</td>
+                      <td className="py-1.5 pl-2 text-right">{b.tipped ? dollars(b.tipCents) : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="mt-1 text-[11px] text-muted-foreground">Wins = Convini registrations and Google reviews posted. Click a name to see their list.</p>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
@@ -183,7 +324,7 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
         </div>
       ) : (
         <ul className="space-y-3">
-          {rows.map((row) => <VipRow key={row.rating_id} row={row} companyId={companyId} onSaved={load} />)}
+          {rows.map((row) => <VipRow key={row.rating_id} row={row} companyId={companyId} staff={staff} onSaved={load} />)}
         </ul>
       )}
       {report?.truncated && <p className="text-xs text-muted-foreground">Showing the most recent 1,000. Narrow the dates to see everything.</p>}
@@ -244,8 +385,12 @@ function fromLocalInput(value: string) {
   return value ? new Date(value).toISOString() : null;
 }
 
-function VipRow({ row, companyId, onSaved }: { row: VipReportRow; companyId: string; onSaved: () => Promise<void> }) {
+type StaffList = Report["staff"];
+const FOLLOW_DAY = "__day__";
+
+function VipRow({ row, companyId, staff, onSaved }: { row: VipReportRow; companyId: string; staff: StaffList; onSaved: () => Promise<void> }) {
   const save = useServerFn(updateVipFollowup);
+  const assignCustomer = useServerFn(assignVipFollowupCustomer);
   const next = vipNextStep(row);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -285,6 +430,19 @@ function VipRow({ row, companyId, onSaved }: { row: VipReportRow; companyId: str
     setEditing(false);
   }
 
+  async function reassign(value: string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      await assignCustomer({ data: { companyId, jobId: row.job_id, staffId: value === FOLLOW_DAY ? null : value } });
+      await onSaved();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not reassign");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const phoneHref = row.customer_phone ? `tel:${row.customer_phone.replace(/[^\d+]/g, "")}` : null;
 
   return (
@@ -298,9 +456,23 @@ function VipRow({ row, companyId, onSaved }: { row: VipReportRow; companyId: str
           </div>
           <div className="text-xs text-muted-foreground">Towbook job #{row.job_id}{row.driver_name ? ` · ${row.driver_name}` : ""}</div>
         </div>
-        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STAGE_BADGE[next.stage]}`}>
-          {STAGE_FILTERS.find((s) => s.id === next.stage)?.label}
-        </span>
+        <div className="flex flex-col items-end gap-1.5">
+          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STAGE_BADGE[next.stage]}`}>
+            {STAGE_FILTERS.find((s) => s.id === next.stage)?.label}
+          </span>
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            Follow-up by
+            <Select value={row.assignee_source === "customer" && row.assignee_id ? row.assignee_id : FOLLOW_DAY} onValueChange={(v) => void reassign(v)} disabled={busy}>
+              <SelectTrigger className="h-7 w-40 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={FOLLOW_DAY}>
+                  {row.assignee_source === "day" && row.assignee_name ? `${row.assignee_name} (day)` : "Same as the day's person"}
+                </SelectItem>
+                {staff.filter((p) => p.active || p.id === row.assignee_id).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </label>
+        </div>
       </div>
 
       <div className="mt-3 rounded-md bg-muted/50 p-3 text-sm">
@@ -399,5 +571,54 @@ function DateField({ label, value, onChange, onNow }: { label: string; value: st
         {value && <button type="button" onClick={() => onChange("")} className="rounded-md border border-border px-2 text-xs">Clear</button>}
       </span>
     </label>
+  );
+}
+
+function StaffEditor({ companyId, staff, onSaved }: { companyId: string; staff: StaffList; onSaved: () => Promise<void> }) {
+  const saveStaff = useServerFn(saveVipFollowupStaff);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function run(data: { id?: string; name?: string; active?: boolean }) {
+    setBusy(true);
+    setErr(null);
+    try {
+      await saveStaff({ data: { companyId, ...data } });
+      await onSaved();
+      return true;
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not save");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-2 space-y-2 text-sm">
+      <ul className="divide-y divide-border">
+        {staff.map((p) => (
+          <li key={p.id} className="flex items-center justify-between gap-2 py-1.5">
+            <span className={p.active ? "" : "text-muted-foreground line-through"}>{p.name}</span>
+            <button type="button" disabled={busy} onClick={() => void run({ id: p.id, active: !p.active })} className="rounded-md border border-border px-2 py-0.5 text-xs disabled:opacity-50">
+              {p.active ? "Remove" : "Bring back"}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <form
+        className="flex gap-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (name.trim() && (await run({ name: name.trim() }))) setName("");
+        }}
+      >
+        <input id="vip-staff-name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} placeholder="Add a name" className="min-w-0 flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-sm" />
+        <button type="submit" disabled={busy || !name.trim()} className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50">Add</button>
+      </form>
+      <p className="text-[11px] text-muted-foreground">Removed names keep their past customers and results; they just stop showing in the pickers.</p>
+      {err && <p className="text-xs text-red-600">{err}</p>}
+    </div>
   );
 }

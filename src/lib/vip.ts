@@ -39,6 +39,12 @@ export type VipReportRow = {
   convini_registered_source: string | null;
   contacted_at: string | null;
   notes: string | null;
+  /** Review date (YYYY-MM-DD, company local time). */
+  review_day: string;
+  assignee_id: string | null;
+  assignee_name: string | null;
+  /** Assigned directly to this customer, or inherited from the day. */
+  assignee_source: "customer" | "day" | null;
 };
 
 export type VipStage = "registered" | "clicked" | "link_sent" | "no_link";

@@ -113,6 +113,9 @@ export async function recordVipEvent(sql: Sql, args: {
  * Tips link to the review directly; older tips that predate that link are
  * matched by employee + customer phone/email within a day of the review.
  */
+/** Review days are counted in this time zone (companies have no zone setting yet). */
+export const VIP_TIME_ZONE = "America/New_York";
+
 export async function vipReportRows(sql: Sql, args: {
   companyId: string;
   from?: string | null;
@@ -131,11 +134,16 @@ export async function vipReportRows(sql: Sql, args: {
            f.google_clicked_at, f.google_posted_at, f.google_stars,
            f.convini_link_sent_at, f.convini_link_last_sent_at, COALESCE(f.convini_link_sent_count, 0) AS convini_link_sent_count,
            f.convini_clicked_at, f.convini_last_clicked_at, COALESCE(f.convini_click_count, 0) AS convini_click_count,
-           f.convini_registered_at, f.convini_registered_source, f.contacted_at, f.notes
+           f.convini_registered_at, f.convini_registered_source, f.contacted_at, f.notes,
+           to_char((r.created_at AT TIME ZONE ${VIP_TIME_ZONE})::date, 'YYYY-MM-DD') AS review_day,
+           st.id AS assignee_id, st.name AS assignee_name,
+           CASE WHEN f.assignee_id IS NOT NULL THEN 'customer' WHEN da.staff_id IS NOT NULL THEN 'day' END AS assignee_source
     FROM ratings r
     JOIN review_contexts rc ON rc.id = r.review_context_id
     LEFT JOIN drivers d ON d.id = r.driver_id
     LEFT JOIN vip_followups f ON f.company_id = r.company_id AND f.external_job_id = rc.external_job_id
+    LEFT JOIN vip_day_assignments da ON da.company_id = r.company_id AND da.day = (r.created_at AT TIME ZONE ${VIP_TIME_ZONE})::date
+    LEFT JOIN vip_followup_staff st ON st.id = COALESCE(f.assignee_id, da.staff_id)
     LEFT JOIN LATERAL (
       SELECT count(*)::int AS tip_count,
              COALESCE(sum(t.amount_cents), 0)::int AS tip_total_cents,
@@ -182,4 +190,50 @@ export async function vipReportRows(sql: Sql, args: {
     convini_registered_at: iso(r.convini_registered_at),
     contacted_at: iso(r.contacted_at),
   })) as VipReportRow[];
+}
+
+export type VipStaff = { id: string; name: string; active: boolean };
+
+export async function listVipStaff(sql: Sql, companyId: string): Promise<VipStaff[]> {
+  const rows = await sql`
+    SELECT id, name, active FROM vip_followup_staff
+    WHERE company_id = ${companyId}
+    ORDER BY active DESC, sort_order, lower(name)`;
+  return rows.map((r: any) => ({ id: r.id, name: r.name, active: r.active }));
+}
+
+/** Day → assigned person, for days between `fromDay` and `toDay` (YYYY-MM-DD, inclusive). */
+export async function vipDayAssignments(sql: Sql, companyId: string, fromDay: string, toDay: string) {
+  const rows = await sql`
+    SELECT to_char(day, 'YYYY-MM-DD') AS day, staff_id FROM vip_day_assignments
+    WHERE company_id = ${companyId} AND day BETWEEN ${fromDay}::date AND ${toDay}::date`;
+  return Object.fromEntries(rows.map((r: any) => [r.day as string, r.staff_id as string])) as Record<string, string>;
+}
+
+/** Assign (or with `staffId` null, clear) the follow-up person for one review day. */
+export async function assignVipDay(sql: Sql, args: { companyId: string; day: string; staffId: string | null; userId: string | null }) {
+  if (!args.staffId) {
+    await sql`DELETE FROM vip_day_assignments WHERE company_id = ${args.companyId} AND day = ${args.day}::date`;
+    return;
+  }
+  const saved = await sql`
+    INSERT INTO vip_day_assignments (company_id, day, staff_id, assigned_by)
+    SELECT ${args.companyId}, ${args.day}::date, s.id, ${args.userId}
+    FROM vip_followup_staff s WHERE s.id = ${args.staffId} AND s.company_id = ${args.companyId}
+    ON CONFLICT (company_id, day) DO UPDATE SET staff_id = EXCLUDED.staff_id, assigned_by = EXCLUDED.assigned_by, assigned_at = now()
+    RETURNING day`;
+  if (!saved.length) throw new Error("Unknown follow-up person");
+}
+
+/** Reassign one customer (overrides the day); `staffId` null goes back to the day's person. */
+export async function assignVipCustomer(sql: Sql, args: { companyId: string; jobId: string; staffId: string | null; userId: string | null }) {
+  if (args.staffId) {
+    const [ok] = await sql`SELECT 1 FROM vip_followup_staff WHERE id = ${args.staffId} AND company_id = ${args.companyId}`;
+    if (!ok) throw new Error("Unknown follow-up person");
+  }
+  await sql`
+    INSERT INTO vip_followups (company_id, external_job_id, assignee_id, assigned_at, updated_by)
+    VALUES (${args.companyId}, ${args.jobId}, ${args.staffId}, now(), ${args.userId})
+    ON CONFLICT (company_id, external_job_id) DO UPDATE SET
+      assignee_id = EXCLUDED.assignee_id, assigned_at = now(), updated_by = EXCLUDED.updated_by, updated_at = now()`;
 }

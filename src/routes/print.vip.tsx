@@ -5,13 +5,14 @@ import { z } from "zod";
 import { getVipReport } from "@/lib/vip.functions";
 import { vipNextStep } from "@/lib/vip";
 import { dollars } from "@/lib/constants";
-import { STAGE_FILTERS, fmtWhen, sortVipRows, summarizeVip } from "@/components/VipCustomersPanel";
+import { STAGE_FILTERS, UNASSIGNED, filterByAssignee, fmtWhen, sortVipRows, summarizeVip } from "@/components/VipCustomersPanel";
 
 const searchSchema = z.object({
   companyId: z.string().uuid(),
   from: z.string().optional(),
   to: z.string().optional(),
   stage: z.enum(["all", "clicked", "link_sent", "no_link", "registered"]).default("all"),
+  assignee: z.string().max(64).default("all"),
   autoprint: z.preprocess((v) => v === true || v === "true" || v === "1", z.boolean()).default(true),
 });
 
@@ -50,16 +51,17 @@ function PrintVipPage() {
   }, [fetchReport, search.companyId, search.from, search.to, search.autoprint]);
 
   const rows = useMemo(() => {
-    const all = sortVipRows(report?.rows ?? []);
+    const all = sortVipRows(filterByAssignee(report?.rows ?? [], search.assignee));
     return search.stage === "all" ? all : all.filter((r) => vipNextStep(r).stage === search.stage);
-  }, [report, search.stage]);
+  }, [report, search.stage, search.assignee]);
 
   if (error) return <div className="grid min-h-screen place-items-center p-6 text-center text-sm text-red-700">{error}</div>;
   if (!report) return <div className="grid min-h-screen place-items-center">Preparing report…</div>;
 
   const co = report.company;
   const brand = co.primary_color || "#0b2545";
-  const summary = summarizeVip(report.rows);
+  const summary = summarizeVip(filterByAssignee(report.rows, search.assignee));
+  const personName = search.assignee === "all" ? null : search.assignee === UNASSIGNED ? "Unassigned" : report.staff.find((p) => p.id === search.assignee)?.name ?? null;
   const stageLabel = search.stage === "all" ? null : STAGE_FILTERS.find((s) => s.id === search.stage)?.label;
 
   return (
@@ -84,7 +86,7 @@ function PrintVipPage() {
         <div className="flex items-start justify-between border-b-2 pb-3" style={{ borderColor: brand }}>
           <div>
             <div className="text-xs uppercase tracking-widest text-gray-500">{co.name}</div>
-            <h1 className="mt-1 text-2xl font-bold" style={{ color: brand }}>VIP customer follow-up</h1>
+            <h1 className="mt-1 text-2xl font-bold" style={{ color: brand }}>VIP customer follow-up{personName ? ` — ${personName}` : ""}</h1>
             <div className="mt-1 text-xs text-gray-600">
               {rangeLabel(report.range.from, report.range.to)} · Customers who answered a review request{stageLabel ? ` · ${stageLabel}` : ""}
             </div>
@@ -127,6 +129,7 @@ function PrintVipPage() {
                       {r.customer_email && <div className="break-all text-gray-600">{r.customer_email}</div>}
                       <div className="mt-0.5 text-gray-600">Job #{r.job_id}</div>
                       {r.driver_name && <div className="text-gray-600">{r.driver_name}</div>}
+                      <div className="mt-0.5 font-semibold">Follow-up: {r.assignee_name ?? "—"}</div>
                     </td>
                     <td className="p-1.5">
                       <div><span style={{ color: "#d97706" }}>{"★".repeat(r.stars)}</span><span className="text-gray-300">{"★".repeat(5 - r.stars)}</span> <span className="text-gray-600">{fmtWhen(r.reviewed_at)}</span></div>

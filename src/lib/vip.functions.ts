@@ -9,6 +9,8 @@ async function assertCompanyAdmin(userId: string, companyId: string) {
   if (!ok) throw new Error("Forbidden");
 }
 
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
 /**
  * VIP customer follow-up report: customers who answered a GHL review request,
  * with their review, tip, Google review and Convini app status.
@@ -21,12 +23,15 @@ export const getVipReport = createServerFn({ method: "POST" })
       from: z.string().datetime().optional(),
       to: z.string().datetime().optional(),
       driverId: z.string().uuid().optional(),
+      // The calendar days shown for assignment (company local dates).
+      fromDay: day.optional(),
+      toDay: day.optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
     await assertCompanyAdmin(context.userId, data.companyId);
     const { sql } = await import("@/db/client.server");
-    const { vipReportRows } = await import("@/lib/vip-report.server");
+    const { vipReportRows, listVipStaff, vipDayAssignments } = await import("@/lib/vip-report.server");
     const [company] = await sql()`
       SELECT id, name, slug, logo_url, primary_color, secondary_color FROM companies WHERE id = ${data.companyId}`;
     if (!company) throw new Error("Not found");
@@ -43,6 +48,8 @@ export const getVipReport = createServerFn({ method: "POST" })
       range: { from: data.from ?? null, to: data.to ?? null },
       rows,
       truncated: rows.length >= 1000,
+      staff: await listVipStaff(sql(), data.companyId),
+      dayAssignments: data.fromDay && data.toDay ? await vipDayAssignments(sql(), data.companyId, data.fromDay, data.toDay) : {},
     };
   });
 
@@ -110,5 +117,64 @@ export const trackGoogleClick = createServerFn({ method: "POST" })
       FROM ratings r JOIN review_contexts rc ON rc.id = r.review_context_id
       WHERE r.id = ${data.ratingId} AND r.created_at > now() - interval '3 days'`;
     if (rating) await recordVipEvent(sql(), { companyId: rating.company_id, jobId: rating.external_job_id, event: "google_clicked" });
+    return { ok: true };
+  });
+
+/** Assign one review day's customers to a follow-up person (null clears it). */
+export const assignVipFollowupDay = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({ companyId: z.string().uuid(), day, staffId: z.string().uuid().nullable() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertCompanyAdmin(context.userId, data.companyId);
+    const { sql } = await import("@/db/client.server");
+    const { assignVipDay } = await import("@/lib/vip-report.server");
+    await assignVipDay(sql(), { ...data, userId: context.userId });
+    return { ok: true };
+  });
+
+/** Reassign a single customer; null returns them to the day's person. */
+export const assignVipFollowupCustomer = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({ companyId: z.string().uuid(), jobId: z.string().trim().min(1).max(200), staffId: z.string().uuid().nullable() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertCompanyAdmin(context.userId, data.companyId);
+    const { sql } = await import("@/db/client.server");
+    const [known] = await sql()`SELECT 1 FROM review_contexts WHERE company_id = ${data.companyId} AND external_job_id = ${data.jobId}`;
+    if (!known) throw new Error("Job not found");
+    const { assignVipCustomer } = await import("@/lib/vip-report.server");
+    await assignVipCustomer(sql(), { ...data, userId: context.userId });
+    return { ok: true };
+  });
+
+/** Add, rename, or turn on/off a follow-up person for this company. */
+export const saveVipFollowupStaff = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({
+    companyId: z.string().uuid(),
+    id: z.string().uuid().optional(),
+    name: z.string().trim().min(1).max(60).optional(),
+    active: z.boolean().optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertCompanyAdmin(context.userId, data.companyId);
+    const { sql } = await import("@/db/client.server");
+    try {
+      if (!data.id) {
+        if (!data.name) throw new Error("Enter a name");
+        await sql()`
+          INSERT INTO vip_followup_staff (company_id, name, sort_order)
+          VALUES (${data.companyId}, ${data.name}, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM vip_followup_staff WHERE company_id = ${data.companyId}))`;
+      } else {
+        const updated = await sql()`
+          UPDATE vip_followup_staff
+          SET name = COALESCE(${data.name ?? null}, name), active = COALESCE(${data.active ?? null}, active)
+          WHERE id = ${data.id} AND company_id = ${data.companyId}
+          RETURNING id`;
+        if (!updated.length) throw new Error("Not found");
+      }
+    } catch (error: any) {
+      if (error?.code === "23505") throw new Error("That name is already on the list");
+      throw error;
+    }
     return { ok: true };
   });

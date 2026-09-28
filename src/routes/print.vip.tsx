@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getVipReport } from "@/lib/vip.functions";
 import { vipNextStep } from "@/lib/vip";
 import { dollars } from "@/lib/constants";
-import { STAGE_FILTERS, UNASSIGNED, filterByAssignee, fmtWhen, sortVipRows, summarizeVip } from "@/components/VipCustomersPanel";
+import { STAGE_FILTERS, UNASSIGNED, filterByAssignee, fmtWhen, followupLabel, sortVipRows, summarizeVip } from "@/components/VipCustomersPanel";
 
 const searchSchema = z.object({
   companyId: z.string().uuid(),
@@ -13,6 +13,8 @@ const searchSchema = z.object({
   to: z.string().optional(),
   stage: z.enum(["all", "clicked", "link_sent", "no_link", "registered"]).default("all"),
   assignee: z.string().max(64).default("all"),
+  // "Follow-ups due" sheet: everyone whose next call is on or before this date.
+  due: z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).default(""),
   autoprint: z.preprocess((v) => v === true || v === "true" || v === "1", z.boolean()).default(true),
 });
 
@@ -39,7 +41,7 @@ function PrintVipPage() {
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetchReport({ data: { companyId: search.companyId, from: search.from, to: search.to } });
+        const r = await fetchReport({ data: { companyId: search.companyId, from: search.from, to: search.to, dueOn: search.due || undefined } });
         if (cancelled) return;
         setReport(r);
         if (search.autoprint) setTimeout(() => window.print(), 400);
@@ -48,7 +50,7 @@ function PrintVipPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [fetchReport, search.companyId, search.from, search.to, search.autoprint]);
+  }, [fetchReport, search.companyId, search.from, search.to, search.due, search.autoprint]);
 
   const rows = useMemo(() => {
     const all = sortVipRows(filterByAssignee(report?.rows ?? [], search.assignee));
@@ -88,7 +90,7 @@ function PrintVipPage() {
             <div className="text-xs uppercase tracking-widest text-gray-500">{co.name}</div>
             <h1 className="mt-1 text-2xl font-bold" style={{ color: brand }}>VIP customer follow-up{personName ? ` — ${personName}` : ""}</h1>
             <div className="mt-1 text-xs text-gray-600">
-              {rangeLabel(report.range.from, report.range.to)} · Customers who answered a review request{stageLabel ? ` · ${stageLabel}` : ""}
+              {search.due ? `Follow-up calls due by ${new Date(`${search.due}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}` : rangeLabel(report.range.from, report.range.to)} · Customers who answered a review request{stageLabel ? ` · ${stageLabel}` : ""}
             </div>
           </div>
           {co.logo_url && <img src={co.logo_url} alt="" className="h-12 max-w-[2.5in] object-contain" />}
@@ -150,6 +152,8 @@ function PrintVipPage() {
                     </td>
                     <td className="p-1.5">
                       <div className="font-semibold">{next.action}</div>
+                      {r.next_followup_on && <div className="mt-0.5">Next call: {followupLabel(r.next_followup_on)}</div>}
+                      {r.contacted_at && <div className="text-gray-600">Last call: {fmtWhen(r.contacted_at)}{r.call_count > 1 ? ` (${r.call_count} calls)` : ""}</div>}
                       {r.notes && <div className="mt-0.5 whitespace-pre-wrap text-gray-700">Notes: {r.notes}</div>}
                       <div className="mt-2 border-b border-gray-400" />
                       <div className="mt-3 border-b border-gray-400" />

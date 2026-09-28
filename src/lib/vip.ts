@@ -45,12 +45,33 @@ export type VipReportRow = {
   assignee_name: string | null;
   /** Assigned directly to this customer, or inherited from the day. */
   assignee_source: "customer" | "day" | null;
+  /** Scheduled next follow-up call (YYYY-MM-DD), if any. */
+  next_followup_on: string | null;
+  call_count: number;
 };
 
 export type VipStage = "registered" | "clicked" | "link_sent" | "no_link";
 
 /** Where the lead sits on the path to Convini registration, and what to do next. */
-export function vipNextStep(row: Pick<VipReportRow, "stars" | "google_posted_at" | "convini_link_sent_at" | "convini_clicked_at" | "convini_registered_at">): { stage: VipStage; action: string } {
+/** Today's date as YYYY-MM-DD in the viewer's time zone. */
+export function todayYmd(now = new Date()) {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+export type FollowupState = "overdue" | "due" | "scheduled" | null;
+export function followupState(nextOn: string | null | undefined, today = todayYmd()): FollowupState {
+  if (!nextOn) return null;
+  return nextOn < today ? "overdue" : nextOn === today ? "due" : "scheduled";
+}
+
+export function vipNextStep(row: Pick<VipReportRow, "stars" | "google_posted_at" | "convini_link_sent_at" | "convini_clicked_at" | "convini_registered_at"> & Partial<Pick<VipReportRow, "next_followup_on">>): { stage: VipStage; action: string } {
+  const base = vipStageStep(row);
+  const due = followupState(row.next_followup_on);
+  if (due === "overdue" || due === "due") return { stage: base.stage, action: `Follow-up call ${due === "due" ? "due today" : "overdue"}. ${base.action}` };
+  return base;
+}
+
+function vipStageStep(row: Pick<VipReportRow, "stars" | "google_posted_at" | "convini_link_sent_at" | "convini_clicked_at" | "convini_registered_at">): { stage: VipStage; action: string } {
   const google = row.stars >= 4 && !row.google_posted_at ? " Ask for a Google review." : "";
   if (row.convini_registered_at) return { stage: "registered", action: `Registered — welcome them as a VIP.${google}` };
   if (row.convini_clicked_at) return { stage: "clicked", action: `HOT: opened the Convini link but hasn't registered — call and help them sign up.${google}` };

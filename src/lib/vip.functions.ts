@@ -26,16 +26,20 @@ export const getVipReport = createServerFn({ method: "POST" })
       // The calendar days shown for assignment (company local dates).
       fromDay: day.optional(),
       toDay: day.optional(),
+      // "Follow-ups due" mode: everyone whose next call is on or before this date.
+      dueOn: day.optional(),
+      // Today in the viewer's zone, for the due-count banner.
+      today: day.optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
     await assertCompanyAdmin(context.userId, data.companyId);
     const { sql } = await import("@/db/client.server");
-    const { vipReportRows, listVipStaff, vipDayAssignments } = await import("@/lib/vip-report.server");
+    const { vipReportRows, listVipStaff, vipDayAssignments, vipDueCount, vipCallHistory } = await import("@/lib/vip-report.server");
     const [company] = await sql()`
       SELECT id, name, slug, logo_url, primary_color, secondary_color FROM companies WHERE id = ${data.companyId}`;
     if (!company) throw new Error("Not found");
-    const rows = await vipReportRows(sql(), { companyId: data.companyId, from: data.from, to: data.to, driverId: data.driverId, limit: 1000 });
+    const rows = await vipReportRows(sql(), { companyId: data.companyId, from: data.from, to: data.to, driverId: data.driverId, dueOn: data.dueOn, limit: 1000 });
     return {
       company: {
         id: company.id as string,
@@ -49,6 +53,8 @@ export const getVipReport = createServerFn({ method: "POST" })
       rows,
       truncated: rows.length >= 1000,
       staff: await listVipStaff(sql(), data.companyId),
+      calls: await vipCallHistory(sql(), data.companyId, [...new Set(rows.map((r) => r.job_id))]),
+      dueCount: data.today ? await vipDueCount(sql(), data.companyId, data.today) : 0,
       dayAssignments: data.fromDay && data.toDay ? await vipDayAssignments(sql(), data.companyId, data.fromDay, data.toDay) : {},
     };
   });
@@ -176,5 +182,41 @@ export const saveVipFollowupStaff = createServerFn({ method: "POST" })
       if (error?.code === "23505") throw new Error("That name is already on the list");
       throw error;
     }
+    return { ok: true };
+  });
+
+/** Log a follow-up call: what happened, and when to call next (null = no more calls planned). */
+export const logVipFollowupCall = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({
+    companyId: z.string().uuid(),
+    jobId: z.string().trim().min(1).max(200),
+    note: z.string().trim().max(2000).nullable().optional(),
+    nextFollowupOn: day.nullable(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertCompanyAdmin(context.userId, data.companyId);
+    const { sql } = await import("@/db/client.server");
+    const [known] = await sql()`SELECT 1 FROM review_contexts WHERE company_id = ${data.companyId} AND external_job_id = ${data.jobId}`;
+    if (!known) throw new Error("Job not found");
+    const { logVipCall } = await import("@/lib/vip-report.server");
+    await logVipCall(sql(), { companyId: data.companyId, jobId: data.jobId, note: data.note?.trim() || null, nextFollowupOn: data.nextFollowupOn, userId: context.userId });
+    return { ok: true };
+  });
+
+/** Change or clear the next follow-up date without logging a call. */
+export const setVipNextFollowup = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({ companyId: z.string().uuid(), jobId: z.string().trim().min(1).max(200), nextFollowupOn: day.nullable() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertCompanyAdmin(context.userId, data.companyId);
+    const { sql } = await import("@/db/client.server");
+    const [known] = await sql()`SELECT 1 FROM review_contexts WHERE company_id = ${data.companyId} AND external_job_id = ${data.jobId}`;
+    if (!known) throw new Error("Job not found");
+    await sql()`
+      INSERT INTO vip_followups (company_id, external_job_id, next_followup_on, updated_by)
+      VALUES (${data.companyId}, ${data.jobId}, ${data.nextFollowupOn}::date, ${context.userId})
+      ON CONFLICT (company_id, external_job_id) DO UPDATE SET
+        next_followup_on = EXCLUDED.next_followup_on, updated_by = EXCLUDED.updated_by, updated_at = now()`;
     return { ok: true };
   });

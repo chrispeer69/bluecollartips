@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import postgres from "postgres";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { assignVipCustomer, assignVipDay, listVipStaff, recordVipEvent, resolveVipJob, vipDayAssignments, vipNextStep, vipReportRows } from "../src/lib/vip-report.server.ts";
+import { assignVipCustomer, assignVipDay, listVipStaff, logVipCall, recordVipEvent, resolveVipJob, vipCallHistory, vipDayAssignments, vipDueCount, vipNextStep, vipReportRows } from "../src/lib/vip-report.server.ts";
+import { followupState } from "../src/lib/vip.ts";
 
 try { process.loadEnvFile?.(".env"); } catch (error) {
   if (error?.code !== "ENOENT") throw error;
@@ -184,6 +185,43 @@ test("vip assignments: a day goes to one person, a customer can be reassigned, d
   });
 });
 
+test("vip follow-up calls: log a call, schedule the next one, and find it when due", async () => {
+  await inRollback(async (tx) => {
+    const s = await seed(tx);
+    // An old review (weeks ago) and a fresh one.
+    const old = await s.context(s.company.id, s.ana.id, "TB-4001", { name: "Happy Hannah" });
+    const fresh = await s.context(s.company.id, s.ana.id, "TB-4002", { name: "New Ned" });
+    await s.rating(s.company.id, s.ana.id, old, 5, new Date(Date.UTC(2026, 8, 1, 15)));
+    await s.rating(s.company.id, s.ana.id, fresh, 5, new Date(Date.UTC(2026, 8, 28, 15)));
+
+    await logVipCall(tx, { companyId: s.company.id, jobId: "TB-4001", note: "Voicemail", nextFollowupOn: "2026-09-29", userId: null });
+    await logVipCall(tx, { companyId: s.company.id, jobId: "TB-4001", note: "Very happy, will download the app and review", nextFollowupOn: "2026-10-05", userId: null });
+    await logVipCall(tx, { companyId: s.company.id, jobId: "TB-4002", note: "Registered on the call", nextFollowupOn: null, userId: null });
+
+    // Before the date: not due. On the date: due, even though the review is weeks old.
+    assert.equal(await vipDueCount(tx, s.company.id, "2026-10-04"), 0);
+    assert.equal(await vipDueCount(tx, s.company.id, "2026-10-05"), 1);
+    const due = await vipReportRows(tx, { companyId: s.company.id, dueOn: "2026-10-05", from: "2026-09-28T00:00:00Z", to: "2026-09-28T23:59:59Z" });
+    assert.deepEqual(due.map((r) => r.job_id), ["TB-4001"]);
+    assert.equal(due[0].next_followup_on, "2026-10-05");
+    assert.equal(due[0].call_count, 2);
+    assert.ok(due[0].contacted_at);
+
+    const all = Object.fromEntries((await vipReportRows(tx, { companyId: s.company.id })).map((r) => [r.job_id, r]));
+    assert.equal(all["TB-4002"].next_followup_on, null, "no more calls planned");
+
+    const history = await vipCallHistory(tx, s.company.id, ["TB-4001", "TB-4002"]);
+    assert.deepEqual(history["TB-4001"].map((c) => c.note), ["Very happy, will download the app and review", "Voicemail"]);
+    assert.equal(history["TB-4001"][0].nextFollowupOn, "2026-10-05");
+    assert.equal(history["TB-4002"].length, 1);
+
+    assert.equal(followupState("2026-10-05", "2026-10-04"), "scheduled");
+    assert.equal(followupState("2026-10-05", "2026-10-05"), "due");
+    assert.equal(followupState("2026-10-05", "2026-10-07"), "overdue");
+    assert.equal(followupState(null, "2026-10-07"), null);
+  });
+});
+
 test("vip wiring: public routes, admin checks and dashboard entry", async () => {
   const read = (p) => readFile(new URL(`../${p}`, import.meta.url), "utf8");
   const [events, go, fns, admin, thanks] = await Promise.all([
@@ -197,7 +235,7 @@ test("vip wiring: public routes, admin checks and dashboard entry", async () => 
   assert.match(go, /PREVIEW_BOT/);
   assert.match(go, /FROM review_contexts WHERE company_id/);
   // Every admin function (all but the public Google-tap tracker) checks the caller.
-  assert.equal((fns.match(/assertCompanyAdmin\(context\.userId/g) ?? []).length, 5);
+  assert.equal((fns.match(/assertCompanyAdmin\(context\.userId/g) ?? []).length, 7);
   assert.match(admin, /page === "vip"/);
   assert.match(thanks, /onGoogleClick/);
 });

@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { assignVipFollowupCustomer, assignVipFollowupDay, getVipReport, saveVipFollowupStaff, updateVipFollowup } from "@/lib/vip.functions";
-import { vipNextStep, type VipReportRow, type VipStage } from "@/lib/vip";
+import { assignVipFollowupCustomer, assignVipFollowupDay, getVipReport, logVipFollowupCall, saveVipFollowupStaff, setVipNextFollowup, updateVipFollowup } from "@/lib/vip.functions";
+import { followupState, todayYmd, vipNextStep, type FollowupState, type VipReportRow, type VipStage } from "@/lib/vip";
 import { dollars } from "@/lib/constants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export type VipRangePreset = "today" | "yesterday" | "last_7" | "last_30" | "custom";
+export type VipRangePreset = "due" | "today" | "yesterday" | "last_7" | "last_30" | "custom";
 export type VipStageFilter = "all" | VipStage;
 
 const RANGES: Array<{ id: VipRangePreset; label: string }> = [
+  { id: "due", label: "Follow-ups due" },
   { id: "today", label: "Today" },
   { id: "yesterday", label: "Yesterday" },
   { id: "last_7", label: "Last 7 days" },
@@ -36,6 +37,7 @@ export function ymd(d: Date) {
 
 export function vipRange(preset: VipRangePreset, custom: { from: string; to: string }, now = new Date()) {
   switch (preset) {
+    case "due":
     case "today": return { from: startOfDay(now), to: endOfDay(now) };
     case "yesterday": return { from: startOfDay(addDays(now, -1)), to: endOfDay(addDays(now, -1)) };
     case "last_7": return { from: startOfDay(addDays(now, -6)), to: endOfDay(now) };
@@ -87,10 +89,24 @@ export function vipScoreboard(rows: VipReportRow[]) {
   return [...by.values()].sort((a, b) => (a.key === UNASSIGNED ? 1 : b.key === UNASSIGNED ? -1 : b.registered - a.registered || a.name.localeCompare(b.name)));
 }
 
+const FOLLOWUP_ORDER: Record<string, number> = { overdue: 0, due: 1 };
+
 export function sortVipRows(rows: VipReportRow[]) {
+  const today = todayYmd();
+  const due = (r: VipReportRow) => FOLLOWUP_ORDER[followupState(r.next_followup_on, today) ?? ""] ?? 2;
   return [...rows].sort((a, b) =>
-    STAGE_ORDER[vipNextStep(a).stage] - STAGE_ORDER[vipNextStep(b).stage]
+    due(a) - due(b)
+    || STAGE_ORDER[vipNextStep(a).stage] - STAGE_ORDER[vipNextStep(b).stage]
     || b.reviewed_at.localeCompare(a.reviewed_at));
+}
+
+export function followupLabel(nextOn: string, today = todayYmd()) {
+  const days = Math.round((new Date(`${nextOn}T12:00:00`).getTime() - new Date(`${today}T12:00:00`).getTime()) / 86_400_000);
+  const when = new Date(`${nextOn}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  if (days === 0) return `Today (${when})`;
+  if (days === 1) return `Tomorrow (${when})`;
+  if (days < 0) return `${when}, ${-days} day${days === -1 ? "" : "s"} overdue`;
+  return `${when} (in ${days} days)`;
 }
 
 export function summarizeVip(rows: VipReportRow[]) {
@@ -130,19 +146,27 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
   const assignDay = useServerFn(assignVipFollowupDay);
 
   const range = useMemo(() => vipRange(preset, custom), [preset, custom]);
-  const days = useMemo(() => daysInRange(range.from, range.to), [range]);
+  const days = useMemo(() => (preset === "due" ? [] : daysInRange(range.from, range.to)), [preset, range]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setReport(await fetchReport({ data: { companyId, from: range.from.toISOString(), to: range.to.toISOString(), fromDay: days[0], toDay: days[days.length - 1] } }));
+      setReport(await fetchReport({ data: {
+        companyId,
+        from: range.from.toISOString(),
+        to: range.to.toISOString(),
+        fromDay: days[0],
+        toDay: days[days.length - 1],
+        dueOn: preset === "due" ? todayYmd() : undefined,
+        today: todayYmd(),
+      } }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load VIP customers.");
     } finally {
       setLoading(false);
     }
-  }, [companyId, fetchReport, range, days]);
+  }, [companyId, fetchReport, range, days, preset]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -177,6 +201,7 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
       to: range.to.toISOString(),
       stage,
       assignee: who,
+      due: preset === "due" ? todayYmd() : "",
       autoprint: "true",
     });
     window.open(`/print/vip?${params.toString()}`, "_blank", "noopener");
@@ -190,6 +215,18 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
         Customers who answered a GoHighLevel review request. These customers already engage with you, so work them
         toward a Convini app sign-up. The hottest leads are listed first.
       </p>
+
+      {preset !== "due" && (report?.dueCount ?? 0) > 0 && (
+        <button type="button" onClick={() => setPreset("due")} className="flex w-full items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-left text-sm text-amber-900">
+          <span><span className="font-semibold">{report?.dueCount} follow-up call{report?.dueCount === 1 ? "" : "s"} due</span> today or overdue.</span>
+          <span className="font-semibold underline">Show them</span>
+        </button>
+      )}
+      {preset === "due" && (
+        <p className="rounded-lg border border-border bg-muted/40 px-4 py-2.5 text-sm">
+          Showing everyone whose follow-up call is due today or overdue, whenever they left their review.
+        </p>
+      )}
 
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-xs text-muted-foreground">
@@ -243,6 +280,7 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
             <StaffEditor companyId={companyId} staff={staff} onSaved={load} />
           ) : (
             <ul className="mt-2 divide-y divide-border">
+              {preset === "due" && <li className="py-2 text-xs text-muted-foreground">Pick a date range above to assign days.</li>}
               {[...days].reverse().map((day) => {
                 const assigned = report?.dayAssignments?.[day] ?? UNASSIGNED;
                 return (
@@ -324,7 +362,7 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
         </div>
       ) : (
         <ul className="space-y-3">
-          {rows.map((row) => <VipRow key={row.rating_id} row={row} companyId={companyId} staff={staff} onSaved={load} />)}
+          {rows.map((row) => <VipRow key={row.rating_id} row={row} companyId={companyId} staff={staff} calls={report?.calls?.[row.job_id] ?? []} onSaved={load} />)}
         </ul>
       )}
       {report?.truncated && <p className="text-xs text-muted-foreground">Showing the most recent 1,000. Narrow the dates to see everything.</p>}
@@ -388,8 +426,19 @@ function fromLocalInput(value: string) {
 type StaffList = Report["staff"];
 const FOLLOW_DAY = "__day__";
 
-function VipRow({ row, companyId, staff, onSaved }: { row: VipReportRow; companyId: string; staff: StaffList; onSaved: () => Promise<void> }) {
+type CallList = Report["calls"][string];
+
+const FOLLOWUP_TONE: Record<Exclude<FollowupState, null>, string> = {
+  overdue: "border-red-300 bg-red-50 text-red-800",
+  due: "border-amber-300 bg-amber-50 text-amber-900",
+  scheduled: "border-border bg-muted/40 text-foreground",
+};
+
+function VipRow({ row, companyId, staff, calls, onSaved }: { row: VipReportRow; companyId: string; staff: StaffList; calls: CallList; onSaved: () => Promise<void> }) {
   const save = useServerFn(updateVipFollowup);
+  const setNext = useServerFn(setVipNextFollowup);
+  const [logging, setLogging] = useState(false);
+  const followup = followupState(row.next_followup_on);
   const assignCustomer = useServerFn(assignVipFollowupCustomer);
   const next = vipNextStep(row);
   const [editing, setEditing] = useState(false);
@@ -502,10 +551,45 @@ function VipRow({ row, companyId, staff, onSaved }: { row: VipReportRow; company
       </dl>
 
       <div className="mt-3 rounded-md border border-dashed border-border px-3 py-2 text-sm"><span className="font-semibold">Next step:</span> {next.action}</div>
+      {row.next_followup_on && followup && (
+        <div className={`mt-2 flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm ${FOLLOWUP_TONE[followup]}`}>
+          <span><span className="font-semibold">Next follow-up call:</span> {followupLabel(row.next_followup_on)}</span>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try { await setNext({ data: { companyId, jobId: row.job_id, nextFollowupOn: null } }); await onSaved(); }
+              catch (e) { setErr(e instanceof Error ? e.message : "Could not clear"); }
+              finally { setBusy(false); }
+            }}
+            className="text-xs underline disabled:opacity-50"
+          >
+            Clear
+          </button>
+        </div>
+      )}
       {(row.contacted_at || row.notes) && (
         <div className="mt-2 text-xs text-muted-foreground">
           {row.contacted_at && <>Last contacted {fmtWhen(row.contacted_at)}. </>}
           {row.notes && <span className="whitespace-pre-wrap">Notes: {row.notes}</span>}
+        </div>
+      )}
+      {calls.length > 0 && (
+        <div className="mt-2 rounded-md bg-muted/40 px-3 py-2">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Calls{row.call_count > calls.length ? ` (latest ${calls.length} of ${row.call_count})` : ` (${calls.length})`}
+          </div>
+          <ul className="mt-1 space-y-1 text-xs">
+            {calls.map((c) => (
+              <li key={c.id}>
+                <span className="font-medium">{fmtWhen(c.calledAt)}</span>
+                {c.loggedBy ? <span className="text-muted-foreground"> · {c.loggedBy}</span> : null}
+                {c.note ? <span className="whitespace-pre-wrap"> · {c.note}</span> : null}
+                {c.nextFollowupOn ? <span className="text-muted-foreground"> · call again {new Date(`${c.nextFollowupOn}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span> : null}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -520,13 +604,21 @@ function VipRow({ row, companyId, staff, onSaved }: { row: VipReportRow; company
             Mark Google review posted
           </button>
         )}
-        <button type="button" disabled={busy} onClick={() => void quick({ contactedAt: new Date().toISOString() })} className="rounded-md border border-border px-3 py-1.5 text-xs disabled:opacity-50">
-          Contacted today
+        <button type="button" onClick={() => setLogging((v) => !v)} className="rounded-md border border-primary px-3 py-1.5 text-xs font-semibold text-primary">
+          {logging ? "Cancel call log" : "Log call / follow up next"}
         </button>
         <button type="button" onClick={() => setEditing((e) => !e)} className="rounded-md border border-border px-3 py-1.5 text-xs">
           {editing ? "Cancel" : "Edit details / notes"}
         </button>
       </div>
+
+      {logging && (
+        <LogCallForm
+          companyId={companyId}
+          jobId={row.job_id}
+          onDone={async () => { setLogging(false); await onSaved(); }}
+        />
+      )}
 
       {editing && (
         <div className="mt-3 grid gap-3 rounded-md border border-border p-3 text-xs sm:grid-cols-2">
@@ -620,5 +712,82 @@ function StaffEditor({ companyId, staff, onSaved }: { companyId: string; staff: 
       <p className="text-[11px] text-muted-foreground">Removed names keep their past customers and results; they just stop showing in the pickers.</p>
       {err && <p className="text-xs text-red-600">{err}</p>}
     </div>
+  );
+}
+
+const FOLLOW_UP_CHOICES: Array<{ id: string; label: string; days: number | null }> = [
+  { id: "none", label: "No more calls", days: null },
+  { id: "1", label: "Tomorrow", days: 1 },
+  { id: "3", label: "In 3 days", days: 3 },
+  { id: "7", label: "In 1 week", days: 7 },
+  { id: "14", label: "In 2 weeks", days: 14 },
+  { id: "date", label: "Pick a date", days: null },
+];
+
+function LogCallForm({ companyId, jobId, onDone }: { companyId: string; jobId: string; onDone: () => Promise<void> }) {
+  const logCall = useServerFn(logVipFollowupCall);
+  const [note, setNote] = useState("");
+  const [choice, setChoice] = useState("7");
+  const [date, setDate] = useState(ymd(addDays(new Date(), 7)));
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const nextOn = choice === "none" ? null : choice === "date" ? date || null : ymd(addDays(new Date(), Number(choice)));
+
+  return (
+    <form
+      className="mt-3 space-y-3 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (choice === "date" && !date) { setErr("Pick the follow-up date."); return; }
+        setBusy(true);
+        setErr(null);
+        try {
+          await logCall({ data: { companyId, jobId, note: note.trim() || null, nextFollowupOn: nextOn } });
+          await onDone();
+        } catch (error) {
+          setErr(error instanceof Error ? error.message : "Could not save the call");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <label className="block text-xs text-muted-foreground" htmlFor={`call-note-${jobId}`}>What happened on the call?</label>
+      <textarea
+        id={`call-note-${jobId}`}
+        value={note}
+        maxLength={2000}
+        rows={2}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="e.g. Very happy. Will download Convini and leave a Google review."
+        className="block w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+      />
+      <fieldset>
+        <legend className="text-xs text-muted-foreground">Follow up next</legend>
+        <div className="mt-1 flex flex-wrap gap-1.5">
+          {FOLLOW_UP_CHOICES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => setChoice(c.id)}
+              aria-pressed={choice === c.id}
+              className={`rounded-full border px-3 py-1 text-xs ${choice === c.id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+        {choice === "date" && (
+          <input id={`call-date-${jobId}`} type="date" value={date} min={ymd(new Date())} onChange={(e) => setDate(e.target.value)} className="mt-2 rounded-md border border-input bg-background px-2 py-1.5 text-sm" />
+        )}
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {nextOn ? <>They'll show up under <b>Follow-ups due</b> on {new Date(`${nextOn}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}.</> : "No further call scheduled."}
+        </p>
+      </fieldset>
+      <div className="flex items-center gap-2">
+        <button type="submit" disabled={busy} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">Save call</button>
+        {err && <span className="text-xs text-red-600">{err}</span>}
+      </div>
+    </form>
   );
 }

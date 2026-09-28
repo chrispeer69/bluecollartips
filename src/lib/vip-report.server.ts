@@ -121,6 +121,8 @@ export async function vipReportRows(sql: Sql, args: {
   from?: string | null;
   to?: string | null;
   driverId?: string | null;
+  /** Follow-ups due mode: customers whose next call is on or before this date (YYYY-MM-DD), any review date. */
+  dueOn?: string | null;
   limit?: number;
 }): Promise<VipReportRow[]> {
   const rows = await sql`
@@ -137,6 +139,8 @@ export async function vipReportRows(sql: Sql, args: {
            f.convini_registered_at, f.convini_registered_source, f.contacted_at, f.notes,
            to_char((r.created_at AT TIME ZONE ${VIP_TIME_ZONE})::date, 'YYYY-MM-DD') AS review_day,
            st.id AS assignee_id, st.name AS assignee_name,
+           to_char(f.next_followup_on, 'YYYY-MM-DD') AS next_followup_on,
+           (SELECT COUNT(*) FROM vip_call_log cl WHERE cl.company_id = r.company_id AND cl.external_job_id = rc.external_job_id)::int AS call_count,
            CASE WHEN f.assignee_id IS NOT NULL THEN 'customer' WHEN da.staff_id IS NOT NULL THEN 'day' END AS assignee_source
     FROM ratings r
     JOIN review_contexts rc ON rc.id = r.review_context_id
@@ -171,8 +175,9 @@ export async function vipReportRows(sql: Sql, args: {
     ) tip ON true
     WHERE r.company_id = ${args.companyId}
       AND (${args.driverId ?? null}::uuid IS NULL OR r.driver_id = ${args.driverId ?? null}::uuid)
-      AND (${args.from ?? null}::timestamptz IS NULL OR r.created_at >= ${args.from ?? null}::timestamptz)
-      AND (${args.to ?? null}::timestamptz IS NULL OR r.created_at <= ${args.to ?? null}::timestamptz)
+      AND (${args.dueOn ?? null}::date IS NOT NULL OR ${args.from ?? null}::timestamptz IS NULL OR r.created_at >= ${args.from ?? null}::timestamptz)
+      AND (${args.dueOn ?? null}::date IS NOT NULL OR ${args.to ?? null}::timestamptz IS NULL OR r.created_at <= ${args.to ?? null}::timestamptz)
+      AND (${args.dueOn ?? null}::date IS NULL OR f.next_followup_on <= ${args.dueOn ?? null}::date)
     ORDER BY r.created_at DESC
     LIMIT ${args.limit ?? 1000}`;
   const iso = (v: unknown) => (v ? new Date(v as string).toISOString() : null);
@@ -236,4 +241,54 @@ export async function assignVipCustomer(sql: Sql, args: { companyId: string; job
     VALUES (${args.companyId}, ${args.jobId}, ${args.staffId}, now(), ${args.userId})
     ON CONFLICT (company_id, external_job_id) DO UPDATE SET
       assignee_id = EXCLUDED.assignee_id, assigned_at = now(), updated_by = EXCLUDED.updated_by, updated_at = now()`;
+}
+
+/** How many customers have a follow-up call due on or before `dueOn`. */
+export async function vipDueCount(sql: Sql, companyId: string, dueOn: string) {
+  const [row] = await sql`
+    SELECT COUNT(*)::int AS n FROM vip_followups f
+    WHERE f.company_id = ${companyId} AND f.next_followup_on <= ${dueOn}::date
+      AND EXISTS (SELECT 1 FROM review_contexts rc JOIN ratings r ON r.review_context_id = rc.id
+                  WHERE rc.company_id = f.company_id AND rc.external_job_id = f.external_job_id)`;
+  return Number(row?.n ?? 0);
+}
+
+export type VipCall = { id: string; calledAt: string; note: string | null; nextFollowupOn: string | null; loggedBy: string | null };
+
+/** Recent calls for each job, newest first. */
+export async function vipCallHistory(sql: Sql, companyId: string, jobIds: string[], perJob = 5) {
+  if (!jobIds.length) return {} as Record<string, VipCall[]>;
+  const rows = await sql`
+    SELECT * FROM (
+      SELECT cl.id, cl.external_job_id, cl.called_at, cl.note, to_char(cl.next_followup_on, 'YYYY-MM-DD') AS next_followup_on,
+             u.full_name AS logged_by,
+             row_number() OVER (PARTITION BY cl.external_job_id ORDER BY cl.called_at DESC) AS n
+      FROM vip_call_log cl LEFT JOIN users u ON u.id = cl.logged_by
+      WHERE cl.company_id = ${companyId} AND cl.external_job_id IN ${sql(jobIds)}
+    ) x WHERE n <= ${perJob}
+    ORDER BY called_at DESC`;
+  const out: Record<string, VipCall[]> = {};
+  for (const r of rows as any[]) {
+    (out[r.external_job_id] ??= []).push({
+      id: r.id, calledAt: new Date(r.called_at).toISOString(), note: r.note, nextFollowupOn: r.next_followup_on, loggedBy: r.logged_by ?? null,
+    });
+  }
+  return out;
+}
+
+/** Log a follow-up call and set (or clear) when to call next. */
+export async function logVipCall(sql: Sql, args: { companyId: string; jobId: string; note: string | null; nextFollowupOn: string | null; userId: string | null }) {
+  // Works on a pool (opens a transaction) or inside one (savepoint).
+  const atomic = (fn: (tx: any) => Promise<void>) => (typeof (sql as any).begin === "function" ? (sql as any).begin(fn) : (sql as any).savepoint(fn));
+  await atomic(async (tx: any) => {
+    await tx`
+      INSERT INTO vip_call_log (company_id, external_job_id, called_at, note, next_followup_on, logged_by)
+      VALUES (${args.companyId}, ${args.jobId}, clock_timestamp(), ${args.note}, ${args.nextFollowupOn}::date, ${args.userId})`;
+    await tx`
+      INSERT INTO vip_followups (company_id, external_job_id, contacted_at, next_followup_on, updated_by)
+      VALUES (${args.companyId}, ${args.jobId}, now(), ${args.nextFollowupOn}::date, ${args.userId})
+      ON CONFLICT (company_id, external_job_id) DO UPDATE SET
+        contacted_at = now(), next_followup_on = EXCLUDED.next_followup_on,
+        updated_by = EXCLUDED.updated_by, updated_at = now()`;
+  });
 }

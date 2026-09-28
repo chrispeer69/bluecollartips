@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { applyRatingAttribution, previewRatingAttribution, type DispatchJob } from "@/lib/attribution.functions";
+import { applyJobDetails, applyRatingAttribution, previewRatingAttribution, type DispatchJob } from "@/lib/attribution.functions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Preview = Awaited<ReturnType<typeof previewRatingAttribution>>;
@@ -8,6 +8,8 @@ type Preview = Awaited<ReturnType<typeof previewRatingAttribution>>;
 // Column names we recognise, case-insensitive. TowBook's Dispatching
 // Analysis export is the primary target; generic CSVs work too.
 const COLS: Record<keyof DispatchJob, string[]> = {
+  city: ["tow source city", "pickup city", "source city", "city"],
+  service: ["reason", "service", "call reason", "service type"],
   jobId: ["call number", "call #", "call no", "job id", "job number", "job #", "invoice number", "purchase order"],
   driver: ["driver", "driver name", "employee", "technician", "tech"],
   customerName: ["customer name", "customer", "name"],
@@ -70,6 +72,8 @@ async function parseFile(file: File): Promise<{ jobs: DispatchJob[]; headerFound
       customerPhone: str(cell(r, "customerPhone")),
       customerEmail: str(cell(r, "customerEmail")),
       completedAt: toIso(cell(r, "completedAt")),
+      city: str(cell(r, "city")),
+      service: str(cell(r, "service")),
     });
   }
   return { jobs, headerFound: header.filter(Boolean) };
@@ -82,6 +86,9 @@ const VIA_LABEL: Record<string, string> = {
 export function DispatchImportPanel({ companyId, onApplied }: { companyId: string; onApplied: () => void | Promise<void> }) {
   const preview = useServerFn(previewRatingAttribution);
   const apply = useServerFn(applyRatingAttribution);
+  const tagJobs = useServerFn(applyJobDetails);
+  const [jobsParsed, setJobsParsed] = useState<DispatchJob[]>([]);
+  const [tagResult, setTagResult] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [jobCount, setJobCount] = useState(0);
   const [data, setData] = useState<Preview | null>(null);
@@ -95,7 +102,7 @@ export function DispatchImportPanel({ companyId, onApplied }: { companyId: strin
     try {
       const { jobs } = await parseFile(file);
       if (!jobs.length) throw new Error("No jobs with a driver found in that file.");
-      setFileName(file.name); setJobCount(jobs.length);
+      setFileName(file.name); setJobCount(jobs.length); setJobsParsed(jobs); setTagResult(null);
       const result = await preview({ data: { companyId, jobs } });
       setData(result);
       const initial: Record<string, string | null> = {};
@@ -120,6 +127,26 @@ export function DispatchImportPanel({ companyId, onApplied }: { companyId: strin
       {busy ? "Working…" : "Choose export file"}
     </label>
     {fileName && <span className="ml-3 text-xs text-muted-foreground">{fileName} · {jobCount} jobs</span>}
+    {jobsParsed.length > 0 && (
+      <div className="rounded-md border border-border bg-card p-3 text-sm">
+        <p className="text-muted-foreground">
+          Tag every review with its job's pickup city and service (from the export's "Tow Source City" and "Reason" columns).
+          Reviews matched by job number, phone or email are marked as verified jobs on your public review page.
+        </p>
+        <button type="button" disabled={busy} className="mt-2 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          onClick={async () => {
+            setBusy(true); setError(null);
+            try {
+              const r = await tagJobs({ data: { companyId, jobs: jobsParsed } });
+              setTagResult(`Tagged ${r.tagged} of ${r.total} reviews with city and service (${r.verified} verified by job number, phone or email; ${r.unmatched} had no matching job).`);
+            } catch (err) { setError(err instanceof Error ? err.message : "Could not tag reviews"); }
+            finally { setBusy(false); }
+          }}>
+          Tag reviews with city &amp; service
+        </button>
+        {tagResult && <p className="mt-2 text-emerald-700">{tagResult}</p>}
+      </div>
+    )}
     {error && <p className="text-sm text-destructive">{error}</p>}
     {done && <p className="text-sm text-emerald-700">{done}</p>}
 

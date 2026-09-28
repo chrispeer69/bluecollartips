@@ -44,12 +44,25 @@ export type PublicReview = {
   text: string | null;
   /** Customer first name + last initial, same rule as text. */
   customer: string | null;
+  /** Tied to a real dispatch job: a review link sent from the job, or matched to it by job number, phone or email. */
+  verified: boolean;
+  /** Pickup city and service from the dispatch job, when known. */
+  city: string | null;
+  service: string | null;
 };
 
 type Row = {
   id: string; stars: number; created_at: Date | string; feedback: string | null;
   customer_name: string | null; public_ok: boolean; driver_slug: string | null;
   driver_name: string | null; driver_status: string | null;
+  review_context_id?: string | null; dispatch_match?: string | null;
+  job_city?: string | null; job_service?: string | null;
+};
+
+const tidy = (v: string | null | undefined) => {
+  const t = (v ?? "").replace(/\s+/g, " ").trim();
+  if (!t) return null;
+  return t.split(" ").map((w) => (w === w.toUpperCase() && w.length > 2 ? w.charAt(0) + w.slice(1).toLowerCase() : w)).join(" ");
 };
 
 export function toPublicReview(r: Row): PublicReview {
@@ -63,5 +76,8 @@ export function toPublicReview(r: Row): PublicReview {
     driverKey: activeDriver ? driverKey(r.driver_slug as string) : null,
     text,
     customer: r.public_ok ? firstNameLastInitial(r.customer_name) : null,
+    verified: Boolean(r.review_context_id) || r.dispatch_match === "job" || r.dispatch_match === "phone" || r.dispatch_match === "email",
+    city: tidy(r.job_city),
+    service: tidy(r.job_service),
   };
 }

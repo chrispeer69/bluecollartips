@@ -20,6 +20,8 @@ const jobSchema = z.object({
   customerPhone: z.string().trim().max(60).nullable(),
   customerEmail: z.string().trim().max(200).nullable(),
   completedAt: z.string().trim().max(40).nullable(), // ISO date/time
+  city: z.string().trim().max(120).nullable().optional(),
+  service: z.string().trim().max(120).nullable().optional(),
 });
 export type DispatchJob = z.infer<typeof jobSchema>;
 
@@ -128,6 +130,91 @@ export const previewRatingAttribution = createServerFn({ method: "POST" })
         noJob: rows.filter((r) => !r.driverName).length,
       },
     };
+  });
+
+type RatingForMatch = {
+  created_at: string | Date; external_job_id: string | null;
+  customer_phone: string | null; ctx_phone: string | null;
+  customer_email: string | null; ctx_email: string | null;
+  customer_name: string | null; ctx_name: string | null;
+};
+type Via = "job" | "phone" | "email" | "name";
+
+/** Same job matching as the attribution preview: job id, then phone, email, name (nearest date). */
+export function buildJobMatcher(allJobs: DispatchJob[]) {
+  const byJobId = new Map<string, DispatchJob[]>();
+  const byPhone = new Map<string, DispatchJob[]>();
+  const byEmail = new Map<string, DispatchJob[]>();
+  const byName = new Map<string, DispatchJob[]>();
+  const push = (m: Map<string, DispatchJob[]>, k: string | null | undefined, j: DispatchJob) => {
+    if (!k) return;
+    const list = m.get(k) ?? [];
+    list.push(j);
+    m.set(k, list);
+  };
+  for (const j of allJobs) {
+    push(byJobId, j.jobId ? j.jobId.replace(/^#/, "").trim() : null, j);
+    const p = j.customerPhone ? last10(j.customerPhone) : "";
+    push(byPhone, p.length >= 7 ? p : null, j);
+    push(byEmail, j.customerEmail ? normText(j.customerEmail) : null, j);
+    push(byName, j.customerName ? normText(j.customerName) : null, j);
+  }
+  const nearest = (cands: DispatchJob[] | undefined, ratedAt: Date) => {
+    if (!cands?.length) return null;
+    let best: { job: DispatchJob; gap: number } | null = null;
+    for (const job of cands) {
+      const t = job.completedAt ? Date.parse(job.completedAt) : NaN;
+      const gap = Number.isNaN(t) ? 10 * DAY : ratedAt.getTime() - t;
+      if (gap < -DAY || gap > 21 * DAY) continue;
+      if (!best || Math.abs(gap) < Math.abs(best.gap)) best = { job, gap };
+    }
+    return best?.job ?? (cands.length === 1 ? cands[0] : null);
+  };
+  return (r: RatingForMatch): { job: DispatchJob; via: Via } | null => {
+    const ratedAt = new Date(r.created_at);
+    const jobId = r.external_job_id ? String(r.external_job_id).replace(/^#/, "").trim() : null;
+    for (const k of jobId ? [jobId, jobId.split(/[-_ ]/)[0]] : []) {
+      const j = nearest(byJobId.get(k), ratedAt);
+      if (j) return { job: j, via: "job" };
+    }
+    const phone = last10(r.customer_phone ?? r.ctx_phone ?? "");
+    if (phone.length >= 7) { const j = nearest(byPhone.get(phone), ratedAt); if (j) return { job: j, via: "phone" }; }
+    const email = normText(r.customer_email ?? r.ctx_email ?? "");
+    if (email) { const j = nearest(byEmail.get(email), ratedAt); if (j) return { job: j, via: "email" }; }
+    const name = normText(r.customer_name ?? r.ctx_name ?? "");
+    if (name) { const j = nearest(byName.get(name), ratedAt); if (j) return { job: j, via: "name" }; }
+    return null;
+  };
+}
+
+/** Tag every company rating (attributed or not) with its job's pickup city and service. */
+export const applyJobDetails = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({ companyId: z.string().uuid(), jobs: z.array(jobSchema).max(20000) }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireCompanyAdmin(context.userId, data.companyId);
+    const { sql } = await import("@/db/client.server");
+    const database = sql();
+    const ratings = await database`
+      SELECT r.id, r.created_at, r.customer_name, r.customer_phone, r.customer_email,
+             rc.external_job_id, rc.customer_name AS ctx_name, rc.customer_phone AS ctx_phone, rc.customer_email AS ctx_email
+      FROM ratings r LEFT JOIN review_contexts rc ON rc.id = r.review_context_id
+      WHERE r.company_id = ${data.companyId}`;
+    const match = buildJobMatcher(data.jobs);
+    let tagged = 0, verified = 0, unmatched = 0;
+    await database.begin(async (tx) => {
+      for (const r of ratings as unknown as Array<RatingForMatch & { id: string }>) {
+        const m = match(r);
+        if (!m) { unmatched++; continue; }
+        await tx`
+          UPDATE ratings SET job_city = ${m.job.city ?? null}, job_service = ${m.job.service ?? null},
+                 dispatch_job_id = ${m.job.jobId ?? null}, dispatch_match = ${m.via}
+          WHERE id = ${r.id} AND company_id = ${data.companyId}`;
+        tagged++;
+        if (m.via !== "name") verified++;
+      }
+    });
+    return { ok: true, tagged, verified, unmatched, total: ratings.length };
   });
 
 export const applyRatingAttribution = createServerFn({ method: "POST" })

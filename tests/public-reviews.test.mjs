@@ -35,6 +35,13 @@ test("comments and names only with public_ok; stars always", () => {
   const fresh = toPublicReview({ ...base, public_ok: true });
   assert.equal(fresh.text, "Late");
   assert.equal(fresh.customer, "Pat J.");
+  assert.equal(fresh.verified, false);
+  assert.equal(toPublicReview({ ...base, public_ok: true, dispatch_match: "phone" }).verified, true);
+  assert.equal(toPublicReview({ ...base, public_ok: true, dispatch_match: "name" }).verified, false, "name-only match is not verified");
+  assert.equal(toPublicReview({ ...base, public_ok: true, review_context_id: "ctx" }).verified, true);
+  const tagged = toPublicReview({ ...base, public_ok: true, job_city: "DUBLIN", job_service: "Flat Tire" });
+  assert.equal(tagged.city, "Dublin");
+  assert.equal(tagged.service, "Flat Tire");
   const gone = toPublicReview({ ...base, public_ok: true, driver_status: "deactivated" });
   assert.equal(gone.driver, null);
   assert.equal(gone.driverKey, null);

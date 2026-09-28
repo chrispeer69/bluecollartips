@@ -20,6 +20,9 @@ const Body = z.object({
   jobId: z.preprocess((value) => String(value), z.string().trim().min(1).max(200)),
   ghlContactId: optionalText(z.string().trim().max(200)),
   expiresInDays: z.number().int().min(1).max(30).optional(),
+  // Pickup city and service type from the dispatch system (e.g. TowBook "Tow Source City" / "Reason").
+  city: optionalText(z.string().trim().max(120)),
+  service: optionalText(z.string().trim().max(120)),
   driver: z.object({
     // At least one of these must be provided to match a driver.
     slug: optionalText(z.string().trim().min(1)),
@@ -105,6 +108,8 @@ export const Route = createFileRoute("/api/public/webhooks/ghl")({
           // can attribute the review later if matching failed.
           dispatch_driver_name:
             driverKey?.name ?? driverKey?.slug ?? driverKey?.email ?? driverKey?.phone ?? null,
+          job_city: parsed.data.city ?? null,
+          job_service: parsed.data.service ?? null,
         }, { onConflict: "company_id,external_job_id" });
         if (contextError) return json(500, { error: "Could not create review link" });
         const path = driver ? `/${company.slug}/d/${driver.slug}` : `/${company.slug}`;

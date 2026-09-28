@@ -8,6 +8,8 @@ import { publicFeedAllowed, toPublicReview, firstNameLastInitial, driverKey } fr
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, OPTIONS" } as const;
 const CACHE_MS = 10 * 60 * 1000;
+const APP_ORIGIN = () => (process.env.APP_PUBLIC_URL ?? "https://bluecollartips.app").replace(/\/$/, "");
+const absolutePhoto = (u: string | null) => (!u ? null : /^https?:\/\//.test(u) ? u : `${APP_ORIGIN()}${u.startsWith("/") ? "" : "/"}${u}`);
 const cache = new Map<string, { at: number; body: string }>();
 
 function json(status: number, body: string, extra: Record<string, string> = {}) {
@@ -30,18 +32,21 @@ export const Route = createFileRoute("/api/public/reviews/$companySlug")({
         const [rows, drivers] = await Promise.all([
           sql()`
             SELECT r.id, r.stars, r.created_at, r.feedback, r.customer_name, r.public_ok,
+                   r.review_context_id, r.dispatch_match,
+                   COALESCE(r.job_city, rc.job_city) AS job_city, COALESCE(r.job_service, rc.job_service) AS job_service,
                    d.slug AS driver_slug, d.display_name AS driver_name, d.status AS driver_status
             FROM ratings r LEFT JOIN drivers d ON d.id = r.driver_id
+            LEFT JOIN review_contexts rc ON rc.id = r.review_context_id
             WHERE r.company_id = ${company.id}
             ORDER BY r.created_at DESC
             LIMIT 5000`,
-          sql()`SELECT slug, display_name FROM drivers WHERE company_id = ${company.id} AND status = 'active' ORDER BY display_name`,
+          sql()`SELECT slug, display_name, photo_url FROM drivers WHERE company_id = ${company.id} AND status = 'active' ORDER BY display_name`,
         ]);
         const body = JSON.stringify({
           company: { name: company.name, slug: company.slug },
           generatedAt: new Date().toISOString(),
           publicTextSince: "2026-09-28",
-          drivers: (drivers as unknown as Array<{ slug: string; display_name: string }>).map((d) => ({ key: driverKey(d.slug), name: firstNameLastInitial(d.display_name) })),
+          drivers: (drivers as unknown as Array<{ slug: string; display_name: string; photo_url: string | null }>).map((d) => ({ key: driverKey(d.slug), name: firstNameLastInitial(d.display_name), photoUrl: absolutePhoto(d.photo_url) })),
           reviews: (rows as unknown as Parameters<typeof toPublicReview>[0][]).map(toPublicReview),
         });
         cache.set(slug, { at: Date.now(), body });

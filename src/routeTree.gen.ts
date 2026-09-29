@@ -26,6 +26,7 @@ import { Route as GuidesFicaTipCreditRouteImport } from './routes/guides.fica-ti
 import { Route as GuidesTipPoolingRouteImport } from './routes/guides.tip-pooling'
 import { Route as JoinCodeRouteImport } from './routes/join.$code'
 import { Route as PrintReviewsRouteImport } from './routes/print.reviews'
+import { Route as PrintTipPayrollRouteImport } from './routes/print.tip-payroll'
 import { Route as PrintVipRouteImport } from './routes/print.vip'
 import { Route as CompanySlugDDriverSlugRouteImport } from './routes/$companySlug/d/$driverSlug'
 import { Route as ApiAuthGoogleRouteImport } from './routes/api/auth/google'
@@ -121,6 +122,11 @@ const PrintReviewsRoute = PrintReviewsRouteImport.update({
   path: '/print/reviews',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrintTipPayrollRoute = PrintTipPayrollRouteImport.update({
+  id: '/print/tip-payroll',
+  path: '/print/tip-payroll',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PrintVipRoute = PrintVipRouteImport.update({
   id: '/print/vip',
   path: '/print/vip',
@@ -185,6 +191,7 @@ export interface FileRoutesByFullPath {
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
   '/print/reviews': typeof PrintReviewsRoute
+  '/print/tip-payroll': typeof PrintTipPayrollRoute
   '/print/vip': typeof PrintVipRoute
   '/$companySlug/': typeof CompanySlugIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -213,6 +220,7 @@ export interface FileRoutesByTo {
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
   '/print/reviews': typeof PrintReviewsRoute
+  '/print/tip-payroll': typeof PrintTipPayrollRoute
   '/print/vip': typeof PrintVipRoute
   '/$companySlug': typeof CompanySlugIndexRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -242,6 +250,7 @@ export interface FileRoutesById {
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
   '/print/reviews': typeof PrintReviewsRoute
+  '/print/tip-payroll': typeof PrintTipPayrollRoute
   '/print/vip': typeof PrintVipRoute
   '/$companySlug/': typeof CompanySlugIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -272,6 +281,7 @@ export interface FileRouteTypes {
     | '/guides/tip-pooling'
     | '/join/$code'
     | '/print/reviews'
+    | '/print/tip-payroll'
     | '/print/vip'
     | '/$companySlug/'
     | '/dashboard/'
@@ -300,6 +310,7 @@ export interface FileRouteTypes {
     | '/guides/tip-pooling'
     | '/join/$code'
     | '/print/reviews'
+    | '/print/tip-payroll'
     | '/print/vip'
     | '/$companySlug'
     | '/dashboard'
@@ -328,6 +339,7 @@ export interface FileRouteTypes {
     | '/guides/tip-pooling'
     | '/join/$code'
     | '/print/reviews'
+    | '/print/tip-payroll'
     | '/print/vip'
     | '/$companySlug/'
     | '/dashboard/'
@@ -357,6 +369,7 @@ export interface RootRouteChildren {
   GuidesTipPoolingRoute: typeof GuidesTipPoolingRoute
   JoinCodeRoute: typeof JoinCodeRoute
   PrintReviewsRoute: typeof PrintReviewsRoute
+  PrintTipPayrollRoute: typeof PrintTipPayrollRoute
   PrintVipRoute: typeof PrintVipRoute
   CompanySlugIndexRoute: typeof CompanySlugIndexRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
@@ -490,6 +503,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrintReviewsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/print/tip-payroll': {
+      id: '/print/tip-payroll'
+      path: '/print/tip-payroll'
+      fullPath: '/print/tip-payroll'
+      preLoaderRoute: typeof PrintTipPayrollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/print/vip': {
       id: '/print/vip'
       path: '/print/vip'
@@ -584,6 +604,7 @@ const rootRouteChildren: RootRouteChildren = {
   GuidesTipPoolingRoute: GuidesTipPoolingRoute,
   JoinCodeRoute: JoinCodeRoute,
   PrintReviewsRoute: PrintReviewsRoute,
+  PrintTipPayrollRoute: PrintTipPayrollRoute,
   PrintVipRoute: PrintVipRoute,
   CompanySlugIndexRoute: CompanySlugIndexRoute,
   DashboardIndexRoute: DashboardIndexRoute,

@@ -38,6 +38,7 @@ import { HelpCenter, SupportInbox, TenantSupportPanel } from "@/components/Suppo
 import { DispatchImportPanel } from "@/components/DispatchImportPanel";
 import { PerformancePanel } from "@/components/PerformancePanel";
 import { ReviewPrintPanel } from "@/components/ReviewPrintPanel";
+import { TipPayrollPanel } from "@/components/TipPayrollPanel";
 import { SupportChatWidget } from "@/components/SupportChatWidget";
 import { VipCustomersPanel } from "@/components/VipCustomersPanel";
 import { reconciliationOverview } from "@/lib/reconciliation.functions";
@@ -417,6 +418,10 @@ function AdminDashboard() {
 
         {page === "employees" && <Section title="Pending join requests">
           <JoinRequestsPanel companyId={data.company.id} onApproved={() => load(companyId)} />
+        </Section>}
+
+        {page === "payments" && <Section title="Weekly tip payroll report">
+          <TipPayrollPanel companyId={data.company.id} />
         </Section>}
 
         {page === "payments" && <Section title="Tip disputes & refunds">

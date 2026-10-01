@@ -101,7 +101,7 @@ function PrintPage() {
         </div>
         <div className="mt-6 grid grid-cols-4 gap-2 text-center text-sm">
           <Cell label="Gross tips" v={dollars(s.totals.gross)} />
-          <Cell label="Employee 80%" v={dollars(s.totals.driver)} />
+          <Cell label="Employee share" v={dollars(s.totals.driver)} />
           <Cell label="Company share" v={dollars(s.totals.company)} />
           <Cell label="Platform 10%" v={dollars(s.totals.platform)} />
         </div>

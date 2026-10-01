@@ -33,7 +33,7 @@ test("tip payroll: employee share of card tips, Eastern week edges, cash for rec
   try {
     await db.begin(async (tx) => {
       const suffix = randomUUID().slice(0, 8);
-      const [company] = await tx`insert into companies (name, slug, company_pct) values (${`Payroll Co ${suffix}`}, ${`payroll-${suffix}`}, 10) returning id`;
+      const [company] = await tx`insert into companies (name, slug) values (${`Payroll Co ${suffix}`}, ${`payroll-${suffix}`}) returning id`;
       const [other] = await tx`insert into companies (name, slug) values (${`Other ${suffix}`}, ${`other-${suffix}`}) returning id`;
       const [ana] = await tx`insert into drivers (company_id, display_name, slug, status, employee_id) values (${company.id}, 'Ana Driver', ${`ana-${suffix}`}, 'active', 'E-1') returning id`;
       const [ben] = await tx`insert into drivers (company_id, display_name, slug, status) values (${company.id}, 'Ben Driver', ${`ben-${suffix}`}, 'active') returning id`;
@@ -67,15 +67,20 @@ test("tip payroll: employee share of card tips, Eastern week edges, cash for rec
       assert.deepEqual(r.week, { start: "2026-09-19", end: "2026-09-25" });
       const by = Object.fromEntries(r.employees.map((e) => [e.name, e]));
 
-      // Employee keeps 80% of card tips (90 - 10% company).
+      // Employee keeps 90% of card tips; the company keeps nothing.
       assert.equal(by["Ana Driver"].cardCount, 2);
       assert.equal(by["Ana Driver"].cardGrossCents, 3000);
-      assert.equal(by["Ana Driver"].payrollCents, 2400);
+      assert.equal(by["Ana Driver"].payrollCents, 2700);
+      await assert.rejects(
+        tx.savepoint((sp) => sp`update companies set company_pct = 10, driver_pct = 80 where id = ${company.id}`),
+        /companies_company_pct_zero/,
+        "a company share can no longer be set",
+      );
       assert.equal(by["Ana Driver"].employeeId, "E-1");
       assert.equal(by["Ana Driver"].otherCents, 1500, "cash is listed but not added");
       assert.equal(by["Ana Driver"].appPayoutCents, 1200);
 
-      assert.equal(by["Ben Driver"].payrollCents, 3200);
+      assert.equal(by["Ben Driver"].payrollCents, 3600);
       assert.equal(by["Ben Driver"].heldTips.length, 1, "refunded tip held back");
 
       assert.equal(by["Cal Idle"].payrollCents, 0, "active employee with no tips still listed");
@@ -83,7 +88,7 @@ test("tip payroll: employee share of card tips, Eastern week edges, cash for rec
       assert.equal(by["Zed"], undefined, "other company excluded");
 
       assert.deepEqual(r.unassignedCardTips, { count: 1, grossCents: 1000 });
-      assert.equal(r.totals.payrollCents, 5600);
+      assert.equal(r.totals.payrollCents, 6300);
       assert.equal(r.totals.cardGrossCents, 8000); // 2000 + 1000 + 4000 + 1000 unassigned
       assert.equal(r.totals.heldCount, 1);
       throw rollback;

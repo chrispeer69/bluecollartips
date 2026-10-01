@@ -93,14 +93,15 @@ test("company admins can assign verified company tips without cross-company acce
   assert.match(adminDashboard, /<SelectItem value="company">Company<\/SelectItem>/);
 });
 
-test("company share is configurable from zero to ten while platform remains ten", () => {
-  assert.match(splitMigration, /company_pct BETWEEN 0 AND 10/);
+test("employee keeps 90% of card tips; the company share is locked at zero", async () => {
+  const keep90 = await readFile(new URL("../migrations/030_employee_keeps_90.sql", import.meta.url), "utf8");
   assert.match(splitMigration, /platform_pct = 10/);
   assert.match(splitMigration, /90 - c_pct/);
-  assert.match(adminFunctions, /export const updateCompanyTipShare/);
-  assert.match(adminFunctions, /companyPercent: z\.number\(\)\.int\(\)\.min\(0\)\.max\(10\)/);
-  assert.match(adminDashboard, /Company share \(0–10%\)/);
-  assert.match(adminDashboard, /Employee receives/);
+  assert.match(keep90, /CHECK \(company_pct = 0\)/);
+  assert.match(keep90, /company_payout_requests/, "past tips of companies with company payouts are left alone");
+  assert.doesNotMatch(adminFunctions, /updateCompanyTipShare/);
+  assert.doesNotMatch(adminDashboard, /Tip distribution/);
+  assert.match(adminDashboard, /90% employee · 10% Blue Collar Tips/);
   assert.match(adminDashboard, /After platform fee/);
 });
 

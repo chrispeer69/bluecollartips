@@ -31,7 +31,7 @@ await db.begin(async (tx) => {
     ) values (
       'Blue Collar Demo Towing', 'blue-collar-demo', 'dispatch@bluecollardemo.local', '+1 555 010 1000',
       '#0F2A44', '#F97316', 'https://g.page/r/demo/review', 'https://yelp.com/biz/demo',
-      'https://facebook.com/demo/reviews', 'redirect', 'https://g.page/r/demo/review', 80, 10, 10, true
+      'https://facebook.com/demo/reviews', 'redirect', 'https://g.page/r/demo/review', 90, 0, 10, true
     ) on conflict (slug) do update set
       name = excluded.name, support_email = excluded.support_email, support_phone = excluded.support_phone,
       positive_submit_action = excluded.positive_submit_action,
@@ -97,7 +97,7 @@ await db.begin(async (tx) => {
       driver_pct, company_pct, platform_pct
     ) values (
       'Metro HVAC Demo', 'metro-hvac-demo', 'office@metrohvac.local',
-      '#164E63', '#F59E0B', 80, 10, 10
+      '#164E63', '#F59E0B', 90, 0, 10
     ) on conflict (slug) do update set name = excluded.name, support_email = excluded.support_email
     returning id
   `;

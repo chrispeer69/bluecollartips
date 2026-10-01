@@ -287,26 +287,6 @@ export const updateCompanyBranding = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const updateCompanyTipShare = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
-  .inputValidator((d) => z.object({
-    companyId: z.string().uuid(),
-    companyPercent: z.number().int().min(0).max(10),
-  }).parse(d))
-  .handler(async ({ data, context }) => {
-    await assertCompanyAdmin(context.userId, data.companyId);
-    const platformPercent = 10;
-    const driverPercent = 100 - platformPercent - data.companyPercent;
-    const { db } = await import("@/db/client.server");
-    const { error } = await db.from("companies").update({
-      company_pct: data.companyPercent,
-      driver_pct: driverPercent,
-      platform_pct: platformPercent,
-    }).eq("id", data.companyId);
-    if (error) throw new Error(error.message);
-    return { ok: true, companyPercent: data.companyPercent, driverPercent, platformPercent };
-  });
-
 export const resolveFlag = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator((d) =>

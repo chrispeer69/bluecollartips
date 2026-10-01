@@ -28,7 +28,7 @@ export const HELP_SECTIONS: HelpSection[] = [
 
 1. Company settings → Branding: upload your logo and pick your two brand colors. Customers see these on every rating and tip page.
 2. Company settings → Public review destinations: save your Google, Yelp and Facebook review URLs, then select the one positive customers should visit. For Google, use the "write a review" link from your Google Business Profile.
-3. Company settings → Tip distribution: choose how much of each tip (0–10%) the company keeps. The rest goes to the employee. Blue Collar Tips keeps a flat 10%.
+3. Card tips need no setup: every one is split 90% to the employee and a flat 10% Blue Collar Tips fee.
 4. Employees → Add employee: enter each tech or driver's name, email and phone. Each one gets a personal QR code and tip link.
 5. Print the QR codes (Employees → QR) and put them on trucks, invoices or business cards.
 6. Optional: connect TowBook / GoHighLevel so a rating link is texted automatically when a job closes (see Integrations).
@@ -130,8 +130,8 @@ Ask Blue Collar Tips support for the webhook URL and secret for your company —
         title: "Where the money goes — the full flow",
         audience: ["admin", "employee"],
         body: `1. A customer tips by card on the rating page. The charge is processed by Stripe into the Blue Collar Tips platform account.
-2. The tip is split automatically the moment it succeeds: the employee's share (80–90%), the company's share (0–10%, set in Tip distribution) and the Blue Collar Tips fee (flat 10%). Every tip stores its own split, so the ledger is auditable to the penny.
-3. The employee's share lands in their Earnings wallet; the company's share lands in the Company wallet (Tips & payments).
+2. The tip is split automatically the moment it succeeds: 90% to the employee and a flat 10% Blue Collar Tips fee. The company keeps no share. Every tip stores its own split, so the ledger is auditable to the penny.
+3. The employee's share lands in their Earnings wallet. A tip with no employee waits under Unassigned company tips until an admin assigns it.
 4. Either party can request a withdrawal once their available balance is at or above the platform minimum (default $25). They choose the payout method on file: bank transfer, Cash App, Venmo, Zelle, PayPal or check.
 5. Blue Collar Tips reviews and pays each request within the processing window (0–5 days, shown on the wallet), then marks it paid with a reference number you can see in your request history.
 

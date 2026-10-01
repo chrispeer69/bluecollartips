@@ -11,7 +11,6 @@ import {
   resolveFlag,
   setDriverStatus,
   updateCompanyBranding,
-  updateCompanyTipShare,
 } from "@/lib/admin.functions";
 import { dollars } from "@/lib/constants";
 import { Section, Stat, TopBar } from "./driver";
@@ -290,7 +289,7 @@ function AdminDashboard() {
         {page === "overview" && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <Stat label="Gross tips" value={dollars(totals.gross)} />
           <Stat label="After platform fee" value={dollars(totals.afterPlatform)} />
-          <Stat label={`Company share (${data.company.company_pct}%)`} value={dollars(totals.company)} />
+          <Stat label="Waiting for an employee" value={dollars(totals.company)} />
           <Stat label="Employees" value={String(data.drivers.length)} />
           <Stat label="Avg rating" value={ratingStats.avg ? ratingStats.avg.toFixed(2) + " ★" : "—"} />
         </div>}
@@ -334,10 +333,6 @@ function AdminDashboard() {
               await load(companyId);
             }}
           />
-        </Section>}
-
-        {page === "settings" && <Section title="Tip distribution">
-          <TipShareSettings company={data.company} onSaved={() => load(companyId)} />
         </Section>}
 
         {page === "employees" && <Section title="Locations / crews">
@@ -1795,7 +1790,7 @@ function CompanyPaymentLedger({ tips, drivers, companyName }: { tips: Data["tips
       <Stat label="Payments" value={String(counted.length)} hint={refunded ? `${dollars(refunded)} refunded` : undefined} />
       <Stat label="Gross" value={dollars(totals.gross)} />
       <Stat label="To employees" value={dollars(totals.driver)} />
-      <Stat label="To company" value={dollars(totals.company)} />
+      <Stat label="Waiting for an employee" value={dollars(totals.company)} />
       <Stat label="Platform fee" value={dollars(totals.platform)} />
     </div>
 
@@ -1873,9 +1868,7 @@ function EmployeePayoutsPanel({ companyId }: { companyId: string }) {
   </div>;
 }
 
-function MoneyFlowExplainer({ company }: { company: Data["company"] }) {
-  const c = Number(company?.company_pct ?? 10);
-  const d = 90 - c;
+function MoneyFlowExplainer({ company: _company }: { company: Data["company"] }) {
   const step = (n: number, title: string, body: string) => (
     <li className="flex gap-3">
       <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{n}</span>
@@ -1885,8 +1878,8 @@ function MoneyFlowExplainer({ company }: { company: Data["company"] }) {
   return <div className="grid gap-4 md:grid-cols-[1fr_auto]">
     <ol className="space-y-3">
       {step(1, "Customer tips by card", "Apple Pay, Google Pay or card on the rating page. Stripe processes it into the Blue Collar Tips account.")}
-      {step(2, `Split instantly: ${d}% employee · ${c}% company · 10% Blue Collar Tips`, "Every tip stores its own split. Change the company share under Company settings → Tip distribution.")}
-      {step(3, "Shares land in wallets", "Employee share → their Earnings wallet. Company share → the Company wallet above. Tips with no employee wait under Unassigned company tips until you assign them.")}
+      {step(2, "Split instantly: 90% employee · 10% Blue Collar Tips", "Every tip stores its own split. The company keeps no share of card tips.")}
+      {step(3, "The employee's share lands in their wallet", "Employee share → their Earnings wallet. Tips with no employee wait under Unassigned company tips until you assign them to someone.")}
       {step(4, "Request a withdrawal", "Once a wallet reaches the platform minimum, request any amount up to the available balance. One open request at a time.")}
       {step(5, "Blue Collar Tips pays it", "Reviewed and paid within the processing window to the payout method on file, then marked paid with a reference you can see here.")}
     </ol>
@@ -1901,50 +1894,6 @@ function MoneyFlowExplainer({ company }: { company: Data["company"] }) {
       <p className="mt-1">Help & support has a full guide and a ticket form for payout questions.</p>
     </div>
   </div>;
-}
-
-function TipShareSettings({ company, onSaved }: { company: Data["company"]; onSaved: () => void | Promise<void> }) {
-  const save = useServerFn(updateCompanyTipShare);
-  const [companyPercent, setCompanyPercent] = useState(String(company.company_pct ?? 10));
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const parsed = Number(companyPercent);
-  const employeePercent = Number.isInteger(parsed) && parsed >= 0 && parsed <= 10 ? 90 - parsed : null;
-
-  return <form onSubmit={async (event) => {
-    event.preventDefault();
-    if (employeePercent == null) {
-      setMessage("Company share must be a whole percentage from 0% to 10%.");
-      return;
-    }
-    setBusy(true);
-    setMessage(null);
-    try {
-      await save({ data: { companyId: company.id, companyPercent: parsed } });
-      setMessage("Tip distribution saved. It will apply to future tips.");
-      await onSaved();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not save tip distribution");
-    } finally {
-      setBusy(false);
-    }
-  }} className="space-y-4">
-    <p className="text-sm text-muted-foreground">Blue Collar Tips keeps a fixed 10% platform fee. Choose whether the company keeps 0–10%; the employee automatically receives the remainder.</p>
-    <div className="grid gap-3 sm:grid-cols-3">
-      <Stat label="Platform fee" value="10%" />
-      <label className="rounded-lg border border-border bg-card p-4 text-sm">
-        <span className="text-xs uppercase tracking-wide text-muted-foreground">Company share (0–10%)</span>
-        <Select value={companyPercent} onValueChange={setCompanyPercent}>
-          <SelectTrigger className="mt-2 w-full"><SelectValue /></SelectTrigger>
-          <SelectContent>{Array.from({ length: 11 }, (_, value) => <SelectItem key={value} value={String(value)}>{value}%</SelectItem>)}</SelectContent>
-        </Select>
-      </label>
-      <Stat label="Employee receives" value={employeePercent == null ? "—" : `${employeePercent}%`} />
-    </div>
-    <p className="text-xs text-muted-foreground">Changes apply to future tips. Historical tips retain their recorded distribution.</p>
-    <button disabled={busy || employeePercent == null} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">Save distribution</button>
-    {message && <p className="text-sm text-muted-foreground">{message}</p>}
-  </form>;
 }
 
 function AdminSmsPanel({ drivers }: { drivers: Data["drivers"] }) {

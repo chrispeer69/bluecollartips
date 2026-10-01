@@ -108,21 +108,15 @@ function TipPoolingGuide() {
         </section>
 
         <section className="mt-10 space-y-4">
-          <h2 className="text-2xl font-semibold">A flexible employee/company split</h2>
+          <h2 className="text-2xl font-semibold">A simple 90/10 split</h2>
           <p>
-            Blue Collar Tips uses 80/10/10 as the default. A company may reduce its own share
-            from 10% down to 0%, automatically increasing the employee share from 80% up to 90%:
+            Every card tip is split two ways. The company keeps none of it:
           </p>
           <div className="rounded-lg border border-border bg-card p-6">
             <ul className="space-y-2 text-sm">
               <li>
-                <strong className="text-secondary">80–90% to the driver</strong> who did the job.
-                The person the customer interacted with gets the majority share, every time.
-              </li>
-              <li>
-                <strong className="text-secondary">0–10% to the company</strong> to offset
-                processing fees, dispatch overhead, and the cost of running the tip
-                program.
+                <strong className="text-secondary">90% to the driver</strong> who did the job.
+                The person the customer interacted with gets the tip, every time.
               </li>
               <li>
                 <strong className="text-secondary">10% to the platform</strong> (Blue Collar

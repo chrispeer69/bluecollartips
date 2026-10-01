@@ -23,9 +23,8 @@ export const getTipPayrollReport = createServerFn({ method: "POST" })
     if (!company) throw new Error("Not found");
     const { tipPayrollReport } = await import("@/lib/tip-payroll.server");
     const report = await tipPayrollReport(sql(), data.companyId, data.weekOf);
-    // Card-tip split in effect (see apply_tip_split): the company keeps up to 10%,
-    // the platform keeps 10%, the employee gets the rest.
-    const companyPct = Math.min(10, Math.max(0, Number(company.company_pct ?? 10)));
+    // Card-tip split in effect (see apply_tip_split): employee 90%, platform 10%.
+    const companyPct = Math.min(10, Math.max(0, Number(company.company_pct ?? 0)));
     return {
       company: {
         name: company.name as string,

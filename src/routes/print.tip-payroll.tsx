@@ -222,7 +222,7 @@ function TipPayrollPage() {
           )}
 
           <div className="mt-6 border-t pt-2 text-[10px] text-gray-500">
-            Card tips are split {report.company.employeePct}% employee · {report.company.companyPct}% {report.company.name} · 10% Blue Collar Tips. "Add to pay" is the employee share of card tips paid this week.
+            Card tips are split {report.company.employeePct}% employee{report.company.companyPct ? ` · ${report.company.companyPct}% ${report.company.name}` : ""} · 10% Blue Collar Tips. "Add to pay" is the employee share of card tips paid this week.
             Generated {new Date().toLocaleString("en-US")} by Blue Collar Tips.
           </div>
         </div>

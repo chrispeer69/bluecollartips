@@ -66,6 +66,10 @@ function TipPage() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  // A used/expired job link no longer blocks the page; the customer can still
+  // leave a review, just not tied to that job.
+  const [reviewAnyway, setReviewAnyway] = useState(false);
 
   useEffect(() => {
     getDriver({
@@ -101,8 +105,13 @@ function TipPage() {
           setDone(result.tipAlreadyReceived);
         }
       })
+      .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
   }, [companySlug, driverSlug, getDriver, reviewToken, submittedRatingId, tipMode]);
+
+  const linkIssue = data?.linkIssue ?? null;
+  // Only send the job link when it is still good.
+  const usableToken = linkIssue ? null : reviewToken;
 
   const brand = useMemo(() => {
     const primary = data?.company?.primary_color || "#0b2545";
@@ -122,6 +131,17 @@ function TipPage() {
   if (loading) {
     return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading…</div>;
   }
+  if (loadFailed) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-6 text-center">
+        <div>
+          <h1 className="text-2xl font-semibold">This page didn't load</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Please check your connection and try again.</p>
+          <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Try again</button>
+        </div>
+      </div>
+    );
+  }
   if (!data?.company || !data.driver) {
     return (
       <div className="grid min-h-screen place-items-center bg-background px-6 text-center">
@@ -136,6 +156,23 @@ function TipPage() {
   }
 
   const { company, driver } = data;
+
+  if (linkIssue === "used" && !reviewAnyway && !done) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-6 text-center">
+        <div className="max-w-sm">
+          {company.logo_url && <img src={company.logo_url} alt={company.name} className="mx-auto mb-4 h-12" />}
+          <h1 className="text-2xl font-semibold">Thanks, we already have your feedback</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Feedback for this job was already received for {firstName(driver.display_name)}. We appreciate you choosing {company.name}.
+          </p>
+          <button type="button" onClick={() => setReviewAnyway(true)} className="mt-5 rounded-md border border-border px-4 py-2 text-sm font-semibold">
+            Leave another review
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (done) {
     return (
@@ -187,7 +224,7 @@ function TipPage() {
           customerName: customerName.trim() || null,
           customerPhone: customerPhone.trim() || null,
           customerEmail: customerEmail.trim() || null,
-          reviewToken,
+          reviewToken: usableToken,
         },
       });
       setRatingId(result.ratingId);
@@ -241,6 +278,14 @@ function TipPage() {
       </header>
 
       <form onSubmit={onSubmit} className="mx-auto max-w-md px-5 pt-6">
+        {(linkIssue === "expired" || linkIssue === "other_employee" || linkIssue === "invalid") && (
+          <p className="mb-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            {linkIssue === "other_employee"
+              ? "This feedback link was for a different driver. You can still review "
+              : "This feedback link has expired, but you can still review "}
+            {firstName(driver.display_name)} here.
+          </p>
+        )}
         <h1 className="sr-only">Rate your service{driver ? ` with ${driver.display_name}` : ""}</h1>
         {step === "review" && <section className="rounded-xl border border-border bg-card p-5">
           <h2 className="text-base font-semibold">How was your service with {firstName(driver.display_name)}?</h2>

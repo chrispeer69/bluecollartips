@@ -53,6 +53,31 @@ async function enforceCompanyRateLimit(companyId: string) {
 
 const PUBLIC_COMPANY_FIELDS = "id, name, slug, logo_url, primary_color, secondary_color, support_email, positive_rating_threshold, positive_submit_action, positive_redirect_url";
 
+/** Why a job-specific review link can't be used, for an honest message on the page. */
+export type ReviewLinkIssue = "used" | "expired" | "invalid" | "other_employee";
+
+async function inspectReviewContext(
+  db: any,
+  token: string | null | undefined,
+  companyId: string,
+  driverId?: string | null,
+  submittedRatingId?: string | null,
+): Promise<{ context: any | null; issue: ReviewLinkIssue | null }> {
+  if (!token) return { context: null, issue: null };
+  try {
+    return { context: await resolveReviewContext(db, token, companyId, driverId, submittedRatingId), issue: null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.includes("different employee")) return { context: null, issue: "other_employee" };
+    const { data: context } = await db.from("review_contexts")
+      .select("consumed_at, expires_at")
+      .eq("token_hash", hashReviewToken(token)).eq("company_id", companyId).maybeSingle();
+    if (!context) return { context: null, issue: "invalid" };
+    if (context.consumed_at) return { context: null, issue: "used" };
+    return { context: null, issue: "expired" };
+  }
+}
+
 async function resolveReviewContext(
   db: any,
   token: string | null | undefined,
@@ -83,8 +108,8 @@ export const getPublicCompany = createServerFn({ method: "GET" })
     const { data: company } = await db.from("companies").select(PUBLIC_COMPANY_FIELDS)
       .eq("slug", data.companySlug).eq("status", "active").maybeSingle();
     if (!company) return null;
-    const context = await resolveReviewContext(db, data.reviewToken, company.id);
-    return { ...company, reviewContact: context ? {
+    const { context, issue } = await inspectReviewContext(db, data.reviewToken, company.id);
+    return { ...company, linkIssue: issue, reviewContact: context ? {
       name: context.customer_name ?? null,
       phone: context.customer_phone ?? null,
       email: context.customer_email ?? null,
@@ -113,6 +138,7 @@ export const getPublicDriver = createServerFn({ method: "GET" })
       reviewContact: null,
       submittedReview: null,
       tipAlreadyReceived: false,
+      linkIssue: null as ReviewLinkIssue | null,
     };
     const { data: driver } = await db
       .from("drivers")
@@ -121,15 +147,15 @@ export const getPublicDriver = createServerFn({ method: "GET" })
       .eq("slug", data.driverSlug)
       .eq("status", "active")
       .maybeSingle();
-    const context = driver
-      ? await resolveReviewContext(
+    const { context, issue: linkIssue } = driver
+      ? await inspectReviewContext(
           db,
           data.reviewToken,
           company.id,
           driver.id,
           data.submittedRatingId,
         )
-      : null;
+      : { context: null, issue: null };
     let submittedReview: {
       id: string;
       stars: number;
@@ -159,7 +185,7 @@ export const getPublicDriver = createServerFn({ method: "GET" })
       name: context.customer_name ?? null,
       phone: context.customer_phone ?? null,
       email: context.customer_email ?? null,
-    } : null, submittedReview, tipAlreadyReceived };
+    } : null, submittedReview, tipAlreadyReceived, linkIssue };
   });
 
 export const submitRating = createServerFn({ method: "POST" })

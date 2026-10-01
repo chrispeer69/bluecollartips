@@ -58,6 +58,8 @@ function CompanyReviewPage() {
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reviewAnyway, setReviewAnyway] = useState(false);
 
   useEffect(() => {
     getCompany({ data: { companySlug, reviewToken } }).then((result) => {
@@ -72,8 +74,12 @@ function CompanyReviewPage() {
         const email = result.reviewContact.email ?? "";
         setCustomerEmail(EMAIL_RE.test(email) ? email : "");
       }
-    }).finally(() => setLoading(false));
+    }).catch(() => setLoadFailed(true)).finally(() => setLoading(false));
   }, [companySlug, getCompany, reviewToken]);
+
+  const linkIssue = company?.linkIssue ?? null;
+  // Only send the job link when it is still good.
+  const usableToken = linkIssue ? null : reviewToken;
 
   const brand = useMemo(() => ({ primary: company?.primary_color || "#0b2545", secondary: company?.secondary_color || "#f59e0b" }), [company]);
   const customTipCents = Math.round(Number.parseFloat(customTip || "0") * 100);
@@ -100,6 +106,29 @@ function CompanyReviewPage() {
   }
 
   if (loading) return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading…</div>;
+  if (loadFailed) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-6 text-center">
+        <div>
+          <h1 className="text-2xl font-semibold">This page didn't load</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Please check your connection and try again.</p>
+          <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Try again</button>
+        </div>
+      </div>
+    );
+  }
+  if (company && linkIssue === "used" && !reviewAnyway && !done) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-6 text-center">
+        <div className="max-w-sm">
+          {company.logo_url && <img src={company.logo_url} alt={company.name} className="mx-auto mb-4 h-12" />}
+          <h1 className="text-2xl font-semibold">Thanks, we already have your feedback</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Feedback for this job was already received. We appreciate you choosing {company.name}.</p>
+          <button type="button" onClick={() => setReviewAnyway(true)} className="mt-5 rounded-md border border-border px-4 py-2 text-sm font-semibold">Leave another review</button>
+        </div>
+      </div>
+    );
+  }
   if (!company) {
     return (
       <div className="grid min-h-screen place-items-center bg-background px-6 text-center">
@@ -131,7 +160,7 @@ function CompanyReviewPage() {
       customerName: customerName.trim() || null,
       customerPhone: customerPhone.trim() || null,
       customerEmail: customerEmail.trim() || null,
-      reviewToken,
+      reviewToken: usableToken,
     } });
     return result;
   }
@@ -147,6 +176,11 @@ function CompanyReviewPage() {
       </div>
     </header>
 
+    {(linkIssue === "expired" || linkIssue === "invalid") && (
+      <p className="mx-auto mt-4 max-w-md rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+        This feedback link has expired, but you can still leave your review here.
+      </p>
+    )}
     <form className="mx-auto max-w-md px-5 pt-6" onSubmit={async (e) => {
       e.preventDefault(); setError(null);
       if (!stars) { setError("Please tap a star rating."); return; }

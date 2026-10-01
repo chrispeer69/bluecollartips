@@ -4,6 +4,10 @@ import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { handleProfilePhotoRequest } from "./lib/profile-photo.server";
 import { handleSupportAttachmentRequest } from "./lib/support-attachments.server";
+import { startPartnerDispatcher } from "./lib/partner-dispatcher.server";
+
+// Signed rating webhooks to partners (US Tow Jobs); idle until configured.
+startPartnerDispatcher();
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;

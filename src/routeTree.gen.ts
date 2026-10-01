@@ -30,6 +30,7 @@ import { Route as PrintTipPayrollRouteImport } from './routes/print.tip-payroll'
 import { Route as PrintVipRouteImport } from './routes/print.vip'
 import { Route as CompanySlugDDriverSlugRouteImport } from './routes/$companySlug/d/$driverSlug'
 import { Route as ApiAuthGoogleRouteImport } from './routes/api/auth/google'
+import { Route as ApiPartnerDriverRatingsRouteImport } from './routes/api/partner/driver-ratings'
 import { Route as PrintEmployeeIdRouteImport } from './routes/print.employee.$id'
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth/google/callback'
 import { Route as ApiPublicReviewsCompanySlugRouteImport } from './routes/api/public/reviews.$companySlug'
@@ -142,6 +143,11 @@ const ApiAuthGoogleRoute = ApiAuthGoogleRouteImport.update({
   path: '/api/auth/google',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPartnerDriverRatingsRoute = ApiPartnerDriverRatingsRouteImport.update({
+  id: '/api/partner/driver-ratings',
+  path: '/api/partner/driver-ratings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PrintEmployeeIdRoute = PrintEmployeeIdRouteImport.update({
   id: '/print/employee/$id',
   path: '/print/employee/$id',
@@ -197,6 +203,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
+  '/api/partner/driver-ratings': typeof ApiPartnerDriverRatingsRoute
   '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/public/reviews/$companySlug': typeof ApiPublicReviewsCompanySlugRoute
@@ -226,6 +233,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
+  '/api/partner/driver-ratings': typeof ApiPartnerDriverRatingsRoute
   '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/public/reviews/$companySlug': typeof ApiPublicReviewsCompanySlugRoute
@@ -256,6 +264,7 @@ export interface FileRoutesById {
   '/dashboard/': typeof DashboardIndexRoute
   '/$companySlug/d/$driverSlug': typeof CompanySlugDDriverSlugRoute
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
+  '/api/partner/driver-ratings': typeof ApiPartnerDriverRatingsRoute
   '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/public/reviews/$companySlug': typeof ApiPublicReviewsCompanySlugRoute
@@ -287,6 +296,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/$companySlug/d/$driverSlug'
     | '/api/auth/google'
+    | '/api/partner/driver-ratings'
     | '/print/employee/$id'
     | '/api/auth/google/callback'
     | '/api/public/reviews/$companySlug'
@@ -316,6 +326,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/$companySlug/d/$driverSlug'
     | '/api/auth/google'
+    | '/api/partner/driver-ratings'
     | '/print/employee/$id'
     | '/api/auth/google/callback'
     | '/api/public/reviews/$companySlug'
@@ -345,6 +356,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/$companySlug/d/$driverSlug'
     | '/api/auth/google'
+    | '/api/partner/driver-ratings'
     | '/print/employee/$id'
     | '/api/auth/google/callback'
     | '/api/public/reviews/$companySlug'
@@ -375,6 +387,7 @@ export interface RootRouteChildren {
   DashboardIndexRoute: typeof DashboardIndexRoute
   CompanySlugDDriverSlugRoute: typeof CompanySlugDDriverSlugRoute
   ApiAuthGoogleRoute: typeof ApiAuthGoogleRouteWithChildren
+  ApiPartnerDriverRatingsRoute: typeof ApiPartnerDriverRatingsRoute
   PrintEmployeeIdRoute: typeof PrintEmployeeIdRoute
   ApiPublicReviewsCompanySlugRoute: typeof ApiPublicReviewsCompanySlugRoute
   ApiPublicWebhooksGhlRoute: typeof ApiPublicWebhooksGhlRoute
@@ -531,6 +544,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthGoogleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/partner/driver-ratings': {
+      id: '/api/partner/driver-ratings'
+      path: '/api/partner/driver-ratings'
+      fullPath: '/api/partner/driver-ratings'
+      preLoaderRoute: typeof ApiPartnerDriverRatingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/print/employee/$id': {
       id: '/print/employee/$id'
       path: '/print/employee/$id'
@@ -610,6 +630,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardIndexRoute: DashboardIndexRoute,
   CompanySlugDDriverSlugRoute: CompanySlugDDriverSlugRoute,
   ApiAuthGoogleRoute: ApiAuthGoogleRouteWithChildren,
+  ApiPartnerDriverRatingsRoute: ApiPartnerDriverRatingsRoute,
   PrintEmployeeIdRoute: PrintEmployeeIdRoute,
   ApiPublicReviewsCompanySlugRoute: ApiPublicReviewsCompanySlugRoute,
   ApiPublicWebhooksGhlRoute: ApiPublicWebhooksGhlRoute,

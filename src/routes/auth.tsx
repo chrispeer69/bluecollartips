@@ -63,6 +63,11 @@ function AuthPage() {
       inviteFromUrl = inv;
       const em = params.get("email");
       const oauthError = params.get("oauthError");
+      const signup = params.get("signup");
+      if (signup === "company" || signup === "employee") {
+        setMode("signup");
+        setSignupType(signup);
+      }
       if (inv) {
         setInviteCode(inv.toUpperCase());
         setMode("signup");

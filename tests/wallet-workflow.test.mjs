@@ -16,7 +16,9 @@ const reconciliation = await readFile(new URL("../src/lib/reconciliation.functio
 const ledger = await readFile(new URL("../src/lib/stripe-tip-ledger.server.ts", import.meta.url), "utf8");
 const stripeFunctions = await readFile(new URL("../src/lib/stripe.functions.ts", import.meta.url), "utf8");
 const stripePanel = await readFile(new URL("../src/components/StripeCardPanel.tsx", import.meta.url), "utf8");
-const driverDashboard = await readFile(new URL("../src/routes/dashboard/driver.tsx", import.meta.url), "utf8");
+const driverDashboard =
+  (await readFile(new URL("../src/routes/dashboard/driver.tsx", import.meta.url), "utf8")) +
+  (await readFile(new URL("../src/components/QuickCashTip.tsx", import.meta.url), "utf8"));
 const adminDashboard = await readFile(new URL("../src/routes/dashboard/admin.tsx", import.meta.url), "utf8");
 const payoutDestinationForm = await readFile(new URL("../src/components/PayoutDestinationForm.tsx", import.meta.url), "utf8");
 

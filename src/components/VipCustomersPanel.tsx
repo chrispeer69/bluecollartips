@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { assignVipFollowupCustomer, assignVipFollowupDay, getVipReport, logVipFollowupCall, saveVipFollowupStaff, setVipNextFollowup, updateVipFollowup } from "@/lib/vip.functions";
-import { followupProgress, followupState, todayYmd, vipNextStep, type FollowupProgress, type FollowupState, type VipReportRow, type VipStage } from "@/lib/vip";
+import { filterByMetric, followupProgress, followupState, todayYmd, vipNextStep, type VipMetric, type FollowupProgress, type FollowupState, type VipReportRow, type VipStage } from "@/lib/vip";
 import { dollars } from "@/lib/constants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -150,6 +150,8 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
   const [error, setError] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
   const [who, setWho] = useState<string>("all");
+  const [metric, setMetric] = useState<VipMetric>("all");
+  const [progress, setProgress] = useState<FollowupProgress | "all">("all");
   const [showNames, setShowNames] = useState(false);
   const assignDay = useServerFn(assignVipFollowupDay);
 
@@ -179,9 +181,10 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
   useEffect(() => { void load(); }, [load]);
 
   const rows = useMemo(() => {
-    const all = sortVipRows(filterByAssignee(report?.rows ?? [], who));
+    let all = sortVipRows(filterByMetric(filterByAssignee(report?.rows ?? [], who), metric));
+    if (progress !== "all") all = all.filter((r) => followupProgress(r.call_count) === progress);
     return stage === "all" ? all : all.filter((r) => vipNextStep(r).stage === stage);
-  }, [report, stage, who]);
+  }, [report, stage, who, metric, progress]);
   const summary = useMemo(() => summarizeVip(filterByAssignee(report?.rows ?? [], who)), [report, who]);
   const board = useMemo(() => vipScoreboard(report?.rows ?? []), [report]);
   const staff = report?.staff ?? [];
@@ -353,21 +356,59 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
 
       <div className="flex flex-wrap gap-2 text-xs">
         {(Object.keys(PROGRESS_STYLE) as FollowupProgress[]).map((p) => (
-          <span key={p} className={`rounded-full px-3 py-1 font-semibold ${PROGRESS_STYLE[p].badge}`}>
+          <button
+            key={p}
+            type="button"
+            aria-pressed={progress === p}
+            onClick={() => setProgress((cur) => (cur === p ? "all" : p))}
+            className={`rounded-full px-3 py-1 font-semibold transition hover:opacity-90 ${PROGRESS_STYLE[p].badge} ${
+              progress === p ? "ring-2 ring-foreground ring-offset-2 ring-offset-background" : progress !== "all" ? "opacity-50" : ""
+            }`}
+          >
             {PROGRESS_STYLE[p].label}: {filterByAssignee(report?.rows ?? [], who).filter((r) => followupProgress(r.call_count) === p).length}
-          </span>
+          </button>
         ))}
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-        <Tile label="Responded" value={summary.customers} />
-        <Tile label="Tipped" value={`${summary.tipped}`} sub={summary.tipCents ? dollars(summary.tipCents) : undefined} />
-        <Tile label="Went to Google" value={summary.googleClicked} />
-        <Tile label="Google posted" value={summary.googlePosted} />
-        <Tile label="Convini link sent" value={summary.linkSent} />
-        <Tile label="Opened Convini" value={summary.clicked} />
-        <Tile label="Registered" value={summary.registered} strong />
+        {(
+          [
+            { id: "all", label: "Responded", value: summary.customers },
+            { id: "tipped", label: "Tipped", value: summary.tipped, sub: summary.tipCents ? dollars(summary.tipCents) : undefined },
+            { id: "googleClicked", label: "Went to Google", value: summary.googleClicked },
+            { id: "googlePosted", label: "Google posted", value: summary.googlePosted },
+            { id: "linkSent", label: "Convini link sent", value: summary.linkSent },
+            { id: "clicked", label: "Opened Convini", value: summary.clicked },
+            { id: "registered", label: "Registered", value: summary.registered },
+          ] as { id: VipMetric; label: string; value: number; sub?: string }[]
+        ).map((t) => (
+          <Tile
+            key={t.id}
+            label={t.label}
+            value={t.value}
+            sub={t.sub}
+            active={metric === t.id}
+            onClick={() => setMetric((cur) => (cur === t.id || t.id === "all" ? "all" : t.id))}
+          />
+        ))}
       </div>
+
+      {(metric !== "all" || progress !== "all") && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span>
+            Showing <b>{rows.length}</b> {rows.length === 1 ? "customer" : "customers"}
+            {metric !== "all" && <> · {METRIC_LABEL[metric]}</>}
+            {progress !== "all" && <> · {PROGRESS_STYLE[progress].label}</>}
+          </span>
+          <button
+            type="button"
+            onClick={() => { setMetric("all"); setProgress("all"); }}
+            className="rounded-md border border-border px-2 py-0.5 text-xs font-medium hover:bg-muted"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
 
       {error && <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       {loading && !report ? (
@@ -413,13 +454,29 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
   );
 }
 
-function Tile({ label, value, sub, strong }: { label: string; value: number | string; sub?: string; strong?: boolean }) {
+const METRIC_LABEL: Record<Exclude<VipMetric, "all">, string> = {
+  tipped: "Tipped",
+  googleClicked: "Went to Google",
+  googlePosted: "Google posted",
+  linkSent: "Convini link sent",
+  clicked: "Opened Convini",
+  registered: "Registered",
+};
+
+function Tile({ label, value, sub, active, onClick }: { label: string; value: number | string; sub?: string; active: boolean; onClick: () => void }) {
   return (
-    <div className={`rounded-lg border p-3 ${strong ? "border-primary" : "border-border"}`}>
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`rounded-lg border p-3 text-left transition hover:border-primary hover:bg-muted/50 ${
+        active ? "border-primary bg-primary/5 ring-2 ring-primary" : "border-border"
+      }`}
+    >
       <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="mt-1 text-xl font-semibold">{value}</div>
       {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
-    </div>
+    </button>
   );
 }
 

@@ -5,20 +5,20 @@ import { auth } from "@/auth/client";
 import { getDriverDashboard, logManualTip, updateDriverProfile, updateNotifyPrefs } from "@/lib/driver.functions";
 import { getPayoutStatement } from "@/lib/payouts.functions";
 import { getDriverWallet, requestWalletPayout, saveDriverPayoutDestination } from "@/lib/wallet.functions";
-import { PRESET_TIPS, TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib/constants";
+import { dollars } from "@/lib/constants";
 import { sendTipLinkSms } from "@/lib/sms.functions";
 import { confirmCashTip, disputeCashTip, listUnverifiedTips } from "@/lib/reconciliation.functions";
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
 import { JoinWorkspacePanel } from "@/components/JoinWorkspacePanel";
 import { PayoutDestinationForm, payoutMethodLabel } from "@/components/PayoutDestinationForm";
 import { LeaveWorkspacePanel } from "@/components/LeaveWorkspacePanel";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Banknote, Building2, Landmark, LayoutDashboard, LifeBuoy, MessageSquareText, QrCode, Settings, WalletCards } from "lucide-react";
 import { HelpCenter, TenantSupportPanel } from "@/components/SupportCenter";
 import { SupportChatWidget } from "@/components/SupportChatWidget";
 import { ProfilePhotoUploader } from "@/components/ProfilePhotoUploader";
 import { MyReviewsPanel } from "@/components/MyReviewsPanel";
 import { PayoutHistoryPanel } from "@/components/PayoutHistoryPanel";
+import { CashTipForm, QuickCashTipButton } from "@/components/QuickCashTip";
 
 type DriverPage = "overview" | "share" | "tips" | "reviews" | "earnings" | "payoutAccount" | "settings" | "support";
 const driverNav: DashboardNavItem<DriverPage>[] = [
@@ -138,6 +138,8 @@ function DriverDashboard() {
         </label>
       }
     >
+
+        <QuickCashTipButton driverId={data.driver.id} todayCents={totals.manualToday} onLogged={() => load(data.driver.id)} />
 
         {page === "overview" && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Stat label="Tips this week (net)" value={dollars(totals.weekNet)} />
@@ -321,121 +323,11 @@ function FullscreenQR({ url, logoUrl, onClose }: { url: string; logoUrl?: string
 }
 
 function LogTipPanel({ driverId, onLogged }: { driverId: string; onLogged: () => void }) {
-  const logTip = useServerFn(logManualTip);
-  const [amount, setAmount] = useState("");
-  const [source, setSource] = useState<"cash" | "venmo" | "cashapp" | "zelle" | "paypal" | "other">("cash");
-  const [customerName, setCustomerName] = useState("");
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setMsg(null);
-    const cents = Math.round(parseFloat(amount || "0") * 100);
-    if (!Number.isFinite(cents) || cents < TIP_MIN_CENTS || cents > TIP_MAX_CENTS) {
-      setMsg(`Amount must be between ${dollars(TIP_MIN_CENTS)} and ${dollars(TIP_MAX_CENTS)}.`);
-      return;
-    }
-    setBusy(true);
-    try {
-      await logTip({
-        data: {
-          amountCents: cents,
-          source,
-          customerName: customerName.trim() || null,
-          note: note.trim() || null,
-          driverId,
-        },
-      });
-      setAmount("");
-      setCustomerName("");
-      setNote("");
-      setMsg("Manual tip recorded for bookkeeping. No company or platform fee was applied.");
-      onLogged();
-    } catch (e: unknown) {
-      setMsg(e instanceof Error ? e.message : "Could not log");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
-    <Section title="Record a manual tip">
-      <p className="mb-4 text-sm text-muted-foreground">
-        Use this only after a cash or external payment was actually received. Customer payments from your Blue Collar Tips link or QR code are processed and recorded automatically through Stripe.
-      </p>
-      <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
-        <label className="text-sm">
-          Amount ($)
-          <input
-            type="number"
-            min={1}
-            step="0.01"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            required
-          />
-        </label>
-        <label className="text-sm">
-          Method
-          <Select
-            value={source}
-            onValueChange={(value) => setSource(value as typeof source)}
-          >
-            <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="cash">Cash</SelectItem>
-              <SelectItem value="venmo">Venmo</SelectItem>
-              <SelectItem value="cashapp">Cash App</SelectItem>
-              <SelectItem value="zelle">Zelle</SelectItem>
-              <SelectItem value="paypal">PayPal</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
-            </SelectContent>
-          </Select>
-        </label>
-        <label className="text-sm sm:col-span-1">
-          Customer name (optional)
-          <input
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            maxLength={120}
-          />
-        </label>
-        <label className="text-sm">
-          Note / job ref (optional)
-          <input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            maxLength={500}
-          />
-        </label>
-        <div className="sm:col-span-2 flex flex-wrap gap-2">
-          {PRESET_TIPS.map((c) => (
-            <button
-              type="button"
-              key={c}
-              onClick={() => setAmount((c / 100).toFixed(2))}
-              className="rounded-md border border-border px-3 py-1 text-xs"
-            >
-              ${(c / 100).toFixed(0)}
-            </button>
-          ))}
-        </div>
-        {msg && <div className="sm:col-span-2 rounded-md bg-muted px-3 py-2 text-sm">{msg}</div>}
-        <div className="sm:col-span-2">
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
-          >
-            {busy ? "Saving…" : "Log tip"}
-          </button>
-        </div>
-      </form>
+    <Section title="Log a cash or app tip">
+      <div className="max-w-xl">
+        <CashTipForm driverId={driverId} onLogged={onLogged} />
+      </div>
     </Section>
   );
 }
@@ -514,6 +406,9 @@ function computeTotals(tips: DashData["tips"]) {
   let monthNet = 0;
   let allNet = 0;
   let manualGross = 0;
+  let manualToday = 0;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
   for (const t of tips) {
     const ts = new Date(t.created_at).getTime();
     allNet += t.driver_amount_cents;
@@ -521,9 +416,10 @@ function computeTotals(tips: DashData["tips"]) {
     if (ts >= monthStart.getTime()) monthNet += t.driver_amount_cents;
     if (t.source !== "stripe") {
       manualGross += t.amount_cents;
+      if (ts >= todayStart.getTime()) manualToday += t.amount_cents;
     }
   }
-  return { weekNet, monthNet, allNet, manualGross };
+  return { weekNet, monthNet, allNet, manualGross, manualToday };
 }
 
 function computeRatingStats(ratings: DashData["ratings"]) {

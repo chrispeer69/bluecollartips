@@ -40,6 +40,7 @@ import { ReviewPrintPanel } from "@/components/ReviewPrintPanel";
 import { TipPayrollPanel } from "@/components/TipPayrollPanel";
 import { SupportChatWidget } from "@/components/SupportChatWidget";
 import { VipCustomersPanel } from "@/components/VipCustomersPanel";
+import { CompanyImportPanel } from "@/components/CompanyImportPanel";
 import { reconciliationOverview } from "@/lib/reconciliation.functions";
 import { ProfilePhotoUploader } from "@/components/ProfilePhotoUploader";
 
@@ -283,6 +284,12 @@ function AdminDashboard() {
                 }}
               />
             </div>
+          </Section>
+        )}
+
+        {page === "platformOrganizations" && data.isSuper && (
+          <Section title="Import companies">
+            <CompanyImportPanel onDone={() => load(companyId ?? undefined)} />
           </Section>
         )}
 

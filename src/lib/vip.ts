@@ -89,3 +89,20 @@ export function followupProgress(callCount: number): FollowupProgress {
   if (callCount >= FOLLOWUP_CALLS_TO_FINISH) return "done";
   return callCount >= 1 ? "followed_once" : "needs_first";
 }
+
+export type VipMetric =
+  "all" | "tipped" | "googleClicked" | "googlePosted" | "linkSent" | "clicked" | "registered";
+
+const METRIC_TEST: Record<Exclude<VipMetric, "all">, (r: VipReportRow) => boolean> = {
+  tipped: (r) => r.tip_count > 0,
+  googleClicked: (r) => !!r.google_clicked_at,
+  googlePosted: (r) => !!r.google_posted_at,
+  linkSent: (r) => !!r.convini_link_sent_at,
+  clicked: (r) => !!r.convini_clicked_at,
+  registered: (r) => !!r.convini_registered_at,
+};
+
+/** Rows behind one of the summary tiles ("all" = Responded). */
+export function filterByMetric(rows: VipReportRow[], metric: VipMetric) {
+  return metric === "all" ? rows : rows.filter(METRIC_TEST[metric]);
+}

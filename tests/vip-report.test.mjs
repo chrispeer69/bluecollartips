@@ -248,3 +248,22 @@ test("vip wiring: public routes, admin checks and dashboard entry", async () => 
 });
 
 test.after(async () => { await db.end(); });
+
+test("summary tiles filter the customer list", async () => {
+  const { filterByMetric } = await import("../src/lib/vip.ts");
+  const base = { tip_count: 0, google_clicked_at: null, google_posted_at: null, convini_link_sent_at: null, convini_clicked_at: null, convini_registered_at: null };
+  const rows = [
+    { ...base, rating_id: "a", tip_count: 1 },
+    { ...base, rating_id: "b", google_clicked_at: "2026-09-30T12:00:00Z", google_posted_at: "2026-09-30T13:00:00Z" },
+    { ...base, rating_id: "c", convini_link_sent_at: "x", convini_clicked_at: "x", convini_registered_at: "x" },
+    { ...base, rating_id: "d" },
+  ];
+  const ids = (m) => filterByMetric(rows, m).map((r) => r.rating_id);
+  assert.deepEqual(ids("all"), ["a", "b", "c", "d"]);
+  assert.deepEqual(ids("tipped"), ["a"]);
+  assert.deepEqual(ids("googleClicked"), ["b"]);
+  assert.deepEqual(ids("googlePosted"), ["b"]);
+  assert.deepEqual(ids("linkSent"), ["c"]);
+  assert.deepEqual(ids("clicked"), ["c"]);
+  assert.deepEqual(ids("registered"), ["c"]);
+});

@@ -191,3 +191,33 @@ export const issueTenantAdminInvite = createServerFn({ method: "POST" })
     }
     return { ok: true, attached: false as const, inviteUrl: `${base}/join/${code}`, code };
   });
+
+/** Create many companies at once from a spreadsheet. Returns invite links;
+ *  nothing is emailed. */
+export const importCompanies = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        rows: z
+          .array(
+            z.object({
+              name: z.string().trim().min(2).max(120),
+              adminEmail: z.string().trim().email().max(200),
+              phone: z.string().trim().max(40).nullable(),
+              supportEmail: z.string().trim().email().max(200).nullable(),
+              googleReviewUrl: z.string().trim().url().max(500).nullable(),
+            }),
+          )
+          .min(1)
+          .max(500),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertSuper(context.userId);
+    const { sql } = await import("@/db/client.server");
+    const { importCompanies: run } = await import("./company-import.server");
+    const base = process.env.APP_BASE_URL ?? "https://bluecollartips.app";
+    return { results: await run(sql(), data.rows, context.userId, base), baseUrl: base };
+  });

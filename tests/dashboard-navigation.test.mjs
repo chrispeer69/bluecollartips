@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const admin = await readFile(new URL("../src/routes/dashboard/admin.tsx", import.meta.url), "utf8");
-const driver = await readFile(new URL("../src/routes/dashboard/driver.tsx", import.meta.url), "utf8");
+const driver =
+  (await readFile(new URL("../src/routes/dashboard/driver.tsx", import.meta.url), "utf8")) +
+  (await readFile(new URL("../src/components/QuickCashTip.tsx", import.meta.url), "utf8"));
 const shell = await readFile(new URL("../src/components/DashboardShell.tsx", import.meta.url), "utf8");
 const joinWorkspace = await readFile(new URL("../src/components/JoinWorkspacePanel.tsx", import.meta.url), "utf8");
 const leaveWorkspace = await readFile(new URL("../src/components/LeaveWorkspacePanel.tsx", import.meta.url), "utf8");
@@ -46,7 +48,8 @@ test("employee dashboard exposes workspace switcher and focused pages", () => {
 
 test("customer tips use Stripe while external tips are employee-recorded", () => {
   assert.match(driver, /Customer payments from your Blue Collar Tips link or QR code are processed and recorded automatically through Stripe/);
-  assert.match(driver, /Record a manual tip/);
+  assert.match(driver, /Log a cash or app tip/);
+  assert.match(driver, /QuickCashTipButton/);
   assert.doesNotMatch(driver, /Venmo handle|Cash App handle|Zelle email|PayPal handle/);
   assert.doesNotMatch(driverFunctions, /venmoHandle|cashappHandle|zelleHandle|paypalHandle/);
   assert.doesNotMatch(publicFunctions, /tipSource:/);

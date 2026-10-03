@@ -1,5 +1,6 @@
-import { Check, Copy, X } from "lucide-react";
+import { Check, Copy, ExternalLink, X } from "lucide-react";
 import { useState } from "react";
+import type { ReviewLink, ReviewSiteId } from "@/lib/review-sites";
 
 export function ReviewThankYou({
   companyName,
@@ -9,7 +10,10 @@ export function ReviewThankYou({
   reviewText,
   redirectUrl,
   driverName,
-  onGoogleClick,
+  mainSite,
+  mainSiteLabel,
+  otherLinks = [],
+  onSiteClick,
 }: {
   companyName: string;
   companyLogoUrl?: string | null;
@@ -18,8 +22,13 @@ export function ReviewThankYou({
   reviewText: string;
   redirectUrl?: string | null;
   driverName?: string | null;
+  /** Which review site the main button opens (null for a custom URL). */
+  mainSite?: ReviewSiteId | null;
+  mainSiteLabel?: string | null;
+  /** Extra review sites shown under the main button. */
+  otherLinks?: ReviewLink[];
   /** Records the tap for the VIP follow-up report; never holds up the redirect for long. */
-  onGoogleClick?: () => Promise<unknown> | void;
+  onSiteClick?: (site: ReviewSiteId) => Promise<unknown> | void;
 }) {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
@@ -44,14 +53,22 @@ export function ReviewThankYou({
   async function copyAndContinue() {
     const success = review ? await copyReview() : true;
     if (!success || !redirectUrl) return;
-    if (onGoogleClick) {
+    if (onSiteClick && mainSite) {
       await Promise.race([
-        Promise.resolve().then(onGoogleClick).catch(() => undefined),
+        Promise.resolve().then(() => onSiteClick(mainSite)).catch(() => undefined),
         new Promise((resolve) => setTimeout(resolve, 800)),
       ]);
     }
     window.location.assign(redirectUrl);
   }
+
+  async function openOther(link: ReviewLink) {
+    if (review) await copyReview();
+    if (onSiteClick) void Promise.resolve().then(() => onSiteClick(link.site)).catch(() => undefined);
+  }
+
+  const mainLabel = mainSiteLabel ?? "the review page";
+  const hasLinks = Boolean(redirectUrl) || otherLinks.length > 0;
 
   return (
     <div className="min-h-screen bg-slate-50 px-5 py-6 text-slate-950">
@@ -88,7 +105,7 @@ export function ReviewThankYou({
             </p>
           </div>
 
-          {positive && (review || redirectUrl) ? (
+          {(positive && review) || hasLinks ? (
             <div className="p-6">
               {review ? (
                 <>
@@ -101,7 +118,7 @@ export function ReviewThankYou({
                   <div className="mt-3 rounded-2xl border border-cyan-200 bg-cyan-50 p-4">
                     <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">{review}</p>
                   </div>
-                  {!redirectUrl ? (
+                  {!hasLinks ? (
                     <button
                       type="button"
                       onClick={() => void copyReview()}
@@ -122,17 +139,43 @@ export function ReviewThankYou({
               {redirectUrl ? (
                 <>
                   <p className="mt-4 text-center text-xs leading-relaxed text-slate-500">
-                    Paste your review on Google and include a photo if you can. It helps other customers choose with confidence.
+                    Paste your review on {mainLabel} and include a photo if you can. It helps other customers choose with confidence.
                   </p>
                   <button
                     type="button"
                     onClick={() => void copyAndContinue()}
                     className="mt-3 flex w-full items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-900 shadow-sm transition hover:bg-slate-50"
                   >
-                    <GoogleMark />
-                    {review ? "Copy review and continue to Google" : "Continue to Google"}
+                    {mainSite === "google" ? <GoogleMark /> : <ExternalLink className="h-5 w-5" aria-hidden="true" />}
+                    {review ? `Copy review and continue to ${mainLabel}` : `Continue to ${mainLabel}`}
                   </button>
                 </>
+              ) : null}
+
+              {otherLinks.length > 0 ? (
+                <div className="mt-5">
+                  <p className="text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {redirectUrl ? "Or leave a review on" : "Leave a review on"}
+                  </p>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {otherLinks.map((link) => (
+                      <a
+                        key={link.site}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => void openOther(link)}
+                        className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50"
+                      >
+                        {link.site === "google" ? <GoogleMark /> : <ExternalLink className="h-4 w-4" aria-hidden="true" />}
+                        {link.label}
+                      </a>
+                    ))}
+                  </div>
+                  {review ? (
+                    <p className="mt-2 text-center text-xs text-slate-500">Your review is copied when you tap — just paste it.</p>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           ) : null}

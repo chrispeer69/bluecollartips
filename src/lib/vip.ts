@@ -28,6 +28,8 @@ export type VipReportRow = {
   tip_refunded: boolean;
   google_clicked_at: string | null;
   google_posted_at: string | null;
+  /** Review sites the customer opened from the thank-you page, in click order. */
+  review_sites_clicked?: string[];
   google_stars: number | null;
   convini_link_sent_at: string | null;
   convini_link_last_sent_at: string | null;

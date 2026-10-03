@@ -244,7 +244,10 @@ test("vip wiring: public routes, admin checks and dashboard entry", async () => 
   // Every admin function (all but the public Google-tap tracker) checks the caller.
   assert.equal((fns.match(/assertCompanyAdmin\(context\.userId/g) ?? []).length, 7);
   assert.match(admin, /page === "vip"/);
-  assert.match(thanks, /onGoogleClick/);
+  assert.match(thanks, /onSiteClick\(mainSite\)/);
+  assert.match(thanks, /onSiteClick\(link\.site\)/);
+  assert.match(fns, /export const trackReviewSiteClick/);
+  assert.match(fns, /event: "google_clicked"/);
 });
 
 test.after(async () => { await db.end(); });
@@ -266,4 +269,42 @@ test("summary tiles filter the customer list", async () => {
   assert.deepEqual(ids("linkSent"), ["c"]);
   assert.deepEqual(ids("clicked"), ["c"]);
   assert.deepEqual(ids("registered"), ["c"]);
+});
+
+test("vip report: lists the review sites a customer opened, in click order", async () => {
+  await inRollback(async (tx) => {
+    const s = await seed(tx);
+    const ctx = await s.context(s.company.id, s.ana.id, "TB-SITES");
+    const ratingId = await s.rating(s.company.id, s.ana.id, ctx, 5, s.at(13));
+    await tx`insert into review_site_clicks (company_id, rating_id, site, clicked_at) values (${s.company.id}, ${ratingId}, 'facebook', ${s.at(14)})`;
+    await tx`insert into review_site_clicks (company_id, rating_id, site, clicked_at) values (${s.company.id}, ${ratingId}, 'google', ${s.at(13)})`;
+    await assert.rejects(
+      tx.savepoint((sp) => sp`insert into review_site_clicks (company_id, rating_id, site) values (${s.company.id}, ${ratingId}, 'myspace')`),
+      /review_site_clicks_site_check/,
+    );
+    const [row] = await vipReportRows(tx, { companyId: s.company.id });
+    assert.deepEqual(row.review_sites_clicked, ["google", "facebook"]);
+  });
+});
+
+test("review sites: extra buttons respect the threshold and skip the main destination", async () => {
+  const { reviewLinksFor, reviewSiteProps } = await import("../src/lib/review-sites.ts");
+  const company = {
+    positive_rating_threshold: 4,
+    google_review_url: "https://g.page/r/x/review",
+    facebook_review_url: "https://facebook.com/x/reviews",
+    yelp_review_url: "  ",
+    bing_review_url: null,
+    usta_review_url: "https://www.ustowalliance.com/company/1/",
+  };
+  assert.deepEqual(reviewLinksFor(company, 3, company.google_review_url), []);
+  assert.deepEqual(
+    reviewLinksFor(company, 5, company.google_review_url).map((l) => l.site),
+    ["facebook", "usta"],
+  );
+  const props = reviewSiteProps({ ...company, positive_rating_threshold: 1 }, 2, company.facebook_review_url);
+  assert.equal(props.mainSite, "facebook");
+  assert.equal(props.mainSiteLabel, "Facebook");
+  assert.deepEqual(props.otherLinks.map((l) => l.site), ["google", "usta"]);
+  assert.equal(reviewSiteProps(company, 5, "https://example.com/custom").mainSite, null);
 });

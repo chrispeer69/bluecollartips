@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireAuth } from "@/auth/middleware";
 import { z } from "zod";
+import { REVIEW_SITE_IDS } from "@/lib/review-sites";
 
 async function assertCompanyAdmin(userId: string, companyId: string) {
   const { db } = await import("@/db/client.server");
@@ -218,5 +219,27 @@ export const setVipNextFollowup = createServerFn({ method: "POST" })
       VALUES (${data.companyId}, ${data.jobId}, ${data.nextFollowupOn}::date, ${context.userId})
       ON CONFLICT (company_id, external_job_id) DO UPDATE SET
         next_followup_on = EXCLUDED.next_followup_on, updated_by = EXCLUDED.updated_by, updated_at = now()`;
+    return { ok: true };
+  });
+
+/** Customer tapped a review-site button on the thank-you page. */
+export const trackReviewSiteClick = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ ratingId: z.string().uuid(), site: z.enum(REVIEW_SITE_IDS) }).parse(d))
+  .handler(async ({ data }) => {
+    const { sql } = await import("@/db/client.server");
+    const db = sql();
+    const [rating] = await db`
+      SELECT r.company_id, rc.external_job_id
+      FROM ratings r LEFT JOIN review_contexts rc ON rc.id = r.review_context_id
+      WHERE r.id = ${data.ratingId} AND r.created_at > now() - interval '3 days'`;
+    if (!rating) return { ok: true };
+    await db`
+      INSERT INTO review_site_clicks (company_id, rating_id, site)
+      VALUES (${rating.company_id}, ${data.ratingId}, ${data.site})
+      ON CONFLICT (rating_id, site) DO NOTHING`;
+    if (data.site === "google" && rating.external_job_id) {
+      const { recordVipEvent } = await import("@/lib/vip-report.server");
+      await recordVipEvent(db, { companyId: rating.company_id, jobId: rating.external_job_id, event: "google_clicked" });
+    }
     return { ok: true };
   });

@@ -140,6 +140,7 @@ export async function vipReportRows(sql: Sql, args: {
            to_char((r.created_at AT TIME ZONE ${VIP_TIME_ZONE})::date, 'YYYY-MM-DD') AS review_day,
            st.id AS assignee_id, st.name AS assignee_name,
            to_char(f.next_followup_on, 'YYYY-MM-DD') AS next_followup_on,
+           COALESCE((SELECT array_agg(c.site ORDER BY c.clicked_at) FROM review_site_clicks c WHERE c.rating_id = r.id), '{}') AS review_sites_clicked,
            (SELECT COUNT(*) FROM vip_call_log cl WHERE cl.company_id = r.company_id AND cl.external_job_id = rc.external_job_id)::int AS call_count,
            CASE WHEN f.assignee_id IS NOT NULL THEN 'customer' WHEN da.staff_id IS NOT NULL THEN 'day' END AS assignee_source
     FROM ratings r

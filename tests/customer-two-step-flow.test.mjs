@@ -93,7 +93,8 @@ test("post-tip handoff shows the review before opening Google", () => {
   assert.match(reviewThankYou, /Your review/);
   assert.match(reviewThankYou, /Copy review/);
   assert.match(reviewThankYou, /Review copied/);
-  assert.match(reviewThankYou, /Copy review and continue to Google/);
+  assert.match(reviewThankYou, /Copy review and continue to \$\{mainLabel\}/);
+  assert.match(reviewThankYou, /Or leave a review on/);
   assert.match(reviewThankYou, /GoogleMark/);
   assert.match(reviewThankYou, /aria-label="Close"/);
   assert.match(reviewThankYou, /include a photo if you can/);
@@ -127,7 +128,10 @@ test("public review uses only the configured redirect", () => {
   assert.match(adminDashboard, /Yelp review URL/);
   assert.match(adminDashboard, /Facebook review URL/);
   assert.match(adminDashboard, /Redirect positive reviews to/);
-  assert.match(adminDashboard, /Customers see only the destination selected above/);
+  assert.match(adminDashboard, /button for every other review site/);
+  assert.match(adminDashboard, /Apple Maps place URL/);
+  assert.match(adminDashboard, /Bing Places URL/);
+  assert.match(adminDashboard, /US Tow Alliance profile URL/);
   assert.match(locationFunctions, /positiveReviewDestination/);
   assert.match(locationFunctions, /google_review_url: data\.googleUrl/);
   assert.match(locationFunctions, /positive_redirect_url: selectedRedirect/);

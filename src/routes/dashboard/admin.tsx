@@ -355,6 +355,9 @@ function AdminDashboard() {
               google: data.company.google_review_url ?? "",
               yelp: data.company.yelp_review_url ?? "",
               facebook: data.company.facebook_review_url ?? "",
+              appleMaps: data.company.apple_maps_review_url ?? "",
+              bing: data.company.bing_review_url ?? "",
+              usta: data.company.usta_review_url ?? "",
               threshold: data.company.positive_rating_threshold ?? 4,
               redirectUrl: data.company.positive_redirect_url ?? "",
               webhookEnabled: data.company.review_webhook_enabled ?? false,
@@ -2224,13 +2227,16 @@ function ReviewLinksPanel({
   companyId: string;
   companySlug: string;
   companyLogo?: string | null;
-  initial: { google: string; yelp: string; facebook: string; threshold: number; redirectUrl: string; webhookEnabled: boolean; webhookUrl: string; tipWebhookEnabled: boolean; tipWebhookUrl: string };
+  initial: { google: string; yelp: string; facebook: string; appleMaps: string; bing: string; usta: string; threshold: number; redirectUrl: string; webhookEnabled: boolean; webhookUrl: string; tipWebhookEnabled: boolean; tipWebhookUrl: string };
   onSaved: () => void;
 }) {
   const save = useServerFn(updateReviewLinks);
   const [google, setGoogle] = useState(initial.google);
   const [yelp, setYelp] = useState(initial.yelp);
   const [facebook, setFacebook] = useState(initial.facebook);
+  const [appleMaps, setAppleMaps] = useState(initial.appleMaps);
+  const [bing, setBing] = useState(initial.bing);
+  const [usta, setUsta] = useState(initial.usta);
   const [threshold, setThreshold] = useState(initial.threshold);
   const [destination, setDestination] = useState<"none" | "google" | "yelp" | "facebook" | "custom">(() => {
     if (!initial.redirectUrl) return "none";
@@ -2272,6 +2278,9 @@ function ReviewLinksPanel({
               googleUrl: google.trim() || null,
               yelpUrl: yelp.trim() || null,
               facebookUrl: facebook.trim() || null,
+              appleMapsUrl: appleMaps.trim() || null,
+              bingUrl: bing.trim() || null,
+              ustaUrl: usta.trim() || null,
               positiveRatingThreshold: threshold,
               positiveReviewDestination: destination,
               customRedirectUrl: customRedirectUrl.trim() || null,
@@ -2291,10 +2300,13 @@ function ReviewLinksPanel({
       <Input label="Google review URL" value={google} onChange={setGoogle} placeholder="https://g.page/r/…/review" />
       <Input label="Yelp review URL" value={yelp} onChange={setYelp} placeholder="https://www.yelp.com/writeareview/biz/…" />
       <Input label="Facebook review URL" value={facebook} onChange={setFacebook} placeholder="https://www.facebook.com/…/reviews" />
+      <Input label="Apple Maps place URL" value={appleMaps} onChange={setAppleMaps} placeholder="https://maps.apple.com/place?…" />
+      <Input label="Bing Places URL" value={bing} onChange={setBing} placeholder="https://www.bing.com/maps?…" />
+      <Input label="US Tow Alliance profile URL" value={usta} onChange={setUsta} placeholder="https://www.ustowalliance.com/company/…/" />
       <label className="text-sm">Positive rating threshold
         <Select value={String(threshold)} onValueChange={(value) => setThreshold(Number(value))}>
           <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="4">4 stars and above</SelectItem><SelectItem value="5">5 stars only</SelectItem></SelectContent>
+          <SelectContent><SelectItem value="1">All customers (any rating)</SelectItem><SelectItem value="4">4 stars and above</SelectItem><SelectItem value="5">5 stars only</SelectItem></SelectContent>
         </Select>
       </label>
       <label className="text-sm">Redirect positive reviews to
@@ -2315,7 +2327,9 @@ function ReviewLinksPanel({
         </div>
       )}
       <p className="sm:col-span-2 text-xs text-muted-foreground">
-        All links stay saved. Customers see only the destination selected above after the tip step.
+        After the tip step, customers who meet the threshold get the destination above as the main button, plus a
+        button for every other review site filled in here. Google&apos;s policy asks businesses not to request reviews
+        only from happy customers — choose &ldquo;All customers&rdquo; to follow it.
       </p>
       <div className="sm:col-span-2 rounded-lg border border-border p-4">
         <label className="flex items-center gap-2 text-sm font-medium">

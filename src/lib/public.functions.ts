@@ -51,7 +51,7 @@ async function enforceCompanyRateLimit(companyId: string) {
   );
 }
 
-const PUBLIC_COMPANY_FIELDS = "id, name, slug, logo_url, primary_color, secondary_color, support_email, positive_rating_threshold, positive_submit_action, positive_redirect_url";
+const PUBLIC_COMPANY_FIELDS = "id, name, slug, logo_url, primary_color, secondary_color, support_email, positive_rating_threshold, positive_submit_action, positive_redirect_url, google_review_url, facebook_review_url, yelp_review_url, apple_maps_review_url, bing_review_url, usta_review_url";
 
 /** Why a job-specific review link can't be used, for an honest message on the page. */
 export type ReviewLinkIssue = "used" | "expired" | "invalid" | "other_employee";

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { assignVipFollowupCustomer, assignVipFollowupDay, getVipReport, logVipFollowupCall, saveVipFollowupStaff, setVipNextFollowup, updateVipFollowup } from "@/lib/vip.functions";
+import { reviewSiteLabel } from "@/lib/review-sites";
 import { filterByMetric, followupProgress, followupState, todayYmd, vipNextStep, type VipMetric, type FollowupProgress, type FollowupState, type VipReportRow, type VipStage } from "@/lib/vip";
 import { dollars } from "@/lib/constants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -631,6 +632,11 @@ function VipRow({ row, companyId, staff, calls, onSaved }: { row: VipReportRow; 
           {row.google_posted_at
             ? <>Posted {fmtWhen(row.google_posted_at)}{row.google_stars ? ` · ${row.google_stars}★` : ""}</>
             : row.google_clicked_at ? <>Went to Google {fmtWhen(row.google_clicked_at)} (not confirmed yet)</> : "Not yet"}
+          {row.review_sites_clicked?.some((site) => site !== "google") && (
+            <div className="mt-1 text-xs text-muted-foreground">
+              Also opened: {row.review_sites_clicked.filter((site) => site !== "google").map(reviewSiteLabel).join(", ")}
+            </div>
+          )}
         </Fact>
         <Fact label="Convini app">
           <div>Link sent: {fmtWhen(row.convini_link_sent_at) ?? "—"}{row.convini_link_sent_count > 1 ? ` (${row.convini_link_sent_count}×)` : ""}</div>

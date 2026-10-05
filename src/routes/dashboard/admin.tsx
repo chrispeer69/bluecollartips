@@ -32,6 +32,7 @@ import {
 import { BrandedQRCode, DashboardShell, WorkspaceSelect, type DashboardNavItem } from "@/components/DashboardShell";
 import { PayoutDestinationForm, formatPayoutDetails, payoutMethodLabel } from "@/components/PayoutDestinationForm";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Building2, Crown, CreditCard, LayoutDashboard, LifeBuoy, MessageSquareText, Settings, ShieldCheck, Trophy, Users } from "lucide-react";
 import { HelpCenter, SupportInbox, TenantSupportPanel } from "@/components/SupportCenter";
 import { DispatchImportPanel } from "@/components/DispatchImportPanel";
@@ -43,6 +44,9 @@ import { VipCustomersPanel } from "@/components/VipCustomersPanel";
 import { CompanyImportPanel } from "@/components/CompanyImportPanel";
 import { reconciliationOverview } from "@/lib/reconciliation.functions";
 import { ProfilePhotoUploader } from "@/components/ProfilePhotoUploader";
+import { ReviewSiteMark } from "@/components/ReviewSiteMark";
+import { REVIEW_SITE_IDS, type ReviewSiteId } from "@/lib/review-sites";
+import { REVIEW_QUALITIES } from "@/lib/review-suggestions";
 
 export const Route = createFileRoute("/dashboard/admin")({
   // ?support=<ticketId> deep-links from support emails straight to a ticket.
@@ -358,8 +362,9 @@ function AdminDashboard() {
               appleMaps: data.company.apple_maps_review_url ?? "",
               bing: data.company.bing_review_url ?? "",
               usta: data.company.usta_review_url ?? "",
+              enabledSites: data.company.enabled_review_sites ?? [...REVIEW_SITE_IDS],
               threshold: data.company.positive_rating_threshold ?? 4,
-              redirectUrl: data.company.positive_redirect_url ?? "",
+              badgesEnabled: data.company.review_badges_enabled ?? true,
               webhookEnabled: data.company.review_webhook_enabled ?? false,
               webhookUrl: data.company.review_webhook_url ?? "",
               tipWebhookEnabled: data.company.tip_webhook_enabled ?? false,
@@ -893,6 +898,7 @@ function FeedbackList({
   const [pendingId, setPendingId] = useState<string | null>(null);
   if (!ratings.length) return <div className="text-sm text-muted-foreground">No ratings yet.</div>;
   const byId = new Map(drivers.map((d) => [d.id, d.display_name]));
+  const qualityLabels = new Map(REVIEW_QUALITIES.map((quality) => [quality.id, quality.label]));
   const assignable = [...drivers].sort((a, b) => a.display_name.localeCompare(b.display_name));
   const unassignedCount = ratings.filter((r) => !r.driver_id).length;
   const lowCount = ratings.filter((r) => r.stars <= 2).length;
@@ -963,6 +969,15 @@ function FeedbackList({
             <span className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString()}</span>
           </div>
           {r.feedback && <p className="mt-1">{r.feedback}</p>}
+          {r.quality_badges?.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {r.quality_badges.map((badge: string) => (
+                <span key={badge} className="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
+                  {qualityLabels.get(badge) ?? badge}
+                </span>
+              ))}
+            </div>
+          )}
           {r.customer_name && <p className="text-xs text-muted-foreground">— {r.customer_name}</p>}
           {!r.driver_id && r.dispatch_driver_name && (
             <p className="mt-1 text-xs text-muted-foreground">
@@ -2227,7 +2242,7 @@ function ReviewLinksPanel({
   companyId: string;
   companySlug: string;
   companyLogo?: string | null;
-  initial: { google: string; yelp: string; facebook: string; appleMaps: string; bing: string; usta: string; threshold: number; redirectUrl: string; webhookEnabled: boolean; webhookUrl: string; tipWebhookEnabled: boolean; tipWebhookUrl: string };
+  initial: { google: string; yelp: string; facebook: string; appleMaps: string; bing: string; usta: string; enabledSites: ReviewSiteId[]; threshold: number; badgesEnabled: boolean; webhookEnabled: boolean; webhookUrl: string; tipWebhookEnabled: boolean; tipWebhookUrl: string };
   onSaved: () => void;
 }) {
   const save = useServerFn(updateReviewLinks);
@@ -2237,25 +2252,20 @@ function ReviewLinksPanel({
   const [appleMaps, setAppleMaps] = useState(initial.appleMaps);
   const [bing, setBing] = useState(initial.bing);
   const [usta, setUsta] = useState(initial.usta);
+  const [enabledSites, setEnabledSites] = useState<ReviewSiteId[]>(initial.enabledSites);
   const [threshold, setThreshold] = useState(initial.threshold);
-  const [destination, setDestination] = useState<"none" | "google" | "yelp" | "facebook" | "custom">(() => {
-    if (!initial.redirectUrl) return "none";
-    if (initial.redirectUrl === initial.google) return "google";
-    if (initial.redirectUrl === initial.yelp) return "yelp";
-    if (initial.redirectUrl === initial.facebook) return "facebook";
-    return "custom";
-  });
-  const [customRedirectUrl, setCustomRedirectUrl] = useState(
-    initial.redirectUrl && ![initial.google, initial.yelp, initial.facebook].includes(initial.redirectUrl)
-      ? initial.redirectUrl
-      : "",
-  );
+  const [badgesEnabled, setBadgesEnabled] = useState(initial.badgesEnabled);
   const [webhookEnabled, setWebhookEnabled] = useState(initial.webhookEnabled);
   const [webhookUrl, setWebhookUrl] = useState(initial.webhookUrl);
   const [tipWebhookEnabled, setTipWebhookEnabled] = useState(initial.tipWebhookEnabled);
   const [tipWebhookUrl, setTipWebhookUrl] = useState(initial.tipWebhookUrl);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  function setSiteEnabled(site: ReviewSiteId, enabled: boolean) {
+    setEnabledSites((current) => enabled
+      ? (current.includes(site) ? current : [...current, site])
+      : current.filter((item) => item !== site));
+  }
   const companyUrl = typeof window !== "undefined" ? `${window.location.origin}/${companySlug}` : `/${companySlug}`;
   const downloadCompanyQr = () => {
     const canvas = document.getElementById("admin-company-qr") as HTMLCanvasElement | null;
@@ -2281,9 +2291,9 @@ function ReviewLinksPanel({
               appleMapsUrl: appleMaps.trim() || null,
               bingUrl: bing.trim() || null,
               ustaUrl: usta.trim() || null,
+              enabledReviewSites: enabledSites,
               positiveRatingThreshold: threshold,
-              positiveReviewDestination: destination,
-              customRedirectUrl: customRedirectUrl.trim() || null,
+              reviewBadgesEnabled: badgesEnabled,
               reviewWebhookEnabled: webhookEnabled,
               reviewWebhookUrl: webhookUrl.trim() || null,
               tipWebhookEnabled,
@@ -2297,40 +2307,37 @@ function ReviewLinksPanel({
         } finally { setBusy(false); }
       }}
     >
-      <Input label="Google review URL" value={google} onChange={setGoogle} placeholder="https://g.page/r/…/review" />
-      <Input label="Yelp review URL" value={yelp} onChange={setYelp} placeholder="https://www.yelp.com/writeareview/biz/…" />
-      <Input label="Facebook review URL" value={facebook} onChange={setFacebook} placeholder="https://www.facebook.com/…/reviews" />
-      <Input label="Apple Maps place URL" value={appleMaps} onChange={setAppleMaps} placeholder="https://maps.apple.com/place?…" />
-      <Input label="Bing Places URL" value={bing} onChange={setBing} placeholder="https://www.bing.com/maps?…" />
-      <Input label="US Tow Alliance profile URL" value={usta} onChange={setUsta} placeholder="https://www.ustowalliance.com/company/…/" />
-      <label className="text-sm">Positive rating threshold
-        <Select value={String(threshold)} onValueChange={(value) => setThreshold(Number(value))}>
-          <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="1">All customers (any rating)</SelectItem><SelectItem value="4">4 stars and above</SelectItem><SelectItem value="5">5 stars only</SelectItem></SelectContent>
-        </Select>
-      </label>
-      <label className="text-sm">Redirect positive reviews to
-        <Select value={destination} onValueChange={(value) => setDestination(value as typeof destination)}>
-          <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="google">Google</SelectItem>
-            <SelectItem value="yelp">Yelp</SelectItem>
-            <SelectItem value="facebook">Facebook</SelectItem>
-            <SelectItem value="custom">Custom URL</SelectItem>
-            <SelectItem value="none">Thank-you page only</SelectItem>
-          </SelectContent>
-        </Select>
-      </label>
-      {destination === "custom" && (
-        <div className="sm:col-span-2">
-          <Input label="Custom redirect URL" value={customRedirectUrl} onChange={setCustomRedirectUrl} placeholder="https://…" required />
-        </div>
-      )}
-      <p className="sm:col-span-2 text-xs text-muted-foreground">
-        After the tip step, customers who meet the threshold get the destination above as the main button, plus a
-        button for every other review site filled in here. Google&apos;s policy asks businesses not to request reviews
-        only from happy customers — choose &ldquo;All customers&rdquo; to follow it.
-      </p>
+      <ReviewDestinationInput site="google" label="Google" value={google} onChange={setGoogle} placeholder="https://g.page/r/…/review" enabled={enabledSites.includes("google")} onEnabledChange={(enabled) => setSiteEnabled("google", enabled)} />
+      <ReviewDestinationInput site="facebook" label="Facebook" value={facebook} onChange={setFacebook} placeholder="https://www.facebook.com/…/reviews" enabled={enabledSites.includes("facebook")} onEnabledChange={(enabled) => setSiteEnabled("facebook", enabled)} />
+      <ReviewDestinationInput site="yelp" label="Yelp" value={yelp} onChange={setYelp} placeholder="https://www.yelp.com/writeareview/biz/…" enabled={enabledSites.includes("yelp")} onEnabledChange={(enabled) => setSiteEnabled("yelp", enabled)} />
+      <ReviewDestinationInput site="apple_maps" label="Apple Maps" value={appleMaps} onChange={setAppleMaps} placeholder="https://maps.apple.com/place?…" enabled={enabledSites.includes("apple_maps")} onEnabledChange={(enabled) => setSiteEnabled("apple_maps", enabled)} />
+      <ReviewDestinationInput site="bing" label="Bing Places" value={bing} onChange={setBing} placeholder="https://www.bing.com/maps?…" enabled={enabledSites.includes("bing")} onEnabledChange={(enabled) => setSiteEnabled("bing", enabled)} />
+      <ReviewDestinationInput site="usta" label="US Tow Alliance" value={usta} onChange={setUsta} placeholder="https://www.ustowalliance.com/company/…/" enabled={enabledSites.includes("usta")} onEnabledChange={(enabled) => setSiteEnabled("usta", enabled)} />
+      <div className="sm:col-span-2 grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-2">
+        <label className="text-sm font-medium">Show public review sites for
+          <Select value={String(threshold)} onValueChange={(value) => setThreshold(Number(value))}>
+            <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">All ratings</SelectItem>
+              <SelectItem value="2">2 stars and above</SelectItem>
+              <SelectItem value="3">3 stars and above</SelectItem>
+              <SelectItem value="4">4 stars and above</SelectItem>
+              <SelectItem value="5">5 stars only</SelectItem>
+            </SelectContent>
+          </Select>
+        </label>
+        <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm font-medium">
+          <Checkbox
+            checked={badgesEnabled}
+            onCheckedChange={(checked) => setBadgesEnabled(checked === true)}
+            aria-label="Show quick feedback badges on the review form"
+          />
+          Show quick feedback badges
+        </label>
+        <p className="text-xs text-muted-foreground sm:col-span-2">
+          Ratings that meet the threshold see every enabled destination with a URL. Choose All ratings to show the same page to everyone.
+        </p>
+      </div>
       <div className="sm:col-span-2 rounded-lg border border-border p-4">
         <label className="flex items-center gap-2 text-sm font-medium">
           <input type="checkbox" checked={webhookEnabled} onChange={(e) => setWebhookEnabled(e.target.checked)} />
@@ -2370,11 +2377,48 @@ function ReviewLinksPanel({
           {busy ? "Saving…" : "Save review settings"}
         </button>
         {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
-        <span className="text-xs text-muted-foreground">Only customers who meet the threshold will be redirected.</span>
+        <span className="text-xs text-muted-foreground">Customers who meet the threshold choose which enabled review site to open.</span>
       </div>
     </form>
   );
 }
+
+function ReviewDestinationInput({
+  site,
+  label,
+  value,
+  onChange,
+  placeholder,
+  enabled,
+  onEnabledChange,
+}: {
+  site: ReviewSiteId;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  enabled: boolean;
+  onEnabledChange: (enabled: boolean) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <ReviewSiteMark site={site} className="h-8 w-8" />
+        <span className="min-w-0 flex-1 text-sm font-semibold">{label}</span>
+        <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-muted-foreground">
+          <Checkbox
+            checked={enabled}
+            onCheckedChange={(checked) => onEnabledChange(checked === true)}
+            aria-label={`Show ${label} on the thank-you page`}
+          />
+          Show
+        </label>
+      </div>
+      <Input label={`${label} URL`} value={value} onChange={onChange} placeholder={placeholder} />
+    </div>
+  );
+}
+
 function DisputesPanel({
   companyId,
   tips,

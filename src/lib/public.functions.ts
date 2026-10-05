@@ -7,6 +7,7 @@ import { deliverReviewWebhook, hashReviewToken } from "./review-webhooks.server"
 const RATE_WINDOW_MS = 5 * 60 * 1000;
 const RATE_MAX = 3;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const qualityBadges = z.array(z.enum(["quick", "professional", "communication", "care", "reassuring", "handoff"])).max(6);
 
 function currentIpHash(): string {
   const fwd = getRequestHeader("x-forwarded-for") || getRequestHeader("cf-connecting-ip") || "unknown";
@@ -51,7 +52,7 @@ async function enforceCompanyRateLimit(companyId: string) {
   );
 }
 
-const PUBLIC_COMPANY_FIELDS = "id, name, slug, logo_url, primary_color, secondary_color, support_email, positive_rating_threshold, positive_submit_action, positive_redirect_url, google_review_url, facebook_review_url, yelp_review_url, apple_maps_review_url, bing_review_url, usta_review_url";
+const PUBLIC_COMPANY_FIELDS = "id, name, slug, logo_url, primary_color, secondary_color, support_email, positive_rating_threshold, review_badges_enabled, google_review_url, facebook_review_url, yelp_review_url, apple_maps_review_url, bing_review_url, usta_review_url, enabled_review_sites";
 
 /** Why a job-specific review link can't be used, for an honest message on the page. */
 export type ReviewLinkIssue = "used" | "expired" | "invalid" | "other_employee";
@@ -196,6 +197,7 @@ export const submitRating = createServerFn({ method: "POST" })
         driverSlug: z.string().min(1),
         stars: z.number().int().min(1).max(5),
         feedback: z.string().trim().max(2000).optional().nullable(),
+        qualityBadges,
         customerName: z.string().trim().max(120).optional().nullable(),
         customerPhone: z.string().trim().max(40).optional().nullable(),
         customerEmail: z.string().trim().max(200).optional().nullable(),
@@ -208,7 +210,7 @@ export const submitRating = createServerFn({ method: "POST" })
     const { db } = await import("@/db/client.server");
     const { data: company } = await db
       .from("companies")
-      .select("id, positive_rating_threshold, positive_submit_action, positive_redirect_url, review_webhook_enabled, review_webhook_url, review_webhook_secret_encrypted")
+      .select("id, review_badges_enabled, review_webhook_enabled, review_webhook_url, review_webhook_secret_encrypted")
       .eq("slug", data.companySlug)
       .maybeSingle();
     if (!company) throw new Error("Company not found");
@@ -234,6 +236,7 @@ export const submitRating = createServerFn({ method: "POST" })
         driver_id: driver.id,
         stars: data.stars,
         feedback: data.feedback ?? null,
+        quality_badges: company.review_badges_enabled ? data.qualityBadges : [],
         customer_name: data.customerName ?? null,
         customer_phone: data.customerPhone ?? null,
         customer_email: data.customerEmail ?? null,
@@ -277,10 +280,7 @@ export const submitRating = createServerFn({ method: "POST" })
       submittedAt: new Date().toISOString(),
     });
 
-    const redirectUrl = data.stars >= company.positive_rating_threshold
-      ? company.positive_redirect_url
-      : null;
-    return { ok: true, ratingId: rating.id, redirectUrl };
+    return { ok: true, ratingId: rating.id };
   });
 
 export const submitCompanyRating = createServerFn({ method: "POST" })
@@ -288,6 +288,7 @@ export const submitCompanyRating = createServerFn({ method: "POST" })
     companySlug: z.string().min(1),
     stars: z.number().int().min(1).max(5),
     feedback: z.string().trim().max(2000).optional().nullable(),
+    qualityBadges,
     customerName: z.string().trim().max(120).optional().nullable(),
     customerPhone: z.string().trim().max(40).optional().nullable(),
     customerEmail: z.string().trim().max(200).optional().nullable(),
@@ -296,7 +297,7 @@ export const submitCompanyRating = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { db } = await import("@/db/client.server");
     const { data: company } = await db.from("companies")
-      .select("id, positive_rating_threshold, positive_submit_action, positive_redirect_url, review_webhook_enabled, review_webhook_url, review_webhook_secret_encrypted")
+      .select("id, review_badges_enabled, review_webhook_enabled, review_webhook_url, review_webhook_secret_encrypted")
       .eq("slug", data.companySlug).eq("status", "active").maybeSingle();
     if (!company) throw new Error("Company not found");
     if (data.customerEmail && !EMAIL_PATTERN.test(data.customerEmail)) {
@@ -306,7 +307,7 @@ export const submitCompanyRating = createServerFn({ method: "POST" })
     await enforceCompanyRateLimit(company.id);
     const { data: rating, error } = await db.from("ratings").insert({
       company_id: company.id, driver_id: null, stars: data.stars,
-      feedback: data.feedback ?? null, customer_name: data.customerName ?? null,
+      feedback: data.feedback ?? null, quality_badges: company.review_badges_enabled ? data.qualityBadges : [], customer_name: data.customerName ?? null,
       customer_phone: data.customerPhone ?? null, customer_email: data.customerEmail ?? null,
       flagged: data.stars <= 2,
       review_context_id: reviewContext?.id ?? null,
@@ -325,8 +326,5 @@ export const submitCompanyRating = createServerFn({ method: "POST" })
       customerName: data.customerName ?? null, customerPhone: data.customerPhone ?? null,
       customerEmail: data.customerEmail ?? null, submittedAt: new Date().toISOString(),
     });
-    const redirectUrl = data.stars >= company.positive_rating_threshold
-      ? company.positive_redirect_url
-      : null;
-    return { ok: true, ratingId: rating.id, redirectUrl };
+    return { ok: true, ratingId: rating.id };
   });

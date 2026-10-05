@@ -3,16 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getPublicCompany, submitCompanyRating } from "@/lib/public.functions";
 import { trackReviewSiteClick } from "@/lib/vip.functions";
-import { reviewSiteProps } from "@/lib/review-sites";
+import { reviewLinksFor } from "@/lib/review-sites";
 import { StripeCardPanel } from "@/components/StripeCardPanel";
 import { PRESET_TIPS, TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib/constants";
-import { Check, Copy } from "lucide-react";
 import { ReviewQualityPicker } from "@/components/ReviewQualityPicker";
 import { ReviewThankYou } from "@/components/ReviewThankYou";
-import {
-  REVIEW_QUALITIES,
-  composeReviewSentence,
-} from "@/lib/review-suggestions";
+import { REVIEW_QUALITIES } from "@/lib/review-suggestions";
 
 // Company-level rating page: reached when dispatch could not match a driver,
 // or from the company's general QR/link. Mirrors the driver page's design so
@@ -45,7 +41,6 @@ function CompanyReviewPage() {
   const [hoverStars, setHoverStars] = useState(0);
   const [feedback, setFeedback] = useState("");
   const [selectedQualities, setSelectedQualities] = useState<string[]>([]);
-  const [reviewCopied, setReviewCopied] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -55,7 +50,6 @@ function CompanyReviewPage() {
   const [tipCents, setTipCents] = useState<number | null>(null);
   const [customTip, setCustomTip] = useState("");
   const [customTipOpen, setCustomTipOpen] = useState(false);
-  const [positiveRedirectUrl, setPositiveRedirectUrl] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,22 +82,9 @@ function CompanyReviewPage() {
   const tipValid = finalTipCents === 0 || (finalTipCents >= TIP_MIN_CENTS && finalTipCents <= TIP_MAX_CENTS);
   const emailOk = !customerEmail.trim() || EMAIL_RE.test(customerEmail.trim());
   function toggleQuality(id: string) {
-    const next = selectedQualities.includes(id)
-      ? selectedQualities.filter((qualityId) => qualityId !== id)
-      : [...selectedQualities, id];
-    setSelectedQualities(next);
-    setFeedback(composeReviewSentence("My driver", next));
-    setReviewCopied(false);
-  }
-
-  async function copyFeedbackForReview() {
-    const copied = await copyReviewText(feedback);
-    if (!copied) {
-      setError("Could not copy automatically. Press and hold your feedback to copy it.");
-      return;
-    }
-    setError(null);
-    setReviewCopied(true);
+    setSelectedQualities((current) => current.includes(id)
+      ? current.filter((qualityId) => qualityId !== id)
+      : [...current, id]);
   }
 
   if (loading) return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading…</div>;
@@ -147,9 +128,7 @@ function CompanyReviewPage() {
         companyLogoUrl={company.logo_url}
         brandColor={brand.primary}
         stars={stars}
-        reviewText={feedback}
-        redirectUrl={positiveRedirectUrl}
-        {...reviewSiteProps(company, stars, positiveRedirectUrl)}
+        reviewLinks={reviewLinksFor(company, stars)}
         onSiteClick={ratingId ? (site) => trackSite({ data: { ratingId, site } }) : undefined}
       />
     );
@@ -159,6 +138,7 @@ function CompanyReviewPage() {
     const result = await submit({ data: {
       companySlug, stars,
       feedback: feedback.trim() || null,
+      qualityBadges: selectedQualities,
       customerName: customerName.trim() || null,
       customerPhone: customerPhone.trim() || null,
       customerEmail: customerEmail.trim() || null,
@@ -193,7 +173,6 @@ function CompanyReviewPage() {
       setBusy(true);
       try {
         const result = await submitRating();
-        setPositiveRedirectUrl(result.redirectUrl ?? null);
         setRatingId(result.ratingId ?? null);
         setDone(true);
       } catch (err) { setError(err instanceof Error ? err.message : "Could not submit"); } finally { setBusy(false); }
@@ -212,28 +191,22 @@ function CompanyReviewPage() {
         </div>
 
         <label className="mt-5 block text-sm font-medium">Tell us about your experience</label>
-        <div className="mt-2 inline-flex rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
-          Choose as many as apply
-        </div>
-        <ReviewQualityPicker
-          qualities={REVIEW_QUALITIES}
-          selectedIds={selectedQualities}
-          onToggle={toggleQuality}
-          brandColor={brand.secondary}
-        />
-        <textarea value={feedback} onChange={(e) => { setFeedback(e.target.value); setReviewCopied(false); }} rows={3} maxLength={2000}
-          placeholder="Choose an option above or write your own review"
-          className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
-        {stars >= 4 && feedback.trim() && company.positive_redirect_url && (
-          <div className="mt-3 rounded-xl border border-cyan-200 bg-cyan-50 p-3 text-slate-900">
-            <button type="button" onClick={() => void copyFeedbackForReview()}
-              className="inline-flex items-center gap-2 rounded-lg border border-cyan-300 bg-cyan-200 px-4 py-2.5 text-sm font-bold text-cyan-950 shadow-sm transition-colors hover:bg-cyan-300">
-              {reviewCopied ? <Check className="h-5 w-5" aria-hidden="true" /> : <Copy className="h-5 w-5" aria-hidden="true" />}
-              {reviewCopied ? "Copied" : "Copy for public review"}
-            </button>
-            <p className="mt-2 text-xs text-cyan-900">After this step, we’ll open the public review page so you can paste your review there.</p>
-          </div>
+        {company.review_badges_enabled !== false && (
+          <>
+            <div className="mt-2 inline-flex rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
+              Choose as many as apply
+            </div>
+            <ReviewQualityPicker
+              qualities={REVIEW_QUALITIES}
+              selectedIds={selectedQualities}
+              onToggle={toggleQuality}
+              brandColor={brand.secondary}
+            />
+          </>
         )}
+        <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} rows={3} maxLength={2000}
+          placeholder="Write your own review (optional)"
+          className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           {!knownName && <Field label="Your name" value={customerName} setValue={setCustomerName} />}
@@ -287,8 +260,7 @@ function CompanyReviewPage() {
               if (stars) {
                 try {
                   const result = await submitRating();
-                  setPositiveRedirectUrl(result.redirectUrl ?? null);
-        setRatingId(result.ratingId ?? null);
+                  setRatingId(result.ratingId ?? null);
                 } catch { /* The payment is still safely recorded by Stripe's webhook. */ }
               }
               setDone(true);
@@ -327,27 +299,4 @@ function Field({ label, value, setValue, type = "text", placeholder, required }:
         className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
     </label>
   );
-}
-
-async function copyReviewText(value: string): Promise<boolean> {
-  const text = value.trim();
-  if (!text) return false;
-  if (navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      // Fall through for browsers that block the async Clipboard API.
-    }
-  }
-  const field = document.createElement("textarea");
-  field.value = text;
-  field.setAttribute("readonly", "");
-  field.style.position = "fixed";
-  field.style.opacity = "0";
-  document.body.appendChild(field);
-  field.select();
-  const copied = document.execCommand("copy");
-  field.remove();
-  return copied;
 }

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getPublicDriver, submitRating } from "@/lib/public.functions";
 import { trackReviewSiteClick } from "@/lib/vip.functions";
-import { reviewSiteProps } from "@/lib/review-sites";
+import { reviewLinksFor } from "@/lib/review-sites";
 import {
   CUSTOMER_TIP_PRESETS,
   DEFAULT_CUSTOMER_TIP_CENTS,
@@ -14,10 +14,7 @@ import {
 import { StripeCardPanel } from "@/components/StripeCardPanel";
 import { ReviewQualityPicker } from "@/components/ReviewQualityPicker";
 import { ReviewThankYou } from "@/components/ReviewThankYou";
-import {
-  REVIEW_QUALITIES,
-  composeReviewSentence,
-} from "@/lib/review-suggestions";
+import { REVIEW_QUALITIES } from "@/lib/review-suggestions";
 
 export const Route = createFileRoute("/$companySlug/d/$driverSlug")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -60,7 +57,6 @@ function TipPage() {
   const [knownPhone, setKnownPhone] = useState(false);
   const [step, setStep] = useState<"review" | "tip">("review");
   const [ratingId, setRatingId] = useState<string | null>(null);
-  const [positiveRedirectUrl, setPositiveRedirectUrl] = useState<string | null>(null);
   const [tipCents, setTipCents] = useState<number | null>(null);
   const [customTip, setCustomTip] = useState("");
   const [customTipOpen, setCustomTipOpen] = useState(false);
@@ -100,7 +96,6 @@ function TipPage() {
           setCustomerPhone(result.submittedReview.customer_phone ?? result.reviewContact?.phone ?? "");
           setCustomerEmail(result.submittedReview.customer_email ?? result.reviewContact?.email ?? "");
           setRatingId(result.submittedReview.id);
-          setPositiveRedirectUrl(result.company?.positive_redirect_url ?? null);
           setTipCents(DEFAULT_CUSTOMER_TIP_CENTS);
           setStep("tip");
           setDone(result.tipAlreadyReceived);
@@ -120,13 +115,9 @@ function TipPage() {
     return { primary, secondary };
   }, [data]);
   function toggleQuality(id: string) {
-    const next = selectedQualities.includes(id)
-      ? selectedQualities.filter((qualityId) => qualityId !== id)
-      : [...selectedQualities, id];
-    setSelectedQualities(next);
-    setFeedback(
-      composeReviewSentence(firstName(data?.driver?.display_name ?? "Our driver"), next),
-    );
+    setSelectedQualities((current) => current.includes(id)
+      ? current.filter((qualityId) => qualityId !== id)
+      : [...current, id]);
   }
 
   if (loading) {
@@ -182,10 +173,8 @@ function TipPage() {
         companyLogoUrl={company.logo_url}
         brandColor={brand.primary}
         stars={stars}
-        reviewText={feedback}
-        redirectUrl={positiveRedirectUrl}
         driverName={driver.display_name}
-        {...reviewSiteProps(company, stars, positiveRedirectUrl)}
+        reviewLinks={reviewLinksFor(company, stars)}
         onSiteClick={ratingId ? (site) => trackSite({ data: { ratingId, site } }) : undefined}
       />
     );
@@ -223,6 +212,7 @@ function TipPage() {
           driverSlug,
           stars,
           feedback: feedback.trim() || null,
+          qualityBadges: selectedQualities,
           customerName: customerName.trim() || null,
           customerPhone: customerPhone.trim() || null,
           customerEmail: customerEmail.trim() || null,
@@ -230,7 +220,6 @@ function TipPage() {
         },
       });
       setRatingId(result.ratingId);
-      setPositiveRedirectUrl(result.redirectUrl ?? null);
       if (stars >= 4) {
         setTipCents(DEFAULT_CUSTOMER_TIP_CENTS);
         setStep("tip");
@@ -314,22 +303,26 @@ function TipPage() {
           </div>
 
           <label className="mt-5 block text-sm font-medium">Tell us about your experience</label>
-          <div className="mt-2 inline-flex rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
-            Choose as many as apply
-          </div>
-          <ReviewQualityPicker
-            qualities={REVIEW_QUALITIES}
-            selectedIds={selectedQualities}
-            onToggle={toggleQuality}
-            brandColor={brand.secondary}
-          />
+          {company.review_badges_enabled !== false && (
+            <>
+              <div className="mt-2 inline-flex rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
+                Choose as many as apply
+              </div>
+              <ReviewQualityPicker
+                qualities={REVIEW_QUALITIES}
+                selectedIds={selectedQualities}
+                onToggle={toggleQuality}
+                brandColor={brand.secondary}
+              />
+            </>
+          )}
           <textarea
             className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             rows={3}
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
             maxLength={2000}
-            placeholder="Choose an option above or write your own review"
+            placeholder="Write your own review (optional)"
           />
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">

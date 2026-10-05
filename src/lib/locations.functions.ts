@@ -99,26 +99,14 @@ export const updateReviewLinks = createServerFn({ method: "POST" })
       appleMapsUrl: httpUrl(500).optional().nullable(),
       bingUrl: httpUrl(500).optional().nullable(),
       ustaUrl: httpUrl(500).optional().nullable(),
+      enabledReviewSites: z.array(z.enum(["google", "facebook", "yelp", "apple_maps", "bing", "usta"])).max(6),
       positiveRatingThreshold: z.number().int().min(1).max(5),
-      positiveReviewDestination: z.enum(["none", "google", "yelp", "facebook", "custom"]),
-      customRedirectUrl: httpUrl(1000).optional().nullable(),
+      reviewBadgesEnabled: z.boolean(),
       reviewWebhookEnabled: z.boolean(),
       reviewWebhookUrl: httpUrl(1000).optional().nullable(),
       tipWebhookEnabled: z.boolean(),
       tipWebhookUrl: httpUrl(1000).optional().nullable(),
     }).superRefine((value, ctx) => {
-      const destinations = {
-        google: value.googleUrl,
-        yelp: value.yelpUrl,
-        facebook: value.facebookUrl,
-        custom: value.customRedirectUrl,
-      } as const;
-      if (value.positiveReviewDestination !== "none" && !destinations[value.positiveReviewDestination]) {
-        const path = value.positiveReviewDestination === "custom"
-          ? "customRedirectUrl"
-          : `${value.positiveReviewDestination}Url`;
-        ctx.addIssue({ code: "custom", path: [path], message: "Add a URL for the selected destination" });
-      }
       if (value.reviewWebhookEnabled && !value.reviewWebhookUrl) {
         ctx.addIssue({ code: "custom", path: ["reviewWebhookUrl"], message: "Webhook URL is required" });
       }
@@ -130,13 +118,6 @@ export const updateReviewLinks = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertCompanyAdmin(context.userId, data.companyId);
     const { db } = await import("@/db/client.server");
-    const selectedRedirect = {
-      none: null,
-      google: data.googleUrl ?? null,
-      yelp: data.yelpUrl ?? null,
-      facebook: data.facebookUrl ?? null,
-      custom: data.customRedirectUrl ?? null,
-    }[data.positiveReviewDestination];
     const update: Record<string, unknown> = {
       google_review_url: data.googleUrl ?? null,
       yelp_review_url: data.yelpUrl ?? null,
@@ -144,9 +125,9 @@ export const updateReviewLinks = createServerFn({ method: "POST" })
       apple_maps_review_url: data.appleMapsUrl ?? null,
       bing_review_url: data.bingUrl ?? null,
       usta_review_url: data.ustaUrl ?? null,
+      enabled_review_sites: data.enabledReviewSites,
       positive_rating_threshold: data.positiveRatingThreshold,
-      positive_submit_action: selectedRedirect ? "redirect" : "success_page",
-      positive_redirect_url: selectedRedirect,
+      review_badges_enabled: data.reviewBadgesEnabled,
       review_webhook_enabled: data.reviewWebhookEnabled,
       review_webhook_url: data.reviewWebhookUrl ?? null,
       tip_webhook_enabled: data.tipWebhookEnabled,

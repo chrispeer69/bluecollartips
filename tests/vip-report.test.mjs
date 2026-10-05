@@ -244,7 +244,6 @@ test("vip wiring: public routes, admin checks and dashboard entry", async () => 
   // Every admin function (all but the public Google-tap tracker) checks the caller.
   assert.equal((fns.match(/assertCompanyAdmin\(context\.userId/g) ?? []).length, 7);
   assert.match(admin, /page === "vip"/);
-  assert.match(thanks, /onSiteClick\(mainSite\)/);
   assert.match(thanks, /onSiteClick\(link\.site\)/);
   assert.match(fns, /export const trackReviewSiteClick/);
   assert.match(fns, /event: "google_clicked"/);
@@ -287,9 +286,10 @@ test("vip report: lists the review sites a customer opened, in click order", asy
   });
 });
 
-test("review sites: extra buttons respect the threshold and skip the main destination", async () => {
-  const { reviewLinksFor, reviewSiteProps } = await import("../src/lib/review-sites.ts");
+test("review sites: threshold gates every enabled destination equally", async () => {
+  const { reviewLinksFor } = await import("../src/lib/review-sites.ts");
   const company = {
+    enabled_review_sites: ["google", "facebook", "usta"],
     positive_rating_threshold: 4,
     google_review_url: "https://g.page/r/x/review",
     facebook_review_url: "https://facebook.com/x/reviews",
@@ -297,14 +297,17 @@ test("review sites: extra buttons respect the threshold and skip the main destin
     bing_review_url: null,
     usta_review_url: "https://www.ustowalliance.com/company/1/",
   };
-  assert.deepEqual(reviewLinksFor(company, 3, company.google_review_url), []);
   assert.deepEqual(
-    reviewLinksFor(company, 5, company.google_review_url).map((l) => l.site),
-    ["facebook", "usta"],
+    reviewLinksFor(company, 5).map((l) => l.site),
+    ["google", "facebook", "usta"],
   );
-  const props = reviewSiteProps({ ...company, positive_rating_threshold: 1 }, 2, company.facebook_review_url);
-  assert.equal(props.mainSite, "facebook");
-  assert.equal(props.mainSiteLabel, "Facebook");
-  assert.deepEqual(props.otherLinks.map((l) => l.site), ["google", "usta"]);
-  assert.equal(reviewSiteProps(company, 5, "https://example.com/custom").mainSite, null);
+  assert.deepEqual(
+    reviewLinksFor({ ...company, enabled_review_sites: ["google"] }, 4).map((l) => l.site),
+    ["google"],
+  );
+  assert.deepEqual(reviewLinksFor(company, 3), []);
+  assert.deepEqual(
+    reviewLinksFor({ ...company, positive_rating_threshold: 1 }, 1).map((l) => l.site),
+    ["google", "facebook", "usta"],
+  );
 });

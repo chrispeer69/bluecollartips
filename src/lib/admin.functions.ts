@@ -66,7 +66,7 @@ export const getAdminDashboard = createServerFn({ method: "POST" })
       // driver name dispatch sent with the job (from the review link) so
       // unattributed reviews show who they were meant for.
       import("@/db/client.server").then(({ sql }) => sql()`
-        SELECT r.id, r.stars, r.feedback, r.customer_name, r.driver_id, r.created_at, r.flagged,
+        SELECT r.id, r.stars, r.feedback, r.quality_badges, r.customer_name, r.driver_id, r.created_at, r.flagged,
                rc.dispatch_driver_name
         FROM (
           (SELECT id FROM ratings WHERE company_id = ${companyId} ORDER BY created_at DESC LIMIT 200)

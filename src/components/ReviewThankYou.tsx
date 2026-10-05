@@ -1,39 +1,26 @@
-import { Check, Copy, ExternalLink, X } from "lucide-react";
-import { useState } from "react";
+import { ArrowUpRight, Camera, Sparkles, X } from "lucide-react";
 import type { ReviewLink, ReviewSiteId } from "@/lib/review-sites";
+import { ReviewSiteMark } from "@/components/ReviewSiteMark";
 
 export function ReviewThankYou({
   companyName,
   companyLogoUrl,
   brandColor,
   stars,
-  reviewText,
-  redirectUrl,
   driverName,
-  mainSite,
-  mainSiteLabel,
-  otherLinks = [],
+  reviewLinks = [],
   onSiteClick,
 }: {
   companyName: string;
   companyLogoUrl?: string | null;
   brandColor: string;
   stars: number;
-  reviewText: string;
-  redirectUrl?: string | null;
   driverName?: string | null;
-  /** Which review site the main button opens (null for a custom URL). */
-  mainSite?: ReviewSiteId | null;
-  mainSiteLabel?: string | null;
-  /** Extra review sites shown under the main button. */
-  otherLinks?: ReviewLink[];
+  reviewLinks?: ReviewLink[];
   /** Records the tap for the VIP follow-up report; never holds up the redirect for long. */
   onSiteClick?: (site: ReviewSiteId) => Promise<unknown> | void;
 }) {
-  const [copied, setCopied] = useState(false);
-  const [copyError, setCopyError] = useState(false);
   const positive = stars >= 4;
-  const review = reviewText.trim();
 
   function closePage() {
     if (window.history.length > 1) {
@@ -43,32 +30,9 @@ export function ReviewThankYou({
     window.close();
   }
 
-  async function copyReview() {
-    const success = await copyText(review);
-    setCopied(success);
-    setCopyError(!success);
-    return success;
-  }
-
-  async function copyAndContinue() {
-    const success = review ? await copyReview() : true;
-    if (!success || !redirectUrl) return;
-    if (onSiteClick && mainSite) {
-      await Promise.race([
-        Promise.resolve().then(() => onSiteClick(mainSite)).catch(() => undefined),
-        new Promise((resolve) => setTimeout(resolve, 800)),
-      ]);
-    }
-    window.location.assign(redirectUrl);
-  }
-
-  async function openOther(link: ReviewLink) {
-    if (review) await copyReview();
+  function openSite(link: ReviewLink) {
     if (onSiteClick) void Promise.resolve().then(() => onSiteClick(link.site)).catch(() => undefined);
   }
-
-  const mainLabel = mainSiteLabel ?? "the review page";
-  const hasLinks = Boolean(redirectUrl) || otherLinks.length > 0;
 
   return (
     <div className="min-h-screen bg-slate-50 px-5 py-6 text-slate-950">
@@ -105,78 +69,39 @@ export function ReviewThankYou({
             </p>
           </div>
 
-          {(positive && review) || hasLinks ? (
+          {reviewLinks.length > 0 ? (
             <div className="p-6">
-              {review ? (
-                <>
-                  <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-base font-bold">Your review</h2>
-                    <span className="text-sm font-semibold text-amber-500" aria-label={`${stars} stars`}>
-                      {"★".repeat(stars)}
-                    </span>
-                  </div>
-                  <div className="mt-3 rounded-2xl border border-cyan-200 bg-cyan-50 p-4">
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">{review}</p>
-                  </div>
-                  {!hasLinks ? (
-                    <button
-                      type="button"
-                      onClick={() => void copyReview()}
-                      className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-300 bg-cyan-100 px-4 py-3 text-sm font-bold text-cyan-950 transition hover:bg-cyan-200"
-                    >
-                      {copied ? <Check className="h-5 w-5" aria-hidden="true" /> : <Copy className="h-5 w-5" aria-hidden="true" />}
-                      {copied ? "Review copied" : "Copy review"}
-                    </button>
-                  ) : null}
-                  {copyError ? (
-                    <p className="mt-2 text-center text-xs text-red-600">
-                      Press and hold the review above to copy it.
-                    </p>
-                  ) : null}
-                </>
-              ) : null}
-
-              {redirectUrl ? (
-                <>
-                  <p className="mt-4 text-center text-xs leading-relaxed text-slate-500">
-                    Paste your review on {mainLabel} and include a photo if you can. It helps other customers choose with confidence.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => void copyAndContinue()}
-                    className="mt-3 flex w-full items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-900 shadow-sm transition hover:bg-slate-50"
-                  >
-                    {mainSite === "google" ? <GoogleMark /> : <ExternalLink className="h-5 w-5" aria-hidden="true" />}
-                    {review ? `Copy review and continue to ${mainLabel}` : `Continue to ${mainLabel}`}
-                  </button>
-                </>
-              ) : null}
-
-              {otherLinks.length > 0 ? (
-                <div className="mt-5">
-                  <p className="text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {redirectUrl ? "Or leave a review on" : "Leave a review on"}
-                  </p>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    {otherLinks.map((link) => (
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-50 via-white to-amber-50 px-5 py-6 text-center ring-1 ring-slate-200">
+                <Sparkles className="absolute right-5 top-5 h-5 w-5 text-amber-400" aria-hidden="true" />
+                <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-white text-cyan-700 shadow-md ring-1 ring-cyan-100">
+                  <Camera className="h-8 w-8" strokeWidth={1.8} aria-hidden="true" />
+                </div>
+                <h2 className="mt-4 text-xl font-bold tracking-tight text-slate-950">
+                  Help others choose with confidence
+                </h2>
+                <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-slate-600">
+                  Your feedback helps us improve. A few words and a photo can help future customers know what to expect.
+                </p>
+              </div>
+              <p className="mt-5 text-center text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                Choose where to share
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                    {reviewLinks.map((link) => (
                       <a
                         key={link.site}
                         href={link.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        onClick={() => void openOther(link)}
-                        className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50"
+                        onClick={() => openSite(link)}
+                        className="group flex min-h-16 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-bold text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-md"
                       >
-                        {link.site === "google" ? <GoogleMark /> : <ExternalLink className="h-4 w-4" aria-hidden="true" />}
-                        {link.label}
+                        <ReviewSiteMark site={link.site} className="h-7 w-7" />
+                        <span className="min-w-0 flex-1">{link.label}</span>
+                        <ArrowUpRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:text-cyan-700" aria-hidden="true" />
                       </a>
                     ))}
-                  </div>
-                  {review ? (
-                    <p className="mt-2 text-center text-xs text-slate-500">Your review is copied when you tap — just paste it.</p>
-                  ) : null}
-                </div>
-              ) : null}
+              </div>
             </div>
           ) : null}
         </section>
@@ -185,37 +110,4 @@ export function ReviewThankYou({
       </div>
     </div>
   );
-}
-
-function GoogleMark() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-      <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.91h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.4Z" />
-      <path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.37l-3.24-2.54c-.9.6-2.05.96-3.38.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22Z" />
-      <path fill="#FBBC05" d="M6.39 13.92A6 6 0 0 1 6.08 12c0-.67.11-1.32.31-1.92V7.46H3.04A10 10 0 0 0 2 12c0 1.61.38 3.14 1.04 4.54l3.35-2.62Z" />
-      <path fill="#EA4335" d="M12 5.95c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.65 9.65 0 0 0 12 2a10 10 0 0 0-8.96 5.46l3.35 2.62C7.18 7.71 9.39 5.95 12 5.95Z" />
-    </svg>
-  );
-}
-
-async function copyText(value: string): Promise<boolean> {
-  if (!value) return false;
-  if (navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(value);
-      return true;
-    } catch {
-      // Fall through for browsers that block the async Clipboard API.
-    }
-  }
-  const field = document.createElement("textarea");
-  field.value = value;
-  field.setAttribute("readonly", "");
-  field.style.position = "fixed";
-  field.style.opacity = "0";
-  document.body.appendChild(field);
-  field.select();
-  const copied = document.execCommand("copy");
-  field.remove();
-  return copied;
 }

@@ -85,33 +85,31 @@ test("customer review and tip are separate sequential steps", () => {
   assert.doesNotMatch(companyRoute, /can not thank you enough/);
 });
 
-test("post-tip handoff shows the review before opening Google", () => {
+test("post-tip handoff shows every enabled review destination without copying text", () => {
   assert.match(customerRoute, /<ReviewThankYou/);
   assert.match(companyRoute, /<ReviewThankYou/);
   assert.doesNotMatch(customerRoute, /window\.location\.assign\(positiveRedirectUrl\)/);
   assert.doesNotMatch(companyRoute, /window\.location\.assign\(result\.redirectUrl\)/);
-  assert.match(reviewThankYou, /Your review/);
-  assert.match(reviewThankYou, /Copy review/);
-  assert.match(reviewThankYou, /Review copied/);
-  assert.match(reviewThankYou, /Copy review and continue to \$\{mainLabel\}/);
-  assert.match(reviewThankYou, /Or leave a review on/);
-  assert.match(reviewThankYou, /GoogleMark/);
+  assert.match(reviewThankYou, /Help others choose with confidence/);
+  assert.match(reviewThankYou, /A few words and a photo can help future customers/);
+  assert.match(reviewThankYou, /Choose where to share/);
+  assert.doesNotMatch(reviewThankYou, /Copy review|Review copied|window\.location\.assign/);
+  assert.match(reviewThankYou, /reviewLinks\.map/);
+  assert.match(reviewThankYou, /ReviewSiteMark/);
   assert.match(reviewThankYou, /aria-label="Close"/);
-  assert.match(reviewThankYou, /include a photo if you can/);
 });
 
-test("review prompts show all six and compose editable multi-select copy", () => {
+test("review badges stay separate from the customer's written review", () => {
   assert.match(reviewSuggestions, /REVIEW_QUALITIES/);
   assert.equal((reviewSuggestions.match(/id: "/g) ?? []).length, 6);
   assert.doesNotMatch(reviewSuggestions, /rotatingReviewQualities/);
-  assert.match(reviewSuggestions, /composeReviewSentence/);
+  assert.doesNotMatch(reviewSuggestions, /composeReviewSentence|phrase:/);
   assert.match(customerRoute, /qualities=\{REVIEW_QUALITIES\}/);
   assert.match(customerRoute, /selectedQualities/);
-  assert.match(customerRoute, /composeReviewSentence/);
+  assert.match(customerRoute, /qualityBadges: selectedQualities/);
   assert.match(companyRoute, /qualities=\{REVIEW_QUALITIES\}/);
-  assert.match(companyRoute, /composeReviewSentence\("My driver", next\)/);
-  assert.match(companyRoute, /stars >= 4 && feedback\.trim\(\)/);
-  assert.match(companyRoute, /Copy for public review/);
+  assert.match(companyRoute, /qualityBadges: selectedQualities/);
+  assert.doesNotMatch(companyRoute, /composeReviewSentence|Copy for public review/);
   assert.match(customerRoute, /Choose as many as apply/);
   assert.match(companyRoute, /Choose as many as apply/);
   assert.doesNotMatch(customerRoute, /Show fewer options|Show all 6 options/);
@@ -121,20 +119,29 @@ test("review prompts show all six and compose editable multi-select copy", () =>
   assert.match(reviewQualityPicker, /VISUALS/);
 });
 
-test("public review uses only the configured redirect", () => {
+test("public review offers enabled destinations after a configurable threshold", () => {
   assert.doesNotMatch(customerRoute, /Review on Yelp|Review on Facebook|Review on Google/);
-  assert.match(customerRoute, /positiveRedirectUrl/);
-  assert.match(adminDashboard, /Google review URL/);
-  assert.match(adminDashboard, /Yelp review URL/);
-  assert.match(adminDashboard, /Facebook review URL/);
-  assert.match(adminDashboard, /Redirect positive reviews to/);
-  assert.match(adminDashboard, /button for every other review site/);
-  assert.match(adminDashboard, /Apple Maps place URL/);
-  assert.match(adminDashboard, /Bing Places URL/);
-  assert.match(adminDashboard, /US Tow Alliance profile URL/);
-  assert.match(locationFunctions, /positiveReviewDestination/);
+  assert.doesNotMatch(customerRoute, /positiveRedirectUrl/);
+  assert.match(adminDashboard, /label="Google"/);
+  assert.match(adminDashboard, /label="Yelp"/);
+  assert.match(adminDashboard, /label="Facebook"/);
+  assert.doesNotMatch(adminDashboard, /Redirect positive reviews to/);
+  assert.match(adminDashboard, /Show public review sites for/);
+  assert.match(adminDashboard, /All ratings/);
+  assert.match(adminDashboard, /Show quick feedback badges/);
+  assert.match(adminDashboard, /label="Apple Maps"/);
+  assert.match(adminDashboard, /label="Bing Places"/);
+  assert.match(adminDashboard, /label="US Tow Alliance"/);
+  assert.match(adminDashboard, /Show \$\{label\} on the thank-you page/);
+  assert.match(adminDashboard, /enabledSites/);
+  assert.doesNotMatch(locationFunctions, /positiveReviewDestination|positive_redirect_url/);
+  assert.match(locationFunctions, /positive_rating_threshold/);
+  assert.match(locationFunctions, /review_badges_enabled/);
+  assert.match(locationFunctions, /enabled_review_sites/);
   assert.match(locationFunctions, /google_review_url: data\.googleUrl/);
-  assert.match(locationFunctions, /positive_redirect_url: selectedRedirect/);
+  assert.match(publicFunctions, /positive_rating_threshold/);
+  assert.match(publicFunctions, /review_badges_enabled/);
+  assert.doesNotMatch(publicFunctions, /positive_redirect_url/);
   assert.doesNotMatch(publicFunctions, /positive_submit_action === "redirect"/);
 });
 

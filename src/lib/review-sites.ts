@@ -15,34 +15,23 @@ export type ReviewLink = { site: ReviewSiteId; label: string; url: string };
 
 export const REVIEW_SITE_IDS = REVIEW_SITES.map((s) => s.id) as [ReviewSiteId, ...ReviewSiteId[]];
 
-/** Review buttons to show a customer: every configured site except the main
- *  redirect, only when the rating meets the company's threshold. */
-export function reviewLinksFor(
-  company: Partial<Record<ReviewSiteColumn, string | null>> & { positive_rating_threshold?: number | null },
-  stars: number,
-  mainUrl: string | null | undefined,
-): ReviewLink[] {
+type ReviewSiteCompany = Partial<Record<ReviewSiteColumn, string | null>> & {
+  enabled_review_sites?: ReviewSiteId[] | null;
+  positive_rating_threshold?: number | null;
+};
+
+/** Every configured, enabled destination once the submitted rating meets the threshold. */
+export function reviewLinksFor(company: ReviewSiteCompany, stars: number): ReviewLink[] {
   if (stars < (company.positive_rating_threshold ?? 4)) return [];
+  const enabledSites = new Set(company.enabled_review_sites ?? REVIEW_SITE_IDS);
   const links: ReviewLink[] = [];
   for (const s of REVIEW_SITES) {
     const url = company[s.column]?.trim();
-    if (url && url !== mainUrl) links.push({ site: s.id, label: s.label, url });
+    if (enabledSites.has(s.id) && url) {
+      links.push({ site: s.id, label: s.label, url });
+    }
   }
   return links;
-}
-
-/** Props for the thank-you page: which site the main button opens and the extra buttons. */
-export function reviewSiteProps(
-  company: Partial<Record<ReviewSiteColumn, string | null>> & { positive_rating_threshold?: number | null },
-  stars: number,
-  mainUrl: string | null | undefined,
-) {
-  const main = mainUrl ? REVIEW_SITES.find((s) => company[s.column]?.trim() === mainUrl) : undefined;
-  return {
-    mainSite: main?.id ?? null,
-    mainSiteLabel: main?.label ?? null,
-    otherLinks: reviewLinksFor(company, stars, mainUrl),
-  };
 }
 
 export function reviewSiteLabel(site: string) {

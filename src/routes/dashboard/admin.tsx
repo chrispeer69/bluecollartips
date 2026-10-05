@@ -365,6 +365,7 @@ function AdminDashboard() {
               enabledSites: data.company.enabled_review_sites ?? [...REVIEW_SITE_IDS],
               threshold: data.company.positive_rating_threshold ?? 4,
               badgesEnabled: data.company.review_badges_enabled ?? true,
+              publicFeedEnabled: data.company.public_review_feed_enabled ?? false,
               webhookEnabled: data.company.review_webhook_enabled ?? false,
               webhookUrl: data.company.review_webhook_url ?? "",
               tipWebhookEnabled: data.company.tip_webhook_enabled ?? false,
@@ -2242,7 +2243,7 @@ function ReviewLinksPanel({
   companyId: string;
   companySlug: string;
   companyLogo?: string | null;
-  initial: { google: string; yelp: string; facebook: string; appleMaps: string; bing: string; usta: string; enabledSites: ReviewSiteId[]; threshold: number; badgesEnabled: boolean; webhookEnabled: boolean; webhookUrl: string; tipWebhookEnabled: boolean; tipWebhookUrl: string };
+  initial: { google: string; yelp: string; facebook: string; appleMaps: string; bing: string; usta: string; enabledSites: ReviewSiteId[]; threshold: number; badgesEnabled: boolean; publicFeedEnabled: boolean; webhookEnabled: boolean; webhookUrl: string; tipWebhookEnabled: boolean; tipWebhookUrl: string };
   onSaved: () => void;
 }) {
   const save = useServerFn(updateReviewLinks);
@@ -2255,6 +2256,7 @@ function ReviewLinksPanel({
   const [enabledSites, setEnabledSites] = useState<ReviewSiteId[]>(initial.enabledSites);
   const [threshold, setThreshold] = useState(initial.threshold);
   const [badgesEnabled, setBadgesEnabled] = useState(initial.badgesEnabled);
+  const [publicFeedEnabled, setPublicFeedEnabled] = useState(initial.publicFeedEnabled);
   const [webhookEnabled, setWebhookEnabled] = useState(initial.webhookEnabled);
   const [webhookUrl, setWebhookUrl] = useState(initial.webhookUrl);
   const [tipWebhookEnabled, setTipWebhookEnabled] = useState(initial.tipWebhookEnabled);
@@ -2294,6 +2296,7 @@ function ReviewLinksPanel({
               enabledReviewSites: enabledSites,
               positiveRatingThreshold: threshold,
               reviewBadgesEnabled: badgesEnabled,
+              publicReviewFeedEnabled: publicFeedEnabled,
               reviewWebhookEnabled: webhookEnabled,
               reviewWebhookUrl: webhookUrl.trim() || null,
               tipWebhookEnabled,
@@ -2337,6 +2340,21 @@ function ReviewLinksPanel({
         <p className="text-xs text-muted-foreground sm:col-span-2">
           Ratings that meet the threshold see every enabled destination with a URL. Choose All ratings to show the same page to everyone.
         </p>
+      </div>
+      <div className="sm:col-span-2 rounded-lg border border-border p-4">
+        <label className="flex items-start gap-3 text-sm font-medium">
+          <Checkbox
+            checked={publicFeedEnabled}
+            onCheckedChange={(checked) => setPublicFeedEnabled(checked === true)}
+            aria-label="Share public reviews with approved partner profiles"
+          />
+          <span>
+            Share public reviews with approved partner profiles
+            <span className="mt-1 block text-xs font-normal text-muted-foreground">
+              Allows US Tow Alliance to read this company’s public reviews after its administrator approves the company connection. Private contact, job, and payment data are never included.
+            </span>
+          </span>
+        </label>
       </div>
       <div className="sm:col-span-2 rounded-lg border border-border p-4">
         <label className="flex items-center gap-2 text-sm font-medium">

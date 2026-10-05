@@ -137,6 +137,7 @@ test("public review offers enabled destinations after a configurable threshold",
   assert.doesNotMatch(locationFunctions, /positiveReviewDestination|positive_redirect_url/);
   assert.match(locationFunctions, /positive_rating_threshold/);
   assert.match(locationFunctions, /review_badges_enabled/);
+  assert.match(locationFunctions, /public_review_feed_enabled/);
   assert.match(locationFunctions, /enabled_review_sites/);
   assert.match(locationFunctions, /google_review_url: data\.googleUrl/);
   assert.match(publicFunctions, /positive_rating_threshold/);

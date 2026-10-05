@@ -27,11 +27,6 @@ export function driverKey(slug: string): string {
   return "d" + h.toString(36);
 }
 
-/** Companies that opted in to the public feed (comma-separated slugs). */
-export function publicFeedAllowed(slug: string, env = process.env.PUBLIC_REVIEW_FEED_SLUGS ?? ""): boolean {
-  return env.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean).includes(slug.toLowerCase());
-}
-
 export type PublicReview = {
   id: string;
   stars: number;
@@ -50,6 +45,19 @@ export type PublicReview = {
   city: string | null;
   service: string | null;
 };
+
+export type PublicCompanyReview = Pick<PublicReview, "stars" | "createdAt" | "text" | "customer">;
+
+/** Minimal cross-site payload. Never includes employee, job, location, contact, or payment data. */
+export function toPublicCompanyReview(r: Row): PublicCompanyReview {
+  const review = toPublicReview(r);
+  return {
+    stars: review.stars,
+    createdAt: review.createdAt,
+    text: review.text,
+    customer: review.customer,
+  };
+}
 
 type Row = {
   id: string; stars: number; created_at: Date | string; feedback: string | null;

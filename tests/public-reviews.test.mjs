@@ -1,6 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { firstNameLastInitial, publicFeedAllowed, toPublicReview, driverKey, scrubContact } from "../src/lib/public-reviews.ts";
+import { firstNameLastInitial, toPublicCompanyReview, toPublicReview, driverKey, scrubContact } from "../src/lib/public-reviews.ts";
+import { readFile } from "node:fs/promises";
+
+const publicRoute = await readFile(new URL("../src/routes/api/public/reviews.$companySlug.ts", import.meta.url), "utf8");
+
+test("public feed validates slugs and requires the company sharing toggle", () => {
+  assert.match(publicRoute, /COMPANY_SLUG\.test\(slug\)/);
+  assert.match(publicRoute, /public_review_feed_enabled = true/);
+  assert.match(publicRoute, /WHERE slug = \$\{slug\}/);
+  assert.doesNotMatch(publicRoute, /PUBLIC_REVIEW_FEED_SLUGS/);
+});
 
 test("comments lose contact details before going public", () => {
   assert.equal(scrubContact("Call me at 614-555-0100 or pat@example.com"), "Call me at [phone removed] or [email removed]");
@@ -15,12 +25,6 @@ test("names are first name + last initial only", () => {
   assert.equal(firstNameLastInitial("Chris"), "Chris");
   assert.equal(firstNameLastInitial(""), null);
   assert.equal(firstNameLastInitial(null), null);
-});
-
-test("feed is opt-in per company", () => {
-  assert.equal(publicFeedAllowed("roadside-towing", "roadside-towing, other"), true);
-  assert.equal(publicFeedAllowed("someone-else", "roadside-towing"), false);
-  assert.equal(publicFeedAllowed("roadside-towing", ""), false);
 });
 
 test("comments and names only with public_ok; stars always", () => {
@@ -45,4 +49,16 @@ test("comments and names only with public_ok; stars always", () => {
   const gone = toPublicReview({ ...base, public_ok: true, driver_status: "deactivated" });
   assert.equal(gone.driver, null);
   assert.equal(gone.driverKey, null);
+});
+
+test("partner payload contains no employee, job, location, contact, or payment data", () => {
+  const review = toPublicCompanyReview({
+    id: "review-1", stars: 5, created_at: "2026-10-05T12:00:00Z",
+    feedback: "Call 614-555-0100", customer_name: "Pat Jones", public_ok: true,
+    driver_slug: "driver-name", driver_name: "Driver Name", driver_status: "active",
+    review_context_id: "job-context", job_city: "Columbus", job_service: "Tow",
+  });
+  assert.deepEqual(Object.keys(review).sort(), ["createdAt", "customer", "stars", "text"]);
+  assert.equal(review.customer, "Pat J.");
+  assert.equal(review.text, "Call [phone removed]");
 });

@@ -108,3 +108,26 @@ const METRIC_TEST: Record<Exclude<VipMetric, "all">, (r: VipReportRow) => boolea
 export function filterByMetric(rows: VipReportRow[], metric: VipMetric) {
   return metric === "all" ? rows : rows.filter(METRIC_TEST[metric]);
 }
+
+function csvCell(v: string | number | null | undefined) {
+  let s = v == null ? "" : String(v);
+  // Customer-typed text must not run as a spreadsheet formula (phone numbers like +1… are fine).
+  if (/^[=@\t\r]|^[+-][^\d\s]/.test(s)) s = `'${s}`;
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** The VIP follow-up report as CSV (opens cleanly in Excel / Google Sheets). */
+export function vipReportCsv(rows: VipReportRow[]) {
+  const lines = [["Date", "Name", "Email", "Phone", "Star rating", "Went to Google"].join(",")];
+  for (const r of rows) {
+    lines.push([
+      r.review_day,
+      r.customer_name,
+      r.customer_email,
+      r.customer_phone,
+      r.stars,
+      r.google_clicked_at || r.google_posted_at ? "Yes" : "No",
+    ].map(csvCell).join(","));
+  }
+  return "﻿" + lines.join("\r\n") + "\r\n";
+}

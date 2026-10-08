@@ -123,8 +123,15 @@ export async function vipReportRows(sql: Sql, args: {
   driverId?: string | null;
   /** Follow-ups due mode: customers whose next call is on or before this date (YYYY-MM-DD), any review date. */
   dueOn?: string | null;
+  /** Name / phone / email search across every review date (ignores from/to). */
+  search?: string | null;
   limit?: number;
 }): Promise<VipReportRow[]> {
+  const term = args.search?.trim() || null;
+  const like = term ? `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null;
+  const digits = term && /^[\d\s()+.-]+$/.test(term) && term.replace(/\D/g, "").length >= 3 ? `%${term.replace(/\D/g, "")}%` : null;
+  const from = term ? null : args.from ?? null;
+  const to = term ? null : args.to ?? null;
   const rows = await sql`
     SELECT r.id AS rating_id, rc.external_job_id AS job_id, rc.external_contact_id AS ghl_contact_id,
            rc.created_at AS review_requested_at, r.created_at AS reviewed_at, r.stars, r.feedback,
@@ -176,8 +183,12 @@ export async function vipReportRows(sql: Sql, args: {
     ) tip ON true
     WHERE r.company_id = ${args.companyId}
       AND (${args.driverId ?? null}::uuid IS NULL OR r.driver_id = ${args.driverId ?? null}::uuid)
-      AND (${args.dueOn ?? null}::date IS NOT NULL OR ${args.from ?? null}::timestamptz IS NULL OR r.created_at >= ${args.from ?? null}::timestamptz)
-      AND (${args.dueOn ?? null}::date IS NOT NULL OR ${args.to ?? null}::timestamptz IS NULL OR r.created_at <= ${args.to ?? null}::timestamptz)
+      AND (${args.dueOn ?? null}::date IS NOT NULL OR ${from}::timestamptz IS NULL OR r.created_at >= ${from}::timestamptz)
+      AND (${args.dueOn ?? null}::date IS NOT NULL OR ${to}::timestamptz IS NULL OR r.created_at <= ${to}::timestamptz)
+      AND (${like}::text IS NULL
+        OR COALESCE(NULLIF(BTRIM(r.customer_name), ''), rc.customer_name) ILIKE ${like}
+        OR COALESCE(NULLIF(BTRIM(r.customer_email), ''), rc.customer_email) ILIKE ${like}
+        OR (${digits}::text IS NOT NULL AND regexp_replace(COALESCE(NULLIF(BTRIM(r.customer_phone), ''), rc.customer_phone, ''), '\\D', '', 'g') LIKE ${digits}))
       AND (${args.dueOn ?? null}::date IS NULL OR f.next_followup_on <= ${args.dueOn ?? null}::date)
     ORDER BY r.created_at DESC
     LIMIT ${args.limit ?? 1000}`;

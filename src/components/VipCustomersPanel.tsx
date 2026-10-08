@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { assignVipFollowupCustomer, assignVipFollowupDay, getVipReport, logVipFollowupCall, saveVipFollowupStaff, setVipNextFollowup, updateVipFollowup } from "@/lib/vip.functions";
 import { reviewSiteLabel } from "@/lib/review-sites";
-import { filterByMetric, followupProgress, followupState, todayYmd, vipNextStep, type VipMetric, type FollowupProgress, type FollowupState, type VipReportRow, type VipStage } from "@/lib/vip";
+import { filterByMetric, followupProgress, vipReportCsv, followupState, todayYmd, vipNextStep, type VipMetric, type FollowupProgress, type FollowupState, type VipReportRow, type VipStage } from "@/lib/vip";
 import { dollars } from "@/lib/constants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -154,6 +154,12 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
   const [metric, setMetric] = useState<VipMetric>("all");
   const [progress, setProgress] = useState<FollowupProgress | "all">("all");
   const [showNames, setShowNames] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchText.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchText]);
   const assignDay = useServerFn(assignVipFollowupDay);
 
   const range = useMemo(() => vipRange(preset, custom), [preset, custom]);
@@ -169,15 +175,16 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
         to: range.to.toISOString(),
         fromDay: days[0],
         toDay: days[days.length - 1],
-        dueOn: preset === "due" ? todayYmd() : undefined,
+        dueOn: preset === "due" && !search ? todayYmd() : undefined,
         today: todayYmd(),
+        search: search || undefined,
       } }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load VIP customers.");
     } finally {
       setLoading(false);
     }
-  }, [companyId, fetchReport, range, days, preset]);
+  }, [companyId, fetchReport, range, days, preset, search]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -219,6 +226,16 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
     window.open(`/print/vip?${params.toString()}`, "_blank", "noopener");
   }
 
+  function downloadCsv() {
+    const label = search ? `search-${search.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}` : preset === "due" ? `due-${todayYmd()}` : days.length > 1 ? `${days[0]}-to-${days[days.length - 1]}` : days[0] ?? todayYmd();
+    const url = URL.createObjectURL(new Blob([vipReportCsv(rows)], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `vip-follow-up-${companySlug}-${label}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const origin = typeof window !== "undefined" ? window.location.origin : "https://bluecollartips.app";
 
   return (
@@ -239,6 +256,22 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
           Showing everyone whose follow-up call is due today or overdue, whenever they left their review.
         </p>
       )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="search"
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          placeholder="Search past customers by name, phone or email"
+          className="w-full max-w-md rounded-md border border-input bg-background px-3 py-2 text-sm"
+        />
+        {search && (
+          <span className="text-xs text-muted-foreground">
+            {loading ? "Searching all dates…" : `${report?.rows.length ?? 0} match${report?.rows.length === 1 ? "" : "es"} across all dates (date filter ignored).`}{" "}
+            <button type="button" onClick={() => { setSearchText(""); setSearch(""); }} className="underline">Clear</button>
+          </span>
+        )}
+      </div>
 
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-xs text-muted-foreground">
@@ -278,6 +311,9 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
         </label>
         <button type="button" onClick={openPrint} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
           {who === "all" ? "Print daily report" : `Print ${who === UNASSIGNED ? "unassigned" : staff.find((p) => p.id === who)?.name ?? ""} list`}
+        </button>
+        <button type="button" onClick={downloadCsv} disabled={rows.length === 0} className="rounded-md border border-border px-3 py-2 text-sm font-semibold disabled:opacity-50">
+          Download CSV ({rows.length})
         </button>
         <button type="button" onClick={() => void load()} className="rounded-md border border-border px-3 py-2 text-sm">Refresh</button>
       </div>

@@ -229,6 +229,30 @@ test("vip follow-up calls: log a call, schedule the next one, and find it when d
   });
 });
 
+test("vip search: name, email or phone across every date, scoped to the company", async () => {
+  await inRollback(async (tx) => {
+    const s = await seed(tx);
+    const old = new Date(Date.UTC(2025, 0, 5, 15));
+    const c1 = await s.context(s.company.id, s.ana.id, "TB-5001", { name: "Patricia O'Neil", phone: "(614) 555-0909", email: "pat@example.com", createdAt: old });
+    const c2 = await s.context(s.company.id, s.ana.id, "TB-5002", { name: "Sam 100%_Roe" });
+    const cz = await s.context(s.other.id, s.zed.id, "TB-5003", { name: "Patricia Other" });
+    await s.rating(s.company.id, s.ana.id, c1, 5, old);
+    await s.rating(s.company.id, s.ana.id, c2, 4, s.at(13));
+    await s.rating(s.other.id, s.zed.id, cz, 5, s.at(13));
+    // A date range that excludes the old review is ignored while searching.
+    const range = { from: new Date(Date.UTC(2026, 8, 24)).toISOString(), to: new Date(Date.UTC(2026, 8, 24, 23, 59)).toISOString() };
+    const find = async (search) => (await vipReportRows(tx, { companyId: s.company.id, ...range, search })).map((r) => r.job_id);
+    assert.deepEqual(await find("patri"), ["TB-5001"]);
+    assert.deepEqual(await find("PAT@EXAMPLE"), ["TB-5001"]);
+    assert.deepEqual(await find("614-555-09"), ["TB-5001"]);
+    assert.deepEqual(await find("100%_"), ["TB-5002"]);
+    // % and _ are literal, not wildcards.
+    assert.deepEqual(await find("Pat%Neil"), []);
+    assert.deepEqual(await find("nobody"), []);
+    assert.deepEqual(await find(""), ["TB-5002"]);
+  });
+});
+
 test("vip wiring: public routes, admin checks and dashboard entry", async () => {
   const read = (p) => readFile(new URL(`../${p}`, import.meta.url), "utf8");
   const [events, go, fns, admin, thanks] = await Promise.all([

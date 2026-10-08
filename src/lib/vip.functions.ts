@@ -31,6 +31,8 @@ export const getVipReport = createServerFn({ method: "POST" })
       dueOn: day.optional(),
       // Today in the viewer's zone, for the due-count banner.
       today: day.optional(),
+      // Customer name / phone / email, searched across every date.
+      search: z.string().trim().max(100).optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -40,7 +42,7 @@ export const getVipReport = createServerFn({ method: "POST" })
     const [company] = await sql()`
       SELECT id, name, slug, logo_url, primary_color, secondary_color FROM companies WHERE id = ${data.companyId}`;
     if (!company) throw new Error("Not found");
-    const rows = await vipReportRows(sql(), { companyId: data.companyId, from: data.from, to: data.to, driverId: data.driverId, dueOn: data.dueOn, limit: 1000 });
+    const rows = await vipReportRows(sql(), { companyId: data.companyId, from: data.from, to: data.to, driverId: data.driverId, dueOn: data.dueOn, search: data.search, limit: 1000 });
     return {
       company: {
         id: company.id as string,

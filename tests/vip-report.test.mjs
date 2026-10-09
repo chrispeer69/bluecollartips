@@ -266,7 +266,7 @@ test("vip wiring: public routes, admin checks and dashboard entry", async () => 
   assert.match(go, /PREVIEW_BOT/);
   assert.match(go, /FROM review_contexts WHERE company_id/);
   // Every admin function (all but the public Google-tap tracker) checks the caller.
-  assert.equal((fns.match(/assertCompanyAdmin\(context\.userId/g) ?? []).length, 7);
+  assert.equal((fns.match(/assertCompanyAdmin\(context\.userId/g) ?? []).length, 11);
   assert.match(admin, /page === "vip"/);
   assert.match(thanks, /onSiteClick\(link\.site\)/);
   assert.match(fns, /export const trackReviewSiteClick/);

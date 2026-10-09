@@ -5,6 +5,7 @@ import { reviewSiteLabel } from "@/lib/review-sites";
 import { filterByMetric, followupProgress, vipReportCsv, followupState, todayYmd, vipNextStep, type VipMetric, type FollowupProgress, type FollowupState, type VipReportRow, type VipStage } from "@/lib/vip";
 import { dollars } from "@/lib/constants";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { GhlSettingsCard, SendLinkCard } from "@/components/VipTextLink";
 
 export type VipRangePreset = "due" | "today" | "yesterday" | "last_7" | "last_30" | "custom";
 export type VipStageFilter = "all" | VipStage;
@@ -156,6 +157,7 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
   const [showNames, setShowNames] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [search, setSearch] = useState("");
+  const [sendingLink, setSendingLink] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchText.trim()), 300);
     return () => clearTimeout(t);
@@ -196,6 +198,7 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
   const summary = useMemo(() => summarizeVip(filterByAssignee(report?.rows ?? [], who)), [report, who]);
   const board = useMemo(() => vipScoreboard(report?.rows ?? []), [report]);
   const staff = report?.staff ?? [];
+  const drivers = report?.drivers ?? [];
   const activeStaff = staff.filter((p) => p.active);
   const perDay = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -271,7 +274,11 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
             <button type="button" onClick={() => { setSearchText(""); setSearch(""); }} className="underline">Clear</button>
           </span>
         )}
+        <button type="button" onClick={() => setSendingLink((v) => !v)} className="ml-auto rounded-md border border-primary px-3 py-2 text-sm font-semibold text-primary">
+          Text a tip &amp; review link
+        </button>
       </div>
+      {sendingLink && <SendLinkCard companyId={companyId} drivers={drivers} onClose={() => setSendingLink(false)} onSent={load} />}
 
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-xs text-muted-foreground">
@@ -456,7 +463,7 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
         </div>
       ) : (
         <ul className="space-y-3">
-          {rows.map((row) => <VipRow key={row.rating_id} row={row} companyId={companyId} staff={staff} calls={report?.calls?.[row.job_id] ?? []} onSaved={load} />)}
+          {rows.map((row) => <VipRow key={row.rating_id} row={row} companyId={companyId} staff={staff} drivers={drivers} calls={report?.calls?.[row.job_id] ?? []} onSaved={load} />)}
         </ul>
       )}
       {report?.truncated && <p className="text-xs text-muted-foreground">Showing the most recent 1,000. Narrow the dates to see everything.</p>}
@@ -484,6 +491,7 @@ export function VipCustomersPanel({ companyId, companySlug }: { companyId: strin
               <code> "event": "convini_registered"</code>, plus the customer’s <code>phone</code>, <code>email</code>, <code>ghlContactId</code> or <code>jobId</code>.
               Until that's connected, mark registrations by hand below.
             </div>
+            <GhlSettingsCard companyId={companyId} />
           </div>
         )}
       </div>
@@ -544,7 +552,8 @@ const FOLLOWUP_TONE: Record<Exclude<FollowupState, null>, string> = {
   scheduled: "border-border bg-muted/40 text-foreground",
 };
 
-function VipRow({ row, companyId, staff, calls, onSaved }: { row: VipReportRow; companyId: string; staff: StaffList; calls: CallList; onSaved: () => Promise<void> }) {
+function VipRow({ row, companyId, staff, drivers, calls, onSaved }: { row: VipReportRow; companyId: string; staff: StaffList; drivers: Report["drivers"]; calls: CallList; onSaved: () => Promise<void> }) {
+  const [sendingLink, setSendingLink] = useState(false);
   const save = useServerFn(updateVipFollowup);
   const setNext = useServerFn(setVipNextFollowup);
   const [logging, setLogging] = useState(false);
@@ -729,6 +738,9 @@ function VipRow({ row, companyId, staff, calls, onSaved }: { row: VipReportRow; 
             Mark Google review posted
           </button>
         )}
+        <button type="button" onClick={() => setSendingLink((v) => !v)} className="rounded-md border border-primary px-3 py-1.5 text-xs font-semibold text-primary">
+          {sendingLink ? "Cancel new link" : "Text new link"}
+        </button>
         <button type="button" onClick={() => setLogging((v) => !v)} className="rounded-md border border-primary px-3 py-1.5 text-xs font-semibold text-primary">
           {logging ? "Cancel call log" : "Log call / follow up next"}
         </button>
@@ -736,6 +748,13 @@ function VipRow({ row, companyId, staff, calls, onSaved }: { row: VipReportRow; 
           {editing ? "Cancel" : "Edit details / notes"}
         </button>
       </div>
+
+      {row.link_resent_at && (
+        <div className="mt-2 text-xs text-muted-foreground">
+          New link texted {fmtWhen(row.link_resent_at)}{(row.link_resent_count ?? 0) > 1 ? ` (${row.link_resent_count}×)` : ""}
+        </div>
+      )}
+      {sendingLink && <SendLinkCard companyId={companyId} ratingId={row.rating_id} drivers={drivers} onClose={() => setSendingLink(false)} onSent={onSaved} />}
 
       {logging && (
         <LogCallForm

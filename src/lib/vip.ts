@@ -50,6 +50,9 @@ export type VipReportRow = {
   /** Scheduled next follow-up call (YYYY-MM-DD), if any. */
   next_followup_on: string | null;
   call_count: number;
+  /** Staff last texted a new tip & review link (VIP report). */
+  link_resent_at?: string | null;
+  link_resent_count?: number;
 };
 
 export type VipStage = "registered" | "clicked" | "link_sent" | "no_link";

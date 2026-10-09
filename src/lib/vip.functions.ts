@@ -56,6 +56,9 @@ export const getVipReport = createServerFn({ method: "POST" })
       rows,
       truncated: rows.length >= 1000,
       staff: await listVipStaff(sql(), data.companyId),
+      drivers: (await sql()`
+        SELECT id, display_name FROM drivers WHERE company_id = ${data.companyId} AND status = 'active' ORDER BY lower(display_name)`)
+        .map((d: any) => ({ id: d.id as string, name: d.display_name as string })),
       calls: await vipCallHistory(sql(), data.companyId, [...new Set(rows.map((r) => r.job_id))]),
       dueCount: data.today ? await vipDueCount(sql(), data.companyId, data.today) : 0,
       dayAssignments: data.fromDay && data.toDay ? await vipDayAssignments(sql(), data.companyId, data.fromDay, data.toDay) : {},
@@ -244,4 +247,107 @@ export const trackReviewSiteClick = createServerFn({ method: "POST" })
       await recordVipEvent(db, { companyId: rating.company_id, jobId: rating.external_job_id, event: "google_clicked" });
     }
     return { ok: true };
+  });
+
+async function loadGhlCreds(companyId: string) {
+  const { sql } = await import("@/db/client.server");
+  const [row] = await sql()`SELECT location_id, api_key_encrypted, api_key_last4 FROM company_ghl_settings WHERE company_id = ${companyId}`;
+  if (!row) return null;
+  const { decryptSecret } = await import("@/lib/secret-box.server");
+  return { locationId: row.location_id as string, apiKey: decryptSecret(row.api_key_encrypted), last4: row.api_key_last4 as string };
+}
+
+/** Is texting through GoHighLevel set up for this company? Never returns the key. */
+export const getGhlSettings = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertCompanyAdmin(context.userId, data.companyId);
+    const { sql } = await import("@/db/client.server");
+    const [row] = await sql()`SELECT location_id, api_key_last4, updated_at FROM company_ghl_settings WHERE company_id = ${data.companyId}`;
+    return row
+      ? { connected: true, locationId: row.location_id as string, last4: row.api_key_last4 as string, updatedAt: new Date(row.updated_at).toISOString() }
+      : { connected: false, locationId: null, last4: null, updatedAt: null };
+  });
+
+/** Save the company's GHL Location ID + Private Integration token, after checking them with GHL. */
+export const saveGhlSettings = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({
+    companyId: z.string().uuid(),
+    locationId: z.string().trim().min(1).max(100),
+    apiKey: z.string().trim().min(20).max(500),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertCompanyAdmin(context.userId, data.companyId);
+    const { ghlCheck } = await import("@/lib/ghl-api.server");
+    await ghlCheck({ locationId: data.locationId, apiKey: data.apiKey });
+    const { encryptSecret } = await import("@/lib/secret-box.server");
+    const { sql } = await import("@/db/client.server");
+    await sql()`
+      INSERT INTO company_ghl_settings (company_id, location_id, api_key_encrypted, api_key_last4, updated_by)
+      VALUES (${data.companyId}, ${data.locationId}, ${encryptSecret(data.apiKey)}, ${data.apiKey.slice(-4)}, ${context.userId})
+      ON CONFLICT (company_id) DO UPDATE SET
+        location_id = EXCLUDED.location_id, api_key_encrypted = EXCLUDED.api_key_encrypted,
+        api_key_last4 = EXCLUDED.api_key_last4, updated_by = EXCLUDED.updated_by, updated_at = now()`;
+    return { ok: true };
+  });
+
+export const removeGhlSettings = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({ companyId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertCompanyAdmin(context.userId, data.companyId);
+    const { sql } = await import("@/db/client.server");
+    await sql()`DELETE FROM company_ghl_settings WHERE company_id = ${data.companyId}`;
+    return { ok: true };
+  });
+
+/**
+ * Fresh tip & review link for a customer. `send: false` previews which job it
+ * will use and the text; `send: true` issues the link (the old one stops
+ * working) and texts it through GHL, or returns it to copy if GHL isn't set up.
+ */
+export const textTipReviewLink = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d) => z.object({
+    companyId: z.string().uuid(),
+    ratingId: z.string().uuid().optional(),
+    phone: z.string().trim().max(40).optional(),
+    name: z.string().trim().max(120).optional(),
+    driverId: z.string().uuid().optional(),
+    send: z.boolean(),
+    message: z.string().trim().max(600).optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertCompanyAdmin(context.userId, data.companyId);
+    const { sql } = await import("@/db/client.server");
+    const { planTipReviewLink, tipLinkMessage, issueTipReviewLink, recordTipLinkSent } = await import("@/lib/tip-link.server");
+    const plan = await planTipReviewLink(sql(), data.companyId, { ratingId: data.ratingId, phone: data.phone, name: data.name, driverId: data.driverId });
+    const creds = await loadGhlCreds(data.companyId);
+    const preview = {
+      jobId: plan.jobId, isNew: !plan.contextId, kind: plan.kind,
+      customerName: plan.customerName, customerPhone: plan.customerPhone,
+      driverName: plan.driverName, reviewedAt: plan.reviewedAt, stars: plan.stars, linkExpiresAt: plan.linkExpiresAt,
+      ghlConnected: Boolean(creds),
+    };
+    if (!data.send) return { ...preview, message: tipLinkMessage(plan), sent: false, url: null as string | null, error: null as string | null };
+
+    if (creds && !plan.ghlContactId && !plan.customerPhone) throw new Error("No phone number on file for this customer.");
+    const template = data.message?.includes("{link}") ? data.message : `${data.message || tipLinkMessage(plan).replace(" {link}", "")} {link}`;
+    const configured = process.env.APP_PUBLIC_URL?.trim();
+    const origin = configured?.startsWith("https://") ? configured : "https://bluecollartips.app";
+    const { url, jobId } = await issueTipReviewLink(sql(), data.companyId, plan, { origin });
+    const text = template.replace("{link}", url);
+    if (!creds) return { ...preview, jobId, message: text, sent: false, url, error: null };
+    try {
+      const { ghlUpsertContact, ghlSendSms } = await import("@/lib/ghl-api.server");
+      const contactId = plan.ghlContactId ?? await ghlUpsertContact(creds, { name: plan.customerName, phone: plan.customerPhone! });
+      await ghlSendSms(creds, contactId, text);
+      await recordTipLinkSent(sql(), data.companyId, jobId, { userId: context.userId, ghlContactId: contactId });
+      return { ...preview, jobId, message: text, sent: true, url, error: null };
+    } catch (e) {
+      // The new link exists either way; hand it back so staff can text it themselves.
+      return { ...preview, jobId, message: text, sent: false, url, error: e instanceof Error ? e.message : "The text could not be sent." };
+    }
   });

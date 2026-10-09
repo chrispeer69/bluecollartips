@@ -144,6 +144,7 @@ export async function vipReportRows(sql: Sql, args: {
            f.convini_link_sent_at, f.convini_link_last_sent_at, COALESCE(f.convini_link_sent_count, 0) AS convini_link_sent_count,
            f.convini_clicked_at, f.convini_last_clicked_at, COALESCE(f.convini_click_count, 0) AS convini_click_count,
            f.convini_registered_at, f.convini_registered_source, f.contacted_at, f.notes,
+           f.link_resent_at, COALESCE(f.link_resent_count, 0) AS link_resent_count,
            to_char((r.created_at AT TIME ZONE ${VIP_TIME_ZONE})::date, 'YYYY-MM-DD') AS review_day,
            st.id AS assignee_id, st.name AS assignee_name,
            to_char(f.next_followup_on, 'YYYY-MM-DD') AS next_followup_on,
@@ -206,6 +207,7 @@ export async function vipReportRows(sql: Sql, args: {
     convini_last_clicked_at: iso(r.convini_last_clicked_at),
     convini_registered_at: iso(r.convini_registered_at),
     contacted_at: iso(r.contacted_at),
+    link_resent_at: iso(r.link_resent_at),
   })) as VipReportRow[];
 }
 

@@ -1,6 +1,12 @@
 User-agent: *
 Allow: /
+# Signed-in app, invites, printouts and machine endpoints: nothing for search here.
 Disallow: /dashboard
 Disallow: /join/
+Disallow: /print/
+Disallow: /api/
+Disallow: /go/
+Disallow: /email/
+# Don't block /_serverFn/: Google's renderer needs it to load page data.
 
 Sitemap: https://bluecollartips.app/sitemap.xml

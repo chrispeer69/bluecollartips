@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { ORGANIZATION, SITE_NAME, SITE_URL } from "@/lib/seo";
 import type { MouseEvent, ReactNode } from "react";
 import {
   ArrowRight,
@@ -28,7 +29,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "One QR code at the end of every job. Customers rate, review, and tip your field crew in seconds — five-star customers go to Google, everything else comes to you first.",
+          "One QR code at the end of every job. Customers rate, review and tip your crew in seconds; 5-star customers go to Google, the rest come to you first.",
       },
       {
         property: "og:title",
@@ -42,6 +43,35 @@ export const Route = createFileRoute("/")({
       { property: "og:url", content: "https://bluecollartips.app/" },
     ],
     links: [{ rel: "canonical", href: "https://bluecollartips.app/" }],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@graph": [
+            ORGANIZATION,
+            {
+              "@type": "WebSite",
+              "@id": `${SITE_URL}/#website`,
+              url: `${SITE_URL}/`,
+              name: SITE_NAME,
+              publisher: { "@id": `${SITE_URL}/#organization` },
+              inLanguage: "en-US",
+            },
+            {
+              "@type": "SoftwareApplication",
+              name: SITE_NAME,
+              url: `${SITE_URL}/`,
+              applicationCategory: "BusinessApplication",
+              operatingSystem: "Web browser",
+              description:
+                "Ratings, reviews and tips for field service companies. Customers scan one QR code to rate the job, leave a review and tip the employee who did the work.",
+              publisher: { "@id": `${SITE_URL}/#organization` },
+            },
+          ],
+        }),
+      },
+    ],
   }),
   component: Index,
 });
@@ -168,7 +198,7 @@ function Hero() {
             Ratings · Reviews · Tips — one QR code
           </span>
           <h1 className="display mt-6 text-[2.6rem] font-bold leading-[1.05] tracking-tight sm:text-6xl lg:text-[4.1rem]">
-            Every finished job
+            Every finished job{" "}
             <br />
             becomes a{" "}
             <span className="relative whitespace-nowrap text-secondary">

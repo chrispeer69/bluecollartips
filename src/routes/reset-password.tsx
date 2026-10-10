@@ -15,7 +15,8 @@ export const Route = createFileRoute("/reset-password")({
       { property: "og:title", content: "Set a new password — Blue Collar Tips" },
       { property: "og:description", content: "Choose a new password for your Blue Collar Tips account." },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
+      // Account utility page: keep it out of search results.
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: ResetPasswordPage,

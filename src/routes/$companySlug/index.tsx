@@ -1,7 +1,8 @@
-import { createFileRoute, useParams } from "@tanstack/react-router";
+import { createFileRoute, notFound, useParams } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { getPublicCompany, submitCompanyRating } from "@/lib/public.functions";
+import { getPublicCompany, getPublicPageInfo, submitCompanyRating } from "@/lib/public.functions";
+import { SITE_URL, pageImage } from "@/lib/seo";
 import { trackReviewSiteClick } from "@/lib/vip.functions";
 import { reviewLinksFor } from "@/lib/review-sites";
 import { StripeCardPanel } from "@/components/StripeCardPanel";
@@ -17,6 +18,34 @@ import { REVIEW_QUALITIES } from "@/lib/review-suggestions";
 
 export const Route = createFileRoute("/$companySlug/")({
   validateSearch: (search: Record<string, unknown>) => ({ t: typeof search.t === "string" ? search.t : undefined }),
+  loader: async ({ params }) => {
+    const info = await getPublicPageInfo({ data: { companySlug: params.companySlug } });
+    // Unknown company (or any mistyped URL): a real 404 instead of an empty page.
+    if (!info) throw notFound();
+    return info;
+  },
+  head: ({ params, loaderData }) => {
+    const url = `${SITE_URL}/${params.companySlug}`;
+    const title = loaderData ? `Rate your service — ${loaderData.companyName}` : "Rate your service — Blue Collar Tips";
+    const description = loaderData
+      ? `Thanks for choosing ${loaderData.companyName}! Rate your service, leave feedback, and tip the crew securely through Stripe.`
+      : "Rate your service, leave feedback, and tip the crew securely through Stripe.";
+    const image = pageImage(loaderData?.logoUrl);
+    return {
+      meta: [
+        { title },
+        { name: "description", content: description },
+        { property: "og:title", content: title },
+        { property: "og:description", content: description },
+        { property: "og:url", content: url },
+        { property: "og:image", content: image },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: description },
+        { name: "twitter:image", content: image },
+      ],
+      links: [{ rel: "canonical", href: url }],
+    };
+  },
   component: CompanyReviewPage,
 });
 
@@ -31,6 +60,7 @@ function firstName(fullName: string): string {
 function CompanyReviewPage() {
   const { companySlug } = useParams({ from: "/$companySlug/" });
   const { t: reviewToken } = Route.useSearch();
+  const pageInfo = Route.useLoaderData();
   const getCompany = useServerFn(getPublicCompany);
   const submit = useServerFn(submitCompanyRating);
   const trackSite = useServerFn(trackReviewSiteClick);
@@ -87,7 +117,17 @@ function CompanyReviewPage() {
       : [...current, id]);
   }
 
-  if (loading) return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading…</div>;
+  if (loading) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-6 text-center">
+        <div>
+          <h1 className="text-2xl font-semibold">Rate your service with {pageInfo.companyName}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Leave a rating, feedback and a tip for the crew</p>
+          <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
+        </div>
+      </div>
+    );
+  }
   if (loadFailed) {
     return (
       <div className="grid min-h-screen place-items-center bg-background px-6 text-center">

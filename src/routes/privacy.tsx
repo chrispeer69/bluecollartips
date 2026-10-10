@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { GuideFooter } from "@/components/GuideChrome";
 
 export const Route = createFileRoute("/privacy")({
   head: () => ({
@@ -13,7 +14,6 @@ export const Route = createFileRoute("/privacy")({
       { property: "og:description", content: "How we handle customer, employee, and company data." },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://bluecollartips.app/privacy" },
-      { name: "twitter:card", content: "summary" },
     ],
     links: [{ rel: "canonical", href: "https://bluecollartips.app/privacy" }],
   }),
@@ -123,6 +123,7 @@ function PrivacyPage() {
           </section>
         </div>
       </div>
+      <GuideFooter />
     </div>
   );
 }

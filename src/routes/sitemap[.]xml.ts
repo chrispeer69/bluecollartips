@@ -14,12 +14,32 @@ export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
       GET: async () => {
+        // lastmod = when the page's content last really changed (update with the page).
         const entries: SitemapEntry[] = [
-          { path: "/", changefreq: "weekly", priority: "1.0" },
-          { path: "/auth", changefreq: "monthly", priority: "0.5" },
-          { path: "/guides/tip-pooling", changefreq: "monthly", priority: "0.8" },
-          { path: "/guides/fica-tip-credit", changefreq: "monthly", priority: "0.8" },
+          { path: "/", lastmod: "2026-10-10", changefreq: "weekly", priority: "1.0" },
+          { path: "/guides/tip-pooling", lastmod: "2026-10-10", changefreq: "monthly", priority: "0.8" },
+          { path: "/guides/fica-tip-credit", lastmod: "2026-10-10", changefreq: "monthly", priority: "0.8" },
+          { path: "/auth", lastmod: "2026-10-01", changefreq: "yearly", priority: "0.3" },
+          { path: "/privacy", lastmod: "2026-10-10", changefreq: "yearly", priority: "0.3" },
+          { path: "/terms", lastmod: "2026-10-10", changefreq: "yearly", priority: "0.3" },
         ];
+
+        // Public company rating pages: /:companySlug
+        try {
+          const { db } = await import("@/db/client.server");
+          const { data: companies } = await db.from("companies").select("slug, created_at").eq("status", "active");
+          for (const c of companies ?? []) {
+            if (!c.slug) continue;
+            entries.push({
+              path: `/${c.slug}`,
+              lastmod: c.created_at ? new Date(c.created_at).toISOString().slice(0, 10) : undefined,
+              changefreq: "monthly",
+              priority: "0.5",
+            });
+          }
+        } catch {
+          // Fall through with what we have.
+        }
 
         // Dynamic public driver pages: /:companySlug/d/:driverSlug
         // Private routes (/dashboard/*, /join/:code) are intentionally excluded —
@@ -69,7 +89,7 @@ export const Route = createFileRoute("/sitemap.xml")({
 
         return new Response(xml, {
           headers: {
-            "Content-Type": "application/xml",
+            "Content-Type": "application/xml; charset=utf-8",
             "Cache-Control": "public, max-age=3600",
           },
         });

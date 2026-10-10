@@ -102,6 +102,35 @@ async function resolveReviewContext(
   return context;
 }
 
+/**
+ * Public names for page titles, link previews and the 404 check. Nothing
+ * about review links: safe to run during server rendering for every visitor.
+ */
+export const getPublicPageInfo = createServerFn({ method: "GET" })
+  .inputValidator((data) => z.object({
+    companySlug: z.string().min(1).max(120),
+    driverSlug: z.string().min(1).max(120).optional(),
+  }).parse(data))
+  .handler(async ({ data }) => {
+    const { db } = await import("@/db/client.server");
+    const { data: company } = await db.from("companies").select("id, name, logo_url, status").eq("slug", data.companySlug).maybeSingle();
+    if (!company) return null;
+    if (!data.driverSlug) {
+      // Same rule as getPublicCompany: only active companies have a public page.
+      if (company.status !== "active") return null;
+      return { companyName: company.name as string, logoUrl: (company.logo_url ?? null) as string | null, driverName: null, photoUrl: null };
+    }
+    const { data: driver } = await db.from("drivers").select("display_name, photo_url")
+      .eq("company_id", company.id).eq("slug", data.driverSlug).eq("status", "active").maybeSingle();
+    if (!driver) return null;
+    return {
+      companyName: company.name as string,
+      logoUrl: (company.logo_url ?? null) as string | null,
+      driverName: driver.display_name as string,
+      photoUrl: (driver.photo_url ?? null) as string | null,
+    };
+  });
+
 export const getPublicCompany = createServerFn({ method: "GET" })
   .inputValidator((data) => z.object({ companySlug: z.string().min(1), reviewToken: z.string().trim().min(20).max(200).optional().nullable() }).parse(data))
   .handler(async ({ data }) => {

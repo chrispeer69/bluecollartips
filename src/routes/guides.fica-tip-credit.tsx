@@ -1,4 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { GuideBreadcrumb, GuideFooter } from "@/components/GuideChrome";
+import { guideJsonLd } from "@/lib/seo";
 
 export const Route = createFileRoute("/guides/fica-tip-credit")({
   head: () => ({
@@ -24,15 +26,12 @@ export const Route = createFileRoute("/guides/fica-tip-credit")({
     scripts: [
       {
         type: "application/ld+json",
-        children: JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "Article",
+        children: guideJsonLd({
+          path: "/guides/fica-tip-credit",
           headline: "FICA Tip Credit (Section 45B): Employer's Guide",
-          description:
-            "How service business owners claim the Section 45B FICA tip credit on Form 8846.",
-          author: { "@type": "Organization", name: "Blue Collar Tips" },
-          publisher: { "@type": "Organization", name: "Blue Collar Tips" },
-          mainEntityOfPage: "https://bluecollartips.app/guides/fica-tip-credit",
+          description: "How service business owners claim the Section 45B FICA tip credit on Form 8846.",
+          published: "2026-06-30",
+          modified: "2026-09-01",
         }),
       },
     ],
@@ -61,7 +60,8 @@ function FicaTipCreditGuide() {
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-16">
-        <span className="inline-block rounded-full bg-secondary/15 px-3 py-1 text-xs font-medium text-secondary">
+        <GuideBreadcrumb title="FICA tip credit" updated="2026-09-01" />
+        <span className="mt-6 inline-block rounded-full bg-secondary/15 px-3 py-1 text-xs font-medium text-secondary">
           Guide
         </span>
         <h1 className="display mt-6 text-4xl font-bold leading-tight md:text-5xl">
@@ -222,9 +222,7 @@ function FicaTipCreditGuide() {
         </section>
       </main>
 
-      <footer className="border-t border-border py-8 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} Blue Collar Tips
-      </footer>
+      <GuideFooter />
     </div>
   );
 }

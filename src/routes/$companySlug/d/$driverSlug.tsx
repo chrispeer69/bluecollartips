@@ -1,7 +1,8 @@
-import { createFileRoute, useParams } from "@tanstack/react-router";
+import { createFileRoute, notFound, useParams } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { getPublicDriver, submitRating } from "@/lib/public.functions";
+import { getPublicDriver, getPublicPageInfo, submitRating } from "@/lib/public.functions";
+import { SITE_URL, pageImage } from "@/lib/seo";
 import { trackReviewSiteClick } from "@/lib/vip.functions";
 import { reviewLinksFor } from "@/lib/review-sites";
 import {
@@ -22,23 +23,41 @@ export const Route = createFileRoute("/$companySlug/d/$driverSlug")({
     tip: search.tip === "1" ? "1" as const : undefined,
     r: typeof search.r === "string" ? search.r : undefined,
   }),
-  head: ({ params }) => ({
-    meta: [
-      { title: "Rate your service — Blue Collar Tips" },
-      { name: "description", content: "Rate your service, leave feedback, and tip your service pro securely through Stripe — powered by Blue Collar Tips." },
-      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { property: "og:title", content: "Rate your service — Blue Collar Tips" },
-      { property: "og:description", content: "Rate your service, leave feedback, and tip securely through Stripe." },
-      { property: "og:url", content: `https://bluecollartips.app/${params.companySlug}/d/${params.driverSlug}` },
-    ],
-    links: [{ rel: "canonical", href: `https://bluecollartips.app/${params.companySlug}/d/${params.driverSlug}` }],
-  }),
+  loader: async ({ params }) => {
+    const info = await getPublicPageInfo({ data: { companySlug: params.companySlug, driverSlug: params.driverSlug } });
+    // Unknown company or driver: a real 404 instead of an empty page.
+    if (!info) throw notFound();
+    return info;
+  },
+  head: ({ params, loaderData }) => {
+    const url = `${SITE_URL}/${params.companySlug}/d/${params.driverSlug}`;
+    const title = loaderData ? `Rate & tip ${loaderData.driverName} — ${loaderData.companyName}` : "Rate your service — Blue Collar Tips";
+    const description = loaderData
+      ? `Thanks for choosing ${loaderData.companyName}! Rate your service with ${loaderData.driverName}, leave feedback, and send a tip securely through Stripe.`
+      : "Rate your service, leave feedback, and tip your service pro securely through Stripe.";
+    const image = pageImage(loaderData?.photoUrl ?? loaderData?.logoUrl);
+    return {
+      meta: [
+        { title },
+        { name: "description", content: description },
+        { property: "og:title", content: title },
+        { property: "og:description", content: description },
+        { property: "og:url", content: url },
+        { property: "og:image", content: image },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: description },
+        { name: "twitter:image", content: image },
+      ],
+      links: [{ rel: "canonical", href: url }],
+    };
+  },
   component: TipPage,
 });
 
 function TipPage() {
   const { companySlug, driverSlug } = useParams({ from: "/$companySlug/d/$driverSlug" });
   const { t: reviewToken, tip: tipMode, r: submittedRatingId } = Route.useSearch();
+  const pageInfo = Route.useLoaderData();
   const getDriver = useServerFn(getPublicDriver);
   const submit = useServerFn(submitRating);
   const trackSite = useServerFn(trackReviewSiteClick);
@@ -121,7 +140,15 @@ function TipPage() {
   }
 
   if (loading) {
-    return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading…</div>;
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-6 text-center">
+        <div>
+          <h1 className="text-2xl font-semibold">Rate your service with {pageInfo.driverName}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{pageInfo.companyName} · leave a rating, feedback and a tip</p>
+          <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
+        </div>
+      </div>
+    );
   }
   if (loadFailed) {
     return (
@@ -262,7 +289,7 @@ function TipPage() {
         <div className="mx-auto mt-5 max-w-sm">
           <p className="text-base font-semibold">Your feedback matters to us</p>
           <p className="mt-1 text-sm leading-snug opacity-90">
-            {knownName ? `${firstName(customerName)}, your` : "Your"} review helps {company.name}
+            {knownName ? `${firstName(customerName)}, your` : "Your"} review helps {company.name}{" "}
             improve the experience for every customer.
           </p>
         </div>

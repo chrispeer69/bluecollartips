@@ -10,6 +10,10 @@ import {
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+import { DEFAULT_OG_IMAGE, SITE_NAME } from "@/lib/seo";
+
+// Fallback for any page that doesn't set its own description.
+const DEFAULT_DESCRIPTION = "Ratings, reviews and tips for field service crews: one QR code at the end of every job turns happy customers into 5-star reviews and tips.";
 
 function NotFoundComponent() {
   return (
@@ -84,13 +88,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "apple-mobile-web-app-title", content: "Blue Collar Tips" },
       { name: "author", content: "Blue Collar Tips" },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { title: "Blue Collar Tips" },
-      { property: "og:title", content: "Blue Collar Tips" },
-      { name: "twitter:title", content: "Blue Collar Tips" },
-      { name: "description", content: "An Automated fast and quick on line tip tool for blue collar workers." },
-      { property: "og:description", content: "An Automated fast and quick on line tip tool for blue collar workers." },
-      { name: "twitter:description", content: "An Automated fast and quick on line tip tool for blue collar workers." },
+      { property: "og:site_name", content: SITE_NAME },
+      { property: "og:locale", content: "en_US" },
+      { property: "og:image", content: DEFAULT_OG_IMAGE },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { property: "og:image:alt", content: "Blue Collar Tips: every finished job becomes a 5-star review" },
+      // X/Twitter reads og:title / og:description, so each page's own text is used.
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: DEFAULT_OG_IMAGE },
+      { title: SITE_NAME },
+      { property: "og:title", content: SITE_NAME },
+      { name: "description", content: DEFAULT_DESCRIPTION },
+      { property: "og:description", content: DEFAULT_DESCRIPTION },
     ],
     links: [
       {
@@ -99,6 +109,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+      { rel: "icon", href: "/favicon.ico", sizes: "any" },
       { rel: "icon", href: "/icon-192.png", type: "image/png", sizes: "192x192" },
     ],
   }),

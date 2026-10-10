@@ -1,4 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { GuideBreadcrumb, GuideFooter } from "@/components/GuideChrome";
+import { guideJsonLd } from "@/lib/seo";
 
 export const Route = createFileRoute("/guides/tip-pooling")({
   head: () => ({
@@ -24,15 +26,12 @@ export const Route = createFileRoute("/guides/tip-pooling")({
     scripts: [
       {
         type: "application/ld+json",
-        children: JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "Article",
+        children: guideJsonLd({
+          path: "/guides/tip-pooling",
           headline: "Tip Pooling for Field Service Teams",
-          description:
-            "How automated tip pooling and flexible employee/company splits work for towing and field service companies.",
-          author: { "@type": "Organization", name: "Blue Collar Tips" },
-          publisher: { "@type": "Organization", name: "Blue Collar Tips" },
-          mainEntityOfPage: "https://bluecollartips.app/guides/tip-pooling",
+          description: "How automated tip pooling and flexible employee/company splits work for towing and field service companies.",
+          published: "2026-06-30",
+          modified: "2026-10-01",
         }),
       },
     ],
@@ -61,7 +60,8 @@ function TipPoolingGuide() {
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-16">
-        <span className="inline-block rounded-full bg-secondary/15 px-3 py-1 text-xs font-medium text-secondary">
+        <GuideBreadcrumb title="Tip pooling" updated="2026-10-01" />
+        <span className="mt-6 inline-block rounded-full bg-secondary/15 px-3 py-1 text-xs font-medium text-secondary">
           Guide
         </span>
         <h1 className="display mt-6 text-4xl font-bold leading-tight md:text-5xl">
@@ -183,18 +183,16 @@ function TipPoolingGuide() {
               Get started
             </Link>
             <Link
-              to="/"
+              to="/guides/fica-tip-credit"
               className="rounded-md border border-border bg-background px-6 py-3 font-medium hover:bg-muted"
             >
-              Back to home
+              Read: FICA tip credit guide
             </Link>
           </div>
         </section>
       </main>
 
-      <footer className="border-t border-border py-8 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} Blue Collar Tips
-      </footer>
+      <GuideFooter />
     </div>
   );
 }

@@ -1,10 +1,17 @@
 # Blue Collar Tips
 
-> Recognition and tipping platform for any field service employee — the feedback loop that turns good work into more tips.
+> Ratings, reviews and tips for field service companies. One QR code or text link at the end of every job lets a customer rate the work, leave a review and tip the employee who did it.
 
-Blue Collar Tips helps field service employees (towing, HVAC, plumbing, landscaping, cleaning, delivery, install/repair, and more) get recognized more often for doing good work. Company-supported and technology-leveraged: a branded page delivered by QR code or text link captures a rating, feedback, and a tip in one tap. The feedback gets you the tip — more often, and with higher payouts.
+Blue Collar Tips helps field service employees (towing, HVAC, plumbing, landscaping, cleaning, delivery, install/repair, and more) get recognized more often for doing good work. A company-branded page, delivered by QR code or text link, captures a rating, feedback and a tip in one tap. Happy customers are sent on to Google and other review sites; anything less than great comes to the company first. Tips are paid securely through Stripe. Blue Collar Tips is operated by Blue Collar AI, Inc.
 
 ## Pages
 
-- [Home](/): What Blue Collar Tips does and who it's for.
-- [Sign in or sign up](/auth): Create an account or redeem a company invite.
+- [Home](https://bluecollartips.app/): What Blue Collar Tips does, how it works and who it's for.
+- [Tip pooling for field service teams](https://bluecollartips.app/guides/tip-pooling): How automated tip pooling and employee/company splits work, with legal guardrails.
+- [FICA tip credit (Section 45B) guide](https://bluecollartips.app/guides/fica-tip-credit): How employers claim the FICA tip credit on Form 8846, and the records they need.
+- [Sign in or sign up](https://bluecollartips.app/auth): Create a company account or redeem an employee invite.
+
+## Policies
+
+- [Privacy Policy](https://bluecollartips.app/privacy)
+- [Terms of Service](https://bluecollartips.app/terms)

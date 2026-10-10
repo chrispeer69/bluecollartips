@@ -11,6 +11,19 @@ export function firstNameLastInitial(name: string | null | undefined): string | 
   return last ? `${first} ${last.charAt(0).toUpperCase()}.` : first;
 }
 
+/**
+ * "Tim Wilson" -> "Tim"; "  TIM  " -> "Tim"; "mary ann smith" -> "Mary".
+ * First name only — never a last name or last initial. Used for employees on
+ * the private (server-to-server) company feed.
+ */
+export function firstNameOnly(name: string | null | undefined): string | null {
+  const word = (name ?? "").trim().split(/\s+/)[0] ?? "";
+  const letters = word.replace(/[^\p{L}'-]/gu, "");
+  if (!letters || !/\p{L}/u.test(letters)) return null;
+  const sane = letters === letters.toUpperCase() && letters.length > 2 ? letters.toLowerCase() : letters;
+  return sane.charAt(0).toUpperCase() + sane.slice(1);
+}
+
 /** Removes contact details from a public comment: emails, phone numbers and web links. */
 export function scrubContact(text: string): string {
   return text
@@ -58,6 +71,20 @@ export function toPublicCompanyReview(r: Row): PublicCompanyReview {
     customer: review.customer,
   };
 }
+
+export type PrivateCompanyReview = PublicReview;
+
+/**
+ * Private company feed (the company's own website, server-to-server with a
+ * bearer token): the full public review shape, but the employee is shown by
+ * FIRST NAME ONLY. Same public_ok rule for text and customer.
+ */
+export function toPrivateCompanyReview(r: Row): PrivateCompanyReview {
+  const review = toPublicReview(r);
+  return { ...review, driver: review.driverKey ? firstNameOnly(r.driver_name) : null };
+}
+
+export type ReviewFeedRow = Row;
 
 type Row = {
   id: string; stars: number; created_at: Date | string; feedback: string | null;

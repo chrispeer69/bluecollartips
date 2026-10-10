@@ -4,6 +4,8 @@ import postgres from "postgres";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { firstNameOnly, toPrivateCompanyReview, toPublicCompanyReview, driverKey } from "../src/lib/public-reviews.ts";
+import { jobDetailColumns } from "../src/lib/review-webhooks.server.ts";
+import { db as appDb } from "../src/db/client.server.ts";
 import { privateFeedAuth, privateFeedTokenHashes, privateFeedBody, sha256Hex, createFailureLimiter, clientIp } from "../src/lib/private-review-feed.server.ts";
 
 const privateRoute = await readFile(new URL("../src/routes/api/private/reviews.$companySlug.ts", import.meta.url), "utf8");
@@ -110,8 +112,12 @@ test("private review shape: driver first name only, city/service/verified, publi
 test("GHL review-link webhook keeps accepting the job's city and service (optional fields)", () => {
   assert.match(ghlWebhook, /^\s*city: optionalText\(z\.string\(\)\.trim\(\)\.max\(120\)\)/m);
   assert.match(ghlWebhook, /^\s*service: optionalText\(z\.string\(\)\.trim\(\)\.max\(120\)\)/m);
-  assert.match(ghlWebhook, /job_city: parsed\.data\.city \?\? null/);
-  assert.match(ghlWebhook, /job_service: parsed\.data\.service \?\? null/);
+  assert.match(ghlWebhook, /\.\.\.jobDetailColumns\(parsed\.data\.city, parsed\.data\.service\)/);
+  assert.doesNotMatch(ghlWebhook, /job_city: parsed\.data\.city \?\? null/, "a re-send without city must not write null");
+  assert.deepEqual(jobDetailColumns("Dublin", "Tow"), { job_city: "Dublin", job_service: "Tow" });
+  assert.deepEqual(jobDetailColumns(undefined, undefined), {});
+  assert.deepEqual(jobDetailColumns("  ", null), {});
+  assert.deepEqual(jobDetailColumns(" Grove City ", ""), { job_city: "Grove City" });
 });
 
 // ---- Integration against a LOCAL database (same guard as the partner feed tests). ----
@@ -169,4 +175,38 @@ test("private feed body: first names, city from the rating or its review link, n
       assert.ok(!raw.includes(leak), `payload must not contain ${leak}`);
     }
   });
+});
+
+test("GHL re-send for the same job: missing city/service keeps the stored values; a new city replaces it", async () => {
+  // Same upsert call the webhook makes (app db wrapper, onConflict company_id,external_job_id).
+  const suffix = randomUUID().slice(0, 8);
+  const [company] = await db`insert into companies (name, slug) values (${`Resend Co ${suffix}`}, ${`resend-${suffix}`}) returning id`;
+  try {
+    const send = (city, service) => appDb.from("review_contexts").upsert({
+      company_id: company.id, driver_id: null, token_hash: randomUUID(), external_job_id: "TB-77",
+      expires_at: new Date(Date.now() + 86_400_000).toISOString(), customer_name: "Pat",
+      ...jobDetailColumns(city, service),
+    }, { onConflict: "company_id,external_job_id" });
+    const row = async () => (await db`select job_city, job_service from review_contexts where company_id = ${company.id} and external_job_id = 'TB-77'`)[0];
+
+    assert.equal((await send("Dublin", "Tow")).error, null);
+    assert.deepEqual({ ...(await row()) }, { job_city: "Dublin", job_service: "Tow" });
+
+    assert.equal((await send(undefined, undefined)).error, null);
+    assert.deepEqual({ ...(await row()) }, { job_city: "Dublin", job_service: "Tow" }, "missing city/service keeps the old values");
+
+    assert.equal((await send("", "  ")).error, null);
+    assert.deepEqual({ ...(await row()) }, { job_city: "Dublin", job_service: "Tow" }, "blank city/service keeps the old values");
+
+    assert.equal((await send("Hilliard", undefined)).error, null);
+    assert.deepEqual({ ...(await row()) }, { job_city: "Hilliard", job_service: "Tow" }, "a new city replaces the old one");
+
+    assert.equal((await send(undefined, "Jump Start")).error, null);
+    assert.deepEqual({ ...(await row()) }, { job_city: "Hilliard", job_service: "Jump Start" }, "a new service replaces the old one");
+  } finally {
+    await db`delete from review_contexts where company_id = ${company.id}`;
+    await db`delete from companies where id = ${company.id}`;
+    const { sql: appSql } = await import("../src/db/client.server.ts");
+    await appSql().end();
+  }
 });

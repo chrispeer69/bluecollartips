@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { verifyGhlSecret } from "@/lib/webhook-auth.server";
-import { hashReviewToken, newReviewToken } from "@/lib/review-webhooks.server";
+import { hashReviewToken, jobDetailColumns, newReviewToken } from "@/lib/review-webhooks.server";
 import { matchDriver, type DriverCandidate } from "@/lib/driver-match";
 
 const optionalText = (schema: z.ZodString) => z.preprocess(
@@ -108,8 +108,8 @@ export const Route = createFileRoute("/api/public/webhooks/ghl")({
           // can attribute the review later if matching failed.
           dispatch_driver_name:
             driverKey?.name ?? driverKey?.slug ?? driverKey?.email ?? driverKey?.phone ?? null,
-          job_city: parsed.data.city ?? null,
-          job_service: parsed.data.service ?? null,
+          // Missing/blank city or service is left out so a re-send never wipes a stored value.
+          ...jobDetailColumns(parsed.data.city, parsed.data.service),
         }, { onConflict: "company_id,external_job_id" });
         if (contextError) return json(500, { error: "Could not create review link" });
         const path = driver ? `/${company.slug}/d/${driver.slug}` : `/${company.slug}`;

@@ -22,6 +22,7 @@ import { Route as DashboardAdminRouteImport } from './routes/dashboard/admin'
 import { Route as DashboardDriverRouteImport } from './routes/dashboard/driver'
 import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
 import { Route as GoConviniRouteImport } from './routes/go.convini'
+import { Route as GoGoogleRouteImport } from './routes/go.google'
 import { Route as GuidesFicaTipCreditRouteImport } from './routes/guides.fica-tip-credit'
 import { Route as GuidesTipPoolingRouteImport } from './routes/guides.tip-pooling'
 import { Route as JoinCodeRouteImport } from './routes/join.$code'
@@ -33,6 +34,7 @@ import { Route as ApiAuthGoogleRouteImport } from './routes/api/auth/google'
 import { Route as ApiPartnerDriverRatingsRouteImport } from './routes/api/partner/driver-ratings'
 import { Route as PrintEmployeeIdRouteImport } from './routes/print.employee.$id'
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth/google/callback'
+import { Route as ApiPrivateReviewsCompanySlugRouteImport } from './routes/api/private/reviews.$companySlug'
 import { Route as ApiPublicReviewsCompanySlugRouteImport } from './routes/api/public/reviews.$companySlug'
 import { Route as ApiPublicWebhooksGhlRouteImport } from './routes/api/public/webhooks/ghl'
 import { Route as ApiPublicWebhooksGhlEventsRouteImport } from './routes/api/public/webhooks/ghl-events'
@@ -103,6 +105,11 @@ const GoConviniRoute = GoConviniRouteImport.update({
   path: '/go/convini',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GoGoogleRoute = GoGoogleRouteImport.update({
+  id: '/go/google',
+  path: '/go/google',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GuidesFicaTipCreditRoute = GuidesFicaTipCreditRouteImport.update({
   id: '/guides/fica-tip-credit',
   path: '/guides/fica-tip-credit',
@@ -158,6 +165,12 @@ const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
   path: '/callback',
   getParentRoute: () => ApiAuthGoogleRoute,
 } as any)
+const ApiPrivateReviewsCompanySlugRoute =
+  ApiPrivateReviewsCompanySlugRouteImport.update({
+    id: '/api/private/reviews/$companySlug',
+    path: '/api/private/reviews/$companySlug',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicReviewsCompanySlugRoute =
   ApiPublicReviewsCompanySlugRouteImport.update({
     id: '/api/public/reviews/$companySlug',
@@ -193,6 +206,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/driver': typeof DashboardDriverRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/go/convini': typeof GoConviniRoute
+  '/go/google': typeof GoGoogleRoute
   '/guides/fica-tip-credit': typeof GuidesFicaTipCreditRoute
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
@@ -206,6 +220,7 @@ export interface FileRoutesByFullPath {
   '/api/partner/driver-ratings': typeof ApiPartnerDriverRatingsRoute
   '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/private/reviews/$companySlug': typeof ApiPrivateReviewsCompanySlugRoute
   '/api/public/reviews/$companySlug': typeof ApiPublicReviewsCompanySlugRoute
   '/api/public/webhooks/ghl': typeof ApiPublicWebhooksGhlRoute
   '/api/public/webhooks/ghl-events': typeof ApiPublicWebhooksGhlEventsRoute
@@ -223,6 +238,7 @@ export interface FileRoutesByTo {
   '/dashboard/driver': typeof DashboardDriverRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/go/convini': typeof GoConviniRoute
+  '/go/google': typeof GoGoogleRoute
   '/guides/fica-tip-credit': typeof GuidesFicaTipCreditRoute
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
@@ -236,6 +252,7 @@ export interface FileRoutesByTo {
   '/api/partner/driver-ratings': typeof ApiPartnerDriverRatingsRoute
   '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/private/reviews/$companySlug': typeof ApiPrivateReviewsCompanySlugRoute
   '/api/public/reviews/$companySlug': typeof ApiPublicReviewsCompanySlugRoute
   '/api/public/webhooks/ghl': typeof ApiPublicWebhooksGhlRoute
   '/api/public/webhooks/ghl-events': typeof ApiPublicWebhooksGhlEventsRoute
@@ -254,6 +271,7 @@ export interface FileRoutesById {
   '/dashboard/driver': typeof DashboardDriverRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/go/convini': typeof GoConviniRoute
+  '/go/google': typeof GoGoogleRoute
   '/guides/fica-tip-credit': typeof GuidesFicaTipCreditRoute
   '/guides/tip-pooling': typeof GuidesTipPoolingRoute
   '/join/$code': typeof JoinCodeRoute
@@ -267,6 +285,7 @@ export interface FileRoutesById {
   '/api/partner/driver-ratings': typeof ApiPartnerDriverRatingsRoute
   '/print/employee/$id': typeof PrintEmployeeIdRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/private/reviews/$companySlug': typeof ApiPrivateReviewsCompanySlugRoute
   '/api/public/reviews/$companySlug': typeof ApiPublicReviewsCompanySlugRoute
   '/api/public/webhooks/ghl': typeof ApiPublicWebhooksGhlRoute
   '/api/public/webhooks/ghl-events': typeof ApiPublicWebhooksGhlEventsRoute
@@ -286,6 +305,7 @@ export interface FileRouteTypes {
     | '/dashboard/driver'
     | '/email/unsubscribe'
     | '/go/convini'
+    | '/go/google'
     | '/guides/fica-tip-credit'
     | '/guides/tip-pooling'
     | '/join/$code'
@@ -299,6 +319,7 @@ export interface FileRouteTypes {
     | '/api/partner/driver-ratings'
     | '/print/employee/$id'
     | '/api/auth/google/callback'
+    | '/api/private/reviews/$companySlug'
     | '/api/public/reviews/$companySlug'
     | '/api/public/webhooks/ghl'
     | '/api/public/webhooks/ghl-events'
@@ -316,6 +337,7 @@ export interface FileRouteTypes {
     | '/dashboard/driver'
     | '/email/unsubscribe'
     | '/go/convini'
+    | '/go/google'
     | '/guides/fica-tip-credit'
     | '/guides/tip-pooling'
     | '/join/$code'
@@ -329,6 +351,7 @@ export interface FileRouteTypes {
     | '/api/partner/driver-ratings'
     | '/print/employee/$id'
     | '/api/auth/google/callback'
+    | '/api/private/reviews/$companySlug'
     | '/api/public/reviews/$companySlug'
     | '/api/public/webhooks/ghl'
     | '/api/public/webhooks/ghl-events'
@@ -346,6 +369,7 @@ export interface FileRouteTypes {
     | '/dashboard/driver'
     | '/email/unsubscribe'
     | '/go/convini'
+    | '/go/google'
     | '/guides/fica-tip-credit'
     | '/guides/tip-pooling'
     | '/join/$code'
@@ -359,6 +383,7 @@ export interface FileRouteTypes {
     | '/api/partner/driver-ratings'
     | '/print/employee/$id'
     | '/api/auth/google/callback'
+    | '/api/private/reviews/$companySlug'
     | '/api/public/reviews/$companySlug'
     | '/api/public/webhooks/ghl'
     | '/api/public/webhooks/ghl-events'
@@ -377,6 +402,7 @@ export interface RootRouteChildren {
   DashboardDriverRoute: typeof DashboardDriverRoute
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
   GoConviniRoute: typeof GoConviniRoute
+  GoGoogleRoute: typeof GoGoogleRoute
   GuidesFicaTipCreditRoute: typeof GuidesFicaTipCreditRoute
   GuidesTipPoolingRoute: typeof GuidesTipPoolingRoute
   JoinCodeRoute: typeof JoinCodeRoute
@@ -389,6 +415,7 @@ export interface RootRouteChildren {
   ApiAuthGoogleRoute: typeof ApiAuthGoogleRouteWithChildren
   ApiPartnerDriverRatingsRoute: typeof ApiPartnerDriverRatingsRoute
   PrintEmployeeIdRoute: typeof PrintEmployeeIdRoute
+  ApiPrivateReviewsCompanySlugRoute: typeof ApiPrivateReviewsCompanySlugRoute
   ApiPublicReviewsCompanySlugRoute: typeof ApiPublicReviewsCompanySlugRoute
   ApiPublicWebhooksGhlRoute: typeof ApiPublicWebhooksGhlRoute
   ApiPublicWebhooksGhlEventsRoute: typeof ApiPublicWebhooksGhlEventsRoute
@@ -488,6 +515,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GoConviniRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/go/google': {
+      id: '/go/google'
+      path: '/go/google'
+      fullPath: '/go/google'
+      preLoaderRoute: typeof GoGoogleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/guides/fica-tip-credit': {
       id: '/guides/fica-tip-credit'
       path: '/guides/fica-tip-credit'
@@ -565,6 +599,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthGoogleCallbackRouteImport
       parentRoute: typeof ApiAuthGoogleRoute
     }
+    '/api/private/reviews/$companySlug': {
+      id: '/api/private/reviews/$companySlug'
+      path: '/api/private/reviews/$companySlug'
+      fullPath: '/api/private/reviews/$companySlug'
+      preLoaderRoute: typeof ApiPrivateReviewsCompanySlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/reviews/$companySlug': {
       id: '/api/public/reviews/$companySlug'
       path: '/api/public/reviews/$companySlug'
@@ -620,6 +661,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardDriverRoute: DashboardDriverRoute,
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
   GoConviniRoute: GoConviniRoute,
+  GoGoogleRoute: GoGoogleRoute,
   GuidesFicaTipCreditRoute: GuidesFicaTipCreditRoute,
   GuidesTipPoolingRoute: GuidesTipPoolingRoute,
   JoinCodeRoute: JoinCodeRoute,
@@ -632,6 +674,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthGoogleRoute: ApiAuthGoogleRouteWithChildren,
   ApiPartnerDriverRatingsRoute: ApiPartnerDriverRatingsRoute,
   PrintEmployeeIdRoute: PrintEmployeeIdRoute,
+  ApiPrivateReviewsCompanySlugRoute: ApiPrivateReviewsCompanySlugRoute,
   ApiPublicReviewsCompanySlugRoute: ApiPublicReviewsCompanySlugRoute,
   ApiPublicWebhooksGhlRoute: ApiPublicWebhooksGhlRoute,
   ApiPublicWebhooksGhlEventsRoute: ApiPublicWebhooksGhlEventsRoute,

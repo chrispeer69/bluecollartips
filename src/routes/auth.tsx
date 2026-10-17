@@ -7,10 +7,10 @@ import { claimRole, getMyRoleContext, registerCompany } from "@/lib/auth.functio
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in — Blue Collar Tips" },
-      { name: "description", content: "Sign in to Blue Collar Tips to manage employee tips, customer ratings, team invites, and company reputation tools." },
-      { property: "og:title", content: "Sign in — Blue Collar Tips" },
-      { property: "og:description", content: "Sign in or create your Blue Collar Tips account to manage tips, ratings, and your team." },
+      { title: "Sign in — Blue Collar Tips & Reviews" },
+      { name: "description", content: "Sign in to Blue Collar Tips & Reviews to manage employee tips, customer ratings, team invites, and company reputation tools." },
+      { property: "og:title", content: "Sign in — Blue Collar Tips & Reviews" },
+      { property: "og:description", content: "Sign in or create your Blue Collar Tips & Reviews account to manage tips, ratings, and your team." },
       { property: "og:url", content: "https://bluecollartips.app/auth" },
     ],
     links: [{ rel: "canonical", href: "https://bluecollartips.app/auth" }],

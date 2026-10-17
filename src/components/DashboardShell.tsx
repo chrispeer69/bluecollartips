@@ -131,7 +131,7 @@ export function DashboardShell<T extends string>({
       <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
         <a href="/" className="flex items-center gap-2 font-semibold">
           <span className="grid size-9 place-items-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">BC</span>
-          <span>Blue Collar Tips</span>
+          <span>Blue Collar Tips & Reviews</span>
         </a>
         <button className="rounded-md p-2 lg:hidden" onClick={() => setOpen(false)} aria-label="Close navigation"><X size={18} /></button>
       </div>

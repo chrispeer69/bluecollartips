@@ -47,7 +47,7 @@ test("employee dashboard exposes workspace switcher and focused pages", () => {
 });
 
 test("customer tips use Stripe while external tips are employee-recorded", () => {
-  assert.match(driver, /Customer payments from your Blue Collar Tips link or QR code are processed and recorded automatically through Stripe/);
+  assert.match(driver, /Customer payments from your Blue Collar Tips & Reviews link or QR code are processed and recorded automatically through Stripe/);
   assert.match(driver, /Log a cash or app tip/);
   assert.match(driver, /QuickCashTipButton/);
   assert.doesNotMatch(driver, /Venmo handle|Cash App handle|Zelle email|PayPal handle/);

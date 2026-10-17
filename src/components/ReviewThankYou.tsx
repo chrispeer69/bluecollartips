@@ -106,7 +106,7 @@ export function ReviewThankYou({
           ) : null}
         </section>
 
-        <p className="mt-5 text-center text-xs text-slate-500">Powered by Blue Collar Tips</p>
+        <p className="mt-5 text-center text-xs text-slate-500">Powered by Blue Collar Tips & Reviews</p>
       </div>
     </div>
   );

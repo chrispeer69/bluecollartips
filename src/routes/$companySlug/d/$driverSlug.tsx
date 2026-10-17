@@ -31,7 +31,7 @@ export const Route = createFileRoute("/$companySlug/d/$driverSlug")({
   },
   head: ({ params, loaderData }) => {
     const url = `${SITE_URL}/${params.companySlug}/d/${params.driverSlug}`;
-    const title = loaderData ? `Rate & tip ${loaderData.driverName} — ${loaderData.companyName}` : "Rate your service — Blue Collar Tips";
+    const title = loaderData ? `Rate & tip ${loaderData.driverName} — ${loaderData.companyName}` : "Rate your service — Blue Collar Tips & Reviews";
     const description = loaderData
       ? `Thanks for choosing ${loaderData.companyName}! Rate your service with ${loaderData.driverName}, leave feedback, and send a tip securely through Stripe.`
       : "Rate your service, leave feedback, and tip your service pro securely through Stripe.";
@@ -538,7 +538,7 @@ function TipPage() {
         )}
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          Powered by Blue Collar Tips
+          Powered by Blue Collar Tips & Reviews
         </p>
         <p className="mt-2 flex justify-center gap-3 text-xs text-muted-foreground">
           <a href="/privacy" className="underline">

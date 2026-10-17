@@ -24,7 +24,7 @@ interface Props {
 }
 
 const Email = ({
-  companyName = 'Blue Collar Tips',
+  companyName = 'Blue Collar Tips & Reviews',
   heading = 'Update',
   preview,
   lines = [],
@@ -53,7 +53,7 @@ const Email = ({
         )}
         <Hr style={hr} />
         <Text style={small}>
-          {footerNote || 'Sent by Blue Collar Tips, a product of Blue Collar AI, Inc.'}
+          {footerNote || 'Sent by Blue Collar Tips & Reviews, a product of Blue Collar AI, Inc.'}
         </Text>
       </Container>
     </Body>
@@ -63,7 +63,7 @@ const Email = ({
 export const template = {
   component: Email,
   subject: (data: Record<string, any>) =>
-    (data?.subject as string) || 'Update from Blue Collar Tips',
+    (data?.subject as string) || 'Update from Blue Collar Tips & Reviews',
   displayName: 'Branded notice',
   previewData: {
     companyName: 'Roadside Towing',

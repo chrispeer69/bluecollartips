@@ -4,7 +4,7 @@ import { TEMPLATES } from '@/lib/email-templates/registry'
 import { db } from '@/db/client.server'
 import { sendEmail } from './send.server'
 
-const SITE_NAME = 'Blue Collar Tips'
+const SITE_NAME = 'Blue Collar Tips & Reviews'
 const SENDER_DOMAIN = 'notify.bluecollarai.online'
 const FROM_DOMAIN = 'bluecollarai.online'
 

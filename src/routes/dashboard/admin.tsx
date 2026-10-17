@@ -54,10 +54,10 @@ export const Route = createFileRoute("/dashboard/admin")({
     typeof search.support === "string" ? { support: search.support } : {},
   head: () => ({
     meta: [
-      { title: "Admin — Blue Collar Tips" },
-      { name: "description", content: "Manage employees, branding, invites, and tip reconciliation for your company on Blue Collar Tips." },
+      { title: "Admin — Blue Collar Tips & Reviews" },
+      { name: "description", content: "Manage employees, branding, invites, and tip reconciliation for your company on Blue Collar Tips & Reviews." },
       { name: "robots", content: "noindex" },
-      { property: "og:title", content: "Admin — Blue Collar Tips" },
+      { property: "og:title", content: "Admin — Blue Collar Tips & Reviews" },
       { property: "og:description", content: "Manage employees, branding, invites, and tip reconciliation for your company." },
       { property: "og:url", content: "/dashboard/admin" },
     ],
@@ -193,7 +193,7 @@ function AdminDashboard() {
   if (!data?.company) {
     return (
       <div className="min-h-screen bg-background">
-        <TopBar title="Blue Collar Tips" subtitle="Super admin" onSignOut={signOut(navigate)} />
+        <TopBar title="Blue Collar Tips & Reviews" subtitle="Super admin" onSignOut={signOut(navigate)} />
         <div className="mx-auto max-w-3xl p-6">
           <NewCompanyForm onCreate={async (v) => {
             const r = await newCo({ data: v });
@@ -214,7 +214,7 @@ function AdminDashboard() {
   const platformWorkspace = "__platform__";
   return (
     <DashboardShell
-      title={isPlatform ? "Blue Collar Tips" : data.company.name}
+      title={isPlatform ? "Blue Collar Tips & Reviews" : data.company.name}
       subtitle={isPlatform ? "Platform administration" : data.isSuper ? "Super admin" : "Company admin"}
       pageTitle={pageTitle}
       active={page}
@@ -1556,7 +1556,7 @@ function PlatformWalletPanel({ mode, onTipsChanged }: { mode: "settings" | "requ
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="font-semibold">Stripe tip recovery</h3>
-            <p className="mt-1 text-xs text-muted-foreground">Sync historical Blue Collar Tips payments, or recover one successful payment by its Stripe ID.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Sync historical Blue Collar Tips & Reviews payments, or recover one successful payment by its Stripe ID.</p>
           </div>
           <button type="button" disabled={busy} onClick={async () => {
             setBusy(true);
@@ -1867,7 +1867,7 @@ function EmployeePayoutsPanel({ companyId }: { companyId: string }) {
   if (!rows.length) return <p className="text-sm text-muted-foreground">No employees yet.</p>;
   const sum = (k: keyof (typeof rows)[number]) => rows.reduce((n, r) => n + Number(r[k] || 0), 0);
   return <div className="space-y-3">
-    <p className="text-sm text-muted-foreground">Per-employee view of what they have earned from card tips, what is sitting in their wallet, what they have requested, and what Blue Collar Tips has paid them. Employees request their own withdrawals from their dashboard.</p>
+    <p className="text-sm text-muted-foreground">Per-employee view of what they have earned from card tips, what is sitting in their wallet, what they have requested, and what Blue Collar Tips & Reviews has paid them. Employees request their own withdrawals from their dashboard.</p>
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead className="text-xs uppercase text-muted-foreground">
@@ -1903,11 +1903,11 @@ function MoneyFlowExplainer({ company: _company }: { company: Data["company"] })
   );
   return <div className="grid gap-4 md:grid-cols-[1fr_auto]">
     <ol className="space-y-3">
-      {step(1, "Customer tips by card", "Apple Pay, Google Pay or card on the rating page. Stripe processes it into the Blue Collar Tips account.")}
-      {step(2, "Split instantly: 90% employee · 10% Blue Collar Tips", "Every tip stores its own split. The company keeps no share of card tips.")}
+      {step(1, "Customer tips by card", "Apple Pay, Google Pay or card on the rating page. Stripe processes it into the Blue Collar Tips & Reviews account.")}
+      {step(2, "Split instantly: 90% employee · 10% Blue Collar Tips & Reviews", "Every tip stores its own split. The company keeps no share of card tips.")}
       {step(3, "The employee's share lands in their wallet", "Employee share → their Earnings wallet. Tips with no employee wait under Unassigned company tips until you assign them to someone.")}
       {step(4, "Request a withdrawal", "Once a wallet reaches the platform minimum, request any amount up to the available balance. One open request at a time.")}
-      {step(5, "Blue Collar Tips pays it", "Reviewed and paid within the processing window to the payout method on file, then marked paid with a reference you can see here.")}
+      {step(5, "Blue Collar Tips & Reviews pays it", "Reviewed and paid within the processing window to the payout method on file, then marked paid with a reference you can see here.")}
     </ol>
     <div className="rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground md:w-64">
       <div className="font-medium text-foreground">Not counted in wallets</div>

@@ -1,8 +1,8 @@
-# Blue Collar Tips: Product Purpose and User Workflows
+# Blue Collar Tips & Reviews: Product Purpose and User Workflows
 
 ## 1. What this website is
 
-Blue Collar Tips is a multi-company rating and tipping platform for towing companies and other field-service businesses.
+Blue Collar Tips & Reviews is a multi-company rating and tipping platform for towing companies and other field-service businesses.
 
 Its main purpose is to help a company collect customer feedback and public reviews after a job. Tipping is an additional feature. A customer must always be able to leave a rating without paying a tip.
 
@@ -88,7 +88,7 @@ A company admin cannot manage an unrelated company unless separately assigned to
 
 ### Platform super admin
 
-The super admin operates the entire Blue Collar Tips platform.
+The super admin operates the entire Blue Collar Tips & Reviews platform.
 
 The super admin can:
 
@@ -160,7 +160,7 @@ The default accounting split is:
 
 - Employee: 80%
 - Company: 10%
-- Blue Collar Tips platform: 10%
+- Blue Collar Tips & Reviews platform: 10%
 
 PostgreSQL calculates and records these three ledger amounts whenever a tip is stored.
 
@@ -176,7 +176,7 @@ Database split calculations are an internal ledger. They do not, by themselves, 
 
 ### Cash and payment-app tips
 
-Cash, Venmo, Cash App, Zelle, PayPal, and similar payments happen outside Blue Collar Tips. The employee receives that money directly and logs it manually.
+Cash, Venmo, Cash App, Zelle, PayPal, and similar payments happen outside Blue Collar Tips & Reviews. The employee receives that money directly and logs it manually.
 
 The app records the same 80/10/10 accounting split. Because the platform did not receive the money, the employee owes the company and platform shares. The dashboard displays that obligation for reconciliation.
 
@@ -295,5 +295,5 @@ These credentials must never be used in production.
 - Customer: “Scan, rate the worker, and optionally tip—no account needed.”
 - Employee: “Share your QR code and track your own ratings and earnings.”
 - Company admin: “Manage employees and review the company's ratings, tips, QR codes, and exceptions.”
-- Super admin: “Operate all companies and monitor the Blue Collar Tips platform.”
+- Super admin: “Operate all companies and monitor the Blue Collar Tips & Reviews platform.”
 

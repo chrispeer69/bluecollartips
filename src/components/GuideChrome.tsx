@@ -29,7 +29,7 @@ export function GuideFooter() {
         <Link to="/privacy" className="hover:underline">Privacy</Link>
         <Link to="/terms" className="hover:underline">Terms</Link>
       </nav>
-      © {new Date().getFullYear()} Blue Collar Tips
+      © {new Date().getFullYear()} Blue Collar Tips & Reviews
     </footer>
   );
 }

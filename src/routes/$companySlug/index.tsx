@@ -26,7 +26,7 @@ export const Route = createFileRoute("/$companySlug/")({
   },
   head: ({ params, loaderData }) => {
     const url = `${SITE_URL}/${params.companySlug}`;
-    const title = loaderData ? `Rate your service — ${loaderData.companyName}` : "Rate your service — Blue Collar Tips";
+    const title = loaderData ? `Rate your service — ${loaderData.companyName}` : "Rate your service — Blue Collar Tips & Reviews";
     const description = loaderData
       ? `Thanks for choosing ${loaderData.companyName}! Rate your service, leave feedback, and tip the crew securely through Stripe.`
       : "Rate your service, leave feedback, and tip the crew securely through Stripe.";
@@ -320,7 +320,7 @@ function CompanyReviewPage() {
       )}
 
       <p className="mt-4 text-center text-xs text-muted-foreground">Your star rating and comment may be shown on this company's website with your first name and last initial only. Your phone number and email are never shown.</p>
-      <p className="mt-6 text-center text-xs text-muted-foreground">Powered by Blue Collar Tips</p>
+      <p className="mt-6 text-center text-xs text-muted-foreground">Powered by Blue Collar Tips & Reviews</p>
       <p className="mt-2 flex justify-center gap-3 text-xs text-muted-foreground">
         <a href="/privacy" className="underline">Privacy</a>
         <a href="/terms" className="underline">Terms</a>

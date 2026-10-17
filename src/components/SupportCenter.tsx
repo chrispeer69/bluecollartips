@@ -21,7 +21,7 @@ type TicketDetail = Awaited<ReturnType<typeof getSupportTicket>>;
 
 const STATUS_LABEL: Record<TicketStatus, string> = {
   open: "Open",
-  waiting_on_platform: "Waiting on Blue Collar Tips",
+  waiting_on_platform: "Waiting on Blue Collar Tips & Reviews",
   waiting_on_tenant: "Waiting on you",
   resolved: "Resolved",
   closed: "Closed",
@@ -207,7 +207,7 @@ export function NewTicketForm({ companyId, onCreated, onCancel }: { companyId: s
       </Field>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="flex items-center gap-2">
-        <button type="submit" disabled={busy} className={btnPrimary}>{busy ? "Sending…" : "Send to Blue Collar Tips"}</button>
+        <button type="submit" disabled={busy} className={btnPrimary}>{busy ? "Sending…" : "Send to Blue Collar Tips & Reviews"}</button>
         {onCancel && <button type="button" onClick={onCancel} className={btnGhost}>Cancel</button>}
       </div>
     </form>
@@ -289,7 +289,7 @@ export function TicketThread({ ticketId, platform, onBack, onChanged }: { ticket
           >
             <div className="mb-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
               <span className="font-medium text-foreground">
-                {m.authorKind === "platform" ? `Blue Collar Tips${m.authorName && m.authorName !== "Blue Collar Tips" ? ` · ${m.authorName}` : ""}` : m.authorName}
+                {m.authorKind === "platform" ? `Blue Collar Tips & Reviews${m.authorName && m.authorName !== "Blue Collar Tips & Reviews" ? ` · ${m.authorName}` : ""}` : m.authorName}
                 {m.internal && <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-800">Internal note</span>}
               </span>
               <span>{when(m.createdAt)}</span>
@@ -337,7 +337,7 @@ export function TicketThread({ ticketId, platform, onBack, onChanged }: { ticket
           rows={4}
           maxLength={10000}
           className={inputCls}
-          placeholder={isClosed ? "Reply to reopen this ticket…" : platform ? "Reply to the tenant…" : "Reply to Blue Collar Tips…"}
+          placeholder={isClosed ? "Reply to reopen this ticket…" : platform ? "Reply to the tenant…" : "Reply to Blue Collar Tips & Reviews…"}
         />
         <div className="flex flex-wrap items-center gap-3">
           {pictures.length > 0 && (

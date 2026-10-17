@@ -15,6 +15,6 @@ test("SMTP email/password credentials drive the shared transactional sender", ()
 
 test("invites and password resets use the shared email sender", () => {
   assert.match(invites, /sendEmail\(\{ to, subject, html, text \}\)/);
-  assert.match(auth, /Reset your Blue Collar Tips password/);
+  assert.match(auth, /Reset your Blue Collar Tips & Reviews password/);
   assert.match(auth, /await sendEmail/);
 });

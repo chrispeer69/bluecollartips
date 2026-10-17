@@ -26,7 +26,7 @@ export type PayrollEmployee = {
   driverId: string | null;
   name: string;
   employeeId: string | null;
-  /** Card tips collected through Blue Collar Tips: the employee share goes on payroll. */
+  /** Card tips collected through Blue Collar Tips & Reviews: the employee share goes on payroll. */
   cardTips: PayrollTip[];
   cardCount: number;
   cardGrossCents: number;

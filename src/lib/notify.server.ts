@@ -60,7 +60,7 @@ export async function notifyEmployee(
   if (!driver) return;
   const cust = args.customerName?.trim() || "A customer";
   const companyName =
-    (driver as { companies?: { name?: string } | null }).companies?.name ?? "Blue Collar Tips";
+    (driver as { companies?: { name?: string } | null }).companies?.name ?? "Blue Collar Tips & Reviews";
   let body: string;
   if (args.kind === "tip") {
     const amt = args.amountCents ? `$${(args.amountCents / 100).toFixed(2)}` : "a tip";
@@ -127,11 +127,11 @@ export async function sendCustomerReceipt(
     await sendNotice({
       to: args.customerEmail,
       subject: `Your ${amt} tip receipt`,
-      companyName: company?.name ?? "Blue Collar Tips",
+      companyName: company?.name ?? "Blue Collar Tips & Reviews",
       heading: `Receipt: ${amt} tip`,
       lines: [
         `Your ${amt} tip to ${driver?.display_name ?? "your service pro"} was processed successfully on ${new Date().toLocaleDateString("en-US", { dateStyle: "long" })}.`,
-        `Charged by ${company?.name ?? "our team"} via Blue Collar Tips. No further action is needed.`,
+        `Charged by ${company?.name ?? "our team"} via Blue Collar Tips & Reviews. No further action is needed.`,
         "Thanks for recognizing great work.",
       ],
       idempotencyKey: `receipt-${args.driverId}-${args.amountCents}-${Date.now()}`,
@@ -167,7 +167,7 @@ async function tipParties(admin: typeof db, companyId: string, driverId: string)
     admin.from("drivers").select("display_name, email, phone, notify_sms").eq("id", driverId).maybeSingle(),
   ]);
   return {
-    companyName: company?.name ?? "Blue Collar Tips",
+    companyName: company?.name ?? "Blue Collar Tips & Reviews",
     driver: driver as { display_name: string; email: string | null; phone: string | null; notify_sms: boolean } | null,
   };
 }

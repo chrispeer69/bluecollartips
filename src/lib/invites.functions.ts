@@ -138,9 +138,9 @@ export const createInvite = createServerFn({ method: "POST" })
         const body =
           data.role === "driver"
             ? data.email
-              ? `${companyName} invited you as an employee on Blue Collar Tips. Accept: ${inviteUrl}`
+              ? `${companyName} invited you as an employee on Blue Collar Tips & Reviews. Accept: ${inviteUrl}`
               : `${companyName} shared an employee join code. Sign in to request admin approval: ${inviteUrl}`
-            : `You're invited to manage ${companyName} on Blue Collar Tips. Activate: ${inviteUrl}`;
+            : `You're invited to manage ${companyName} on Blue Collar Tips & Reviews. Activate: ${inviteUrl}`;
         const result = await sendSms(to, body);
         const status = result.status;
         const providerSid = result.sid;

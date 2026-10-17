@@ -4,13 +4,13 @@ import { GuideFooter } from "@/components/GuideChrome";
 export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
-      { title: "Privacy Policy — Blue Collar Tips" },
+      { title: "Privacy Policy — Blue Collar Tips & Reviews" },
       {
         name: "description",
         content:
-          "How Blue Collar Tips collects, uses, and protects customer, employee, and company data across ratings, tips, email, and SMS.",
+          "How Blue Collar Tips & Reviews collects, uses, and protects customer, employee, and company data across ratings, tips, email, and SMS.",
       },
-      { property: "og:title", content: "Privacy Policy — Blue Collar Tips" },
+      { property: "og:title", content: "Privacy Policy — Blue Collar Tips & Reviews" },
       { property: "og:description", content: "How we handle customer, employee, and company data." },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://bluecollartips.app/privacy" },
@@ -32,7 +32,7 @@ function PrivacyPage() {
           Last updated {new Date().toLocaleDateString("en-US", { dateStyle: "long" })}
         </p>
         <p className="mt-4 text-sm text-muted-foreground">
-          This page is maintained by Blue Collar AI, Inc. to explain how Blue Collar Tips handles
+          This page is maintained by Blue Collar AI, Inc. to explain how Blue Collar Tips & Reviews handles
           data. It describes our current practices, not an independent audit or certification.
         </p>
 

@@ -5,7 +5,7 @@ import { guideJsonLd } from "@/lib/seo";
 export const Route = createFileRoute("/guides/fica-tip-credit")({
   head: () => ({
     meta: [
-      { title: "FICA Tip Credit (Section 45B): Employer's Guide — Blue Collar Tips" },
+      { title: "FICA Tip Credit (Section 45B): Employer's Guide — Blue Collar Tips & Reviews" },
       {
         name: "description",
         content:
@@ -48,7 +48,7 @@ function FicaTipCreditGuide() {
             <div className="grid h-8 w-8 place-items-center rounded-md bg-primary font-bold text-primary-foreground">
               B
             </div>
-            <span className="font-semibold">Blue Collar Tips</span>
+            <span className="font-semibold">Blue Collar Tips & Reviews</span>
           </Link>
           <Link
             to="/auth"
@@ -165,7 +165,7 @@ function FicaTipCreditGuide() {
             <li>P2P tips: same as cash — employee-reported, employer-logged.</li>
           </ul>
           <p>
-            Blue Collar Tips captures every tip — card, cash, and P2P — with a per-driver
+            Blue Collar Tips & Reviews captures every tip — card, cash, and P2P — with a per-driver
             ledger, timestamp, and customer rating link. When tax time comes, your CPA can
             pull a per-employee tip report in one click and drop the totals straight into
             Form 8846.
@@ -202,7 +202,7 @@ function FicaTipCreditGuide() {
         <section className="mt-12 rounded-lg border border-border bg-card p-6">
           <h2 className="text-xl font-semibold">Make tip documentation automatic</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Blue Collar Tips logs every card, cash, and P2P tip per driver — the exact record
+            Blue Collar Tips & Reviews logs every card, cash, and P2P tip per driver — the exact record
             your CPA needs for Form 8846.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">

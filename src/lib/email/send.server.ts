@@ -39,7 +39,7 @@ export async function sendEmail(message: Email) {
       socketTimeout: 20_000,
     });
     const result = await transporter.sendMail({
-      from: `Blue Collar Tips <${smtp.user}>`,
+      from: `Blue Collar Tips & Reviews <${smtp.user}>`,
       to: message.to,
       subject: message.subject,
       html: message.html,

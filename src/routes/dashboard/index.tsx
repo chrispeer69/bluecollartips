@@ -8,11 +8,11 @@ import { JoinWorkspacePanel } from "@/components/JoinWorkspacePanel";
 export const Route = createFileRoute("/dashboard/")({
   head: () => ({
     meta: [
-      { title: "Dashboard — Blue Collar Tips" },
-      { name: "description", content: "Sign in to your Blue Collar Tips dashboard to view ratings, tips, and team activity for your towing or service company." },
+      { title: "Dashboard — Blue Collar Tips & Reviews" },
+      { name: "description", content: "Sign in to your Blue Collar Tips & Reviews dashboard to view ratings, tips, and team activity for your towing or service company." },
       { name: "robots", content: "noindex" },
-      { property: "og:title", content: "Dashboard — Blue Collar Tips" },
-      { property: "og:description", content: "Your Blue Collar Tips dashboard for ratings, tips, and team activity." },
+      { property: "og:title", content: "Dashboard — Blue Collar Tips & Reviews" },
+      { property: "og:description", content: "Your Blue Collar Tips & Reviews dashboard for ratings, tips, and team activity." },
       { property: "og:url", content: "/dashboard" },
     ],
   }),

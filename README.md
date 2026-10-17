@@ -1,4 +1,4 @@
-# Blue Collar Tips
+# Blue Collar Tips & Reviews
 
 For a plain-language explanation of the product, user roles, workflows, integrations, and launch plan, see [Product Purpose and User Workflows](docs/PRODUCT_AND_WORKFLOW.md).
 
@@ -28,7 +28,7 @@ Own Stripe Connect account hierarchy (see Section 4)
 
 Roadside Towing is tenant #1, built and seeded as the first live company — but treat it as a normal tenant, not a hardcoded special case. The codebase must support onboarding additional towing companies without custom dev work.
 
-The Blue Collar Tips platform fee is fixed at 10%. Each company chooses a 0–10% company share, and the employee receives the remaining 80–90%. The selected split is recorded on each tip so historical earnings do not change when settings change later.
+The Blue Collar Tips & Reviews platform fee is fixed at 10%. Each company chooses a 0–10% company share, and the employee receives the remaining 80–90%. The selected split is recorded on each tip so historical earnings do not change when settings change later.
 
 2. User Roles
 
@@ -84,7 +84,7 @@ Required fields: customer name (or description), amount, date/time, job referenc
 
 On submission, the system automatically calculates and records that company’s current split and adds it to the driver's tip ledger exactly like a Stripe-processed tip.
 
-Important distinction: for cash/P2P tips, the driver owes the recorded company share plus the 10% platform fee themselves, since Blue Collar Tips never touched that money. This obligation is tracked separately for company reconciliation and is not treated as platform-collected wallet cash.
+Important distinction: for cash/P2P tips, the driver owes the recorded company share plus the 10% platform fee themselves, since Blue Collar Tips & Reviews never touched that money. This obligation is tracked separately for company reconciliation and is not treated as platform-collected wallet cash.
 
 Policy & verification workflow:
 

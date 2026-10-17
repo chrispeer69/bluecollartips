@@ -7,7 +7,7 @@ import { TIP_MAX_CENTS, TIP_MIN_CENTS, dollars } from "@/lib/constants";
 type Source = "cash" | "venmo" | "cashapp" | "zelle" | "paypal" | "other";
 
 const STRIPE_NOTE =
-  "Log only tips you actually received. Customer payments from your Blue Collar Tips link or QR code are processed and recorded automatically through Stripe.";
+  "Log only tips you actually received. Customer payments from your Blue Collar Tips & Reviews link or QR code are processed and recorded automatically through Stripe.";
 
 const AMOUNTS = [500, 1000, 2000, 3000, 4000, 5000];
 const SOURCES: { id: Source; label: string }[] = [

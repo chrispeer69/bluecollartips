@@ -25,7 +25,7 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Blue Collar Tips — More 5-Star Reviews. Better-Paid Crews." },
+      { title: "Blue Collar Tips & Reviews — More 5-Star Reviews. Better-Paid Crews." },
       {
         name: "description",
         content:
@@ -33,7 +33,7 @@ export const Route = createFileRoute("/")({
       },
       {
         property: "og:title",
-        content: "Blue Collar Tips — More 5-Star Reviews. Better-Paid Crews.",
+        content: "Blue Collar Tips & Reviews — More 5-Star Reviews. Better-Paid Crews.",
       },
       {
         property: "og:description",
@@ -133,7 +133,7 @@ function SiteHeader() {
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3.5">
         <Link to="/" className="flex items-center gap-2.5">
           <LogoMark />
-          <span className="display text-[17px] font-bold tracking-tight">Blue Collar Tips</span>
+          <span className="display text-[17px] font-bold tracking-tight">Blue Collar Tips & Reviews</span>
         </Link>
         <nav className="hidden items-center gap-7 text-sm text-white/70 md:flex">
           {NAV.map((n) => (
@@ -432,7 +432,7 @@ function Outcomes() {
             <span className="text-secondary">Nobody sees it.</span>
           </>
         }
-        body="Blue Collar Tips captures the customer's reaction at the exact moment they're happiest — and turns it into reviews, feedback, and pay."
+        body="Blue Collar Tips & Reviews captures the customer's reaction at the exact moment they're happiest — and turns it into reviews, feedback, and pay."
       />
       <div className="mt-14 grid gap-5 md:grid-cols-3">
         {items.map(({ icon: Icon, title, body }) => (
@@ -824,7 +824,7 @@ function SiteFooter() {
         <div className="flex items-center gap-2.5">
           <LogoMark />
           <div>
-            <p className="display font-bold text-white">Blue Collar Tips</p>
+            <p className="display font-bold text-white">Blue Collar Tips & Reviews</p>
             <p className="text-xs">
               A product of <span className="text-white/80">Blue Collar AI, Inc.</span>
             </p>

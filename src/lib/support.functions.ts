@@ -86,8 +86,8 @@ async function notify(to: string | null | undefined, subject: string, lines: str
     const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
     const html = `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.5;color:#111">
       ${lines.map((l) => `<p>${esc(l)}</p>`).join("")}
-      <p><a href="${link}" style="display:inline-block;background:#0b2545;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Open in Blue Collar Tips</a></p>
-      <p style="color:#666;font-size:13px">Blue Collar Tips support</p>
+      <p><a href="${link}" style="display:inline-block;background:#0b2545;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Open in Blue Collar Tips & Reviews</a></p>
+      <p style="color:#666;font-size:13px">Blue Collar Tips & Reviews support</p>
     </div>`;
     await sendEmail({ to, subject, html, text: `${lines.join("\n\n")}\n\n${link}` });
   } catch (err) {
@@ -264,7 +264,7 @@ export const getSupportTicket = createServerFn({ method: "POST" })
       messages: messages.map((m: any) => ({
         id: m.id,
         authorKind: m.author_kind as "tenant" | "platform" | "system",
-        authorName: m.author_name ?? (m.author_kind === "platform" ? "Blue Collar Tips" : "System"),
+        authorName: m.author_name ?? (m.author_kind === "platform" ? "Blue Collar Tips & Reviews" : "System"),
         authorFirstName: firstName(m.author_name),
         internal: Boolean(m.internal),
         body: m.body as string,
@@ -378,7 +378,7 @@ export const replySupportTicket = createServerFn({ method: "POST" })
         const [me] = await tx`SELECT full_name FROM users WHERE id = ${context.userId}`;
         await tx`
           INSERT INTO support_messages (ticket_id, author_id, author_kind, body, created_at)
-          VALUES (${ticket.id}, ${context.userId}, 'system', ${`${firstName(me?.full_name) ?? "Blue Collar Tips"} joined the conversation`}, NOW() - interval '1 millisecond')
+          VALUES (${ticket.id}, ${context.userId}, 'system', ${`${firstName(me?.full_name) ?? "Blue Collar Tips & Reviews"} joined the conversation`}, NOW() - interval '1 millisecond')
         `;
       }
       const [m] = await tx`
@@ -410,7 +410,7 @@ export const replySupportTicket = createServerFn({ method: "POST" })
         await notify(
           ticket.creator_email,
           `Re: ${ticket.subject}`,
-          [`Blue Collar Tips replied to your support ticket "${ticket.subject}":`, ...(data.body ? [data.body] : []), ...pictures],
+          [`Blue Collar Tips & Reviews replied to your support ticket "${ticket.subject}":`, ...(data.body ? [data.body] : []), ...pictures],
           tenantLink,
         );
       } else {
@@ -457,7 +457,7 @@ export const setSupportTicketStatus = createServerFn({ method: "POST" })
             updated_at = NOW()
         WHERE id = ${ticket.id}
       `;
-      const who = access.isSuper ? "Blue Collar Tips" : "Tenant";
+      const who = access.isSuper ? "Blue Collar Tips & Reviews" : "Tenant";
       await tx`
         INSERT INTO support_messages (ticket_id, author_id, author_kind, body)
         VALUES (${ticket.id}, ${context.userId}, 'system', ${`${who} marked this ticket ${data.status.replace(/_/g, " ")}.`})

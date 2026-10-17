@@ -103,7 +103,7 @@ test("employee keeps 90% of card tips; the company share is locked at zero", asy
   assert.match(keep90, /company_payout_requests/, "past tips of companies with company payouts are left alone");
   assert.doesNotMatch(adminFunctions, /updateCompanyTipShare/);
   assert.doesNotMatch(adminDashboard, /Tip distribution/);
-  assert.match(adminDashboard, /90% employee · 10% Blue Collar Tips/);
+  assert.match(adminDashboard, /90% employee · 10% Blue Collar Tips & Reviews/);
   assert.match(adminDashboard, /After platform fee/);
 });
 

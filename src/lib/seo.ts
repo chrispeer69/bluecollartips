@@ -1,6 +1,6 @@
 // Shared bits for page <head> tags: canonical URLs and link-preview images.
 export const SITE_URL = "https://bluecollartips.app";
-export const SITE_NAME = "Blue Collar Tips";
+export const SITE_NAME = "Blue Collar Tips & Reviews";
 /** 1200×630 banner used when a page has no picture of its own. */
 export const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image.png`;
 

@@ -4,14 +4,14 @@ import { GuideFooter } from "@/components/GuideChrome";
 export const Route = createFileRoute("/terms")({
   head: () => ({
     meta: [
-      { title: "Terms of Service — Blue Collar Tips" },
+      { title: "Terms of Service — Blue Collar Tips & Reviews" },
       {
         name: "description",
         content:
-          "Terms of Service for Blue Collar Tips, the field-service rating and tipping platform from Blue Collar AI, Inc.",
+          "Terms of Service for Blue Collar Tips & Reviews, the field-service rating and tipping platform from Blue Collar AI, Inc.",
       },
-      { property: "og:title", content: "Terms of Service — Blue Collar Tips" },
-      { property: "og:description", content: "The terms governing use of the Blue Collar Tips platform." },
+      { property: "og:title", content: "Terms of Service — Blue Collar Tips & Reviews" },
+      { property: "og:description", content: "The terms governing use of the Blue Collar Tips & Reviews platform." },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://bluecollartips.app/terms" },
     ],
@@ -36,7 +36,7 @@ function TermsPage() {
           <section>
             <h2 className="text-base font-semibold text-foreground">1. Who we are</h2>
             <p className="mt-2">
-              Blue Collar Tips is operated by Blue Collar AI, Inc. ("we", "us"). By creating an
+              Blue Collar Tips & Reviews is operated by Blue Collar AI, Inc. ("we", "us"). By creating an
               account, inviting employees, or submitting a rating or tip, you agree to these terms.
             </p>
           </section>

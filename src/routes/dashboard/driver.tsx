@@ -35,10 +35,10 @@ const driverNav: DashboardNavItem<DriverPage>[] = [
 export const Route = createFileRoute("/dashboard/driver")({
   head: () => ({
     meta: [
-      { title: "My dashboard — Blue Collar Tips" },
+      { title: "My dashboard — Blue Collar Tips & Reviews" },
       { name: "description", content: "View your ratings, track tips, share your Stripe payment QR code, and record tips received outside the platform." },
       { name: "robots", content: "noindex" },
-      { property: "og:title", content: "Employee dashboard — Blue Collar Tips" },
+      { property: "og:title", content: "Employee dashboard — Blue Collar Tips & Reviews" },
       { property: "og:description", content: "Track ratings and tips, share your Stripe payment QR code, and record tips received outside the platform." },
       { property: "og:url", content: "/dashboard/driver" },
     ],
@@ -514,7 +514,7 @@ function WalletPanel({ driverId, viewingAsAdmin, onManageAccount }: { driverId: 
               </p>
               <p className="mt-2">Successful online tips are available immediately.</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                After you request a payout, the Blue Collar Tips platform team will complete it within {wallet.processingDays === 0 ? "the same day" : `0–${wallet.processingDays} days`}.
+                After you request a payout, the Blue Collar Tips & Reviews platform team will complete it within {wallet.processingDays === 0 ? "the same day" : `0–${wallet.processingDays} days`}.
               </p>
               {wallet.openRequest && (
                 <p className="mt-2 font-medium">

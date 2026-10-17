@@ -7,7 +7,7 @@ import { prepareImage } from "@/lib/image-attach";
 import { ArticleBody } from "@/components/SupportCenter";
 
 // Floating customer-care chat for tenants (company admins and employees),
-// answered by Blue Collar Tips staff from the Support inbox. Built on the same
+// answered by Blue Collar Tips & Reviews staff from the Support inbox. Built on the same
 // support tickets as the Help & support page, so both stay in sync.
 
 type Summary = Awaited<ReturnType<typeof getSupportChat>>;
@@ -84,7 +84,7 @@ export function SupportChatWidget({ companyId, audience }: { companyId: string; 
       {open && (
         <div
           role="dialog"
-          aria-label="Chat with Blue Collar Tips support"
+          aria-label="Chat with Blue Collar Tips & Reviews support"
           className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-background shadow-2xl sm:inset-auto sm:bottom-24 sm:right-6 sm:h-[640px] sm:max-h-[calc(100vh-8rem)] sm:w-[390px] sm:rounded-2xl sm:border sm:border-border"
         >
           {view.name === "home" && (
@@ -154,7 +154,7 @@ function Home({ summary, onClose, onNew, onOpen, onHelp }: {
   onOpen: (ticketId: string) => void;
   onHelp: () => void;
 }) {
-  const team = summary?.team.length ? summary.team : ["Blue Collar Tips"];
+  const team = summary?.team.length ? summary.team : ["Blue Collar Tips & Reviews"];
   const recent = summary?.tickets.slice(0, 6) ?? [];
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -182,7 +182,7 @@ function Home({ summary, onClose, onNew, onOpen, onHelp }: {
               {recent.map((t) => (
                 <li key={t.id}>
                   <button type="button" onClick={() => onOpen(t.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/40">
-                    <Avatar name={t.assignedName ?? "Blue Collar Tips"} />
+                    <Avatar name={t.assignedName ?? "Blue Collar Tips & Reviews"} />
                     <div className="min-w-0 flex-1">
                       <div className={`truncate text-sm ${t.unread ? "font-semibold" : ""}`}>{t.subject}</div>
                       <div className="truncate text-xs text-muted-foreground">{t.lastMessagePreview ?? ""} · {ago(t.lastMessageAt)}</div>
@@ -351,16 +351,16 @@ function Conversation({ companyId, ticketId, summary, visible, onBack, onClose, 
       onDrop={(e) => { e.preventDefault(); setDragging(false); void addFiles(Array.from(e.dataTransfer.files)); }}
     >
       <PanelHeader
-        title={agent ?? "Blue Collar Tips"}
-        subtitle={agent ? "Blue Collar Tips support" : `Usually replies in ${replyTime.toLowerCase()}`}
-        avatars={[agent ?? "Blue Collar Tips"]}
+        title={agent ?? "Blue Collar Tips & Reviews"}
+        subtitle={agent ? "Blue Collar Tips & Reviews support" : `Usually replies in ${replyTime.toLowerCase()}`}
+        avatars={[agent ?? "Blue Collar Tips & Reviews"]}
         onBack={onBack}
         onClose={onClose}
       />
 
       <div ref={scroller} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-muted/20 px-3 py-4">
         {!ticketId && (
-          <Bubble side="platform" name="Blue Collar Tips">
+          <Bubble side="platform" name="Blue Collar Tips & Reviews">
             Hi{summary?.me.firstName ? ` ${summary.me.firstName}` : ""}! What can we help with? Tell us what's going on. A screenshot helps: paste it, drag it in, or tap the picture button.
           </Bubble>
         )}
@@ -375,7 +375,7 @@ function Conversation({ companyId, ticketId, summary, visible, onBack, onClose, 
           const mine = m.authorKind === "tenant";
           return (
             <div key={m.id} className="space-y-3">
-              <Bubble side={mine ? "tenant" : "platform"} name={mine ? null : (m.authorFirstName ?? "Blue Collar Tips")} time={m.createdAt} attachments={m.attachments}>
+              <Bubble side={mine ? "tenant" : "platform"} name={mine ? null : (m.authorFirstName ?? "Blue Collar Tips & Reviews")} time={m.createdAt} attachments={m.attachments}>
                 {m.body}
               </Bubble>
               {m.id === firstTenant?.id && (

@@ -6,10 +6,10 @@ import { peekInvite } from "@/lib/invites.functions";
 export const Route = createFileRoute("/join/$code")({
   head: ({ params }) => ({
     meta: [
-      { title: "Join — Blue Collar Tips" },
-      { name: "description", content: "Accept your invite to join your company on Blue Collar Tips and start collecting ratings and tips from customers." },
+      { title: "Join — Blue Collar Tips & Reviews" },
+      { name: "description", content: "Accept your invite to join your company on Blue Collar Tips & Reviews and start collecting ratings and tips from customers." },
       { name: "robots", content: "noindex" },
-      { property: "og:title", content: "Join your team on Blue Collar Tips" },
+      { property: "og:title", content: "Join your team on Blue Collar Tips & Reviews" },
       { property: "og:description", content: "Accept your invite to start collecting ratings and tips from customers." },
       { property: "og:url", content: `https://bluecollartips.app/join/${params.code}` },
     ],

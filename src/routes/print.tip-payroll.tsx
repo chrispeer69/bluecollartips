@@ -16,7 +16,7 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/print/tip-payroll")({
   head: () => ({
     meta: [
-      { title: "Tip payroll report — Blue Collar Tips" },
+      { title: "Tip payroll report — Blue Collar Tips & Reviews" },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -176,7 +176,7 @@ function TipPayrollPage() {
             <div className="avoid-break mt-3 rounded-md border border-amber-400 bg-amber-50 p-2.5 text-[11px]">
               <div className="font-bold uppercase tracking-wide text-amber-900">Check before running payroll</div>
               <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                {flagged.length > 0 && <li><b>Paid through the app:</b> {flagged.map((e) => `${e.name} (${dollars(e.appPayoutCents)})`).join(", ")} also received a tip payout through Blue Collar Tips this week. Don't pay the same tips twice.</li>}
+                {flagged.length > 0 && <li><b>Paid through the app:</b> {flagged.map((e) => `${e.name} (${dollars(e.appPayoutCents)})`).join(", ")} also received a tip payout through Blue Collar Tips & Reviews this week. Don't pay the same tips twice.</li>}
                 {report.unassignedCardTips && <li><b>{report.unassignedCardTips.count} card tip{report.unassignedCardTips.count === 1 ? "" : "s"} ({dollars(report.unassignedCardTips.grossCents)})</b> are not assigned to an employee. Assign them in Tips &amp; payments, then reprint.</li>}
                 {report.totals.heldCount > 0 && <li><b>{report.totals.heldCount} refunded or disputed card tip{report.totals.heldCount === 1 ? "" : "s"}</b> are left out of the totals.</li>}
               </ul>
@@ -222,8 +222,8 @@ function TipPayrollPage() {
           )}
 
           <div className="mt-6 border-t pt-2 text-[10px] text-gray-500">
-            Card tips are split {report.company.employeePct}% employee{report.company.companyPct ? ` · ${report.company.companyPct}% ${report.company.name}` : ""} · 10% Blue Collar Tips. "Add to pay" is the employee share of card tips paid this week.
-            Generated {new Date().toLocaleString("en-US")} by Blue Collar Tips.
+            Card tips are split {report.company.employeePct}% employee{report.company.companyPct ? ` · ${report.company.companyPct}% ${report.company.name}` : ""} · 10% Blue Collar Tips & Reviews. "Add to pay" is the employee share of card tips paid this week.
+            Generated {new Date().toLocaleString("en-US")} by Blue Collar Tips & Reviews.
           </div>
         </div>
       )}

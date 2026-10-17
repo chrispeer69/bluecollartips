@@ -28,7 +28,7 @@ export const HELP_SECTIONS: HelpSection[] = [
 
 1. Company settings → Branding: upload your logo and pick your two brand colors. Customers see these on every rating and tip page.
 2. Company settings → Public review destinations: save your Google, Yelp and Facebook review URLs, then select the one positive customers should visit. For Google, use the "write a review" link from your Google Business Profile.
-3. Card tips need no setup: every one is split 90% to the employee and a flat 10% Blue Collar Tips fee.
+3. Card tips need no setup: every one is split 90% to the employee and a flat 10% Blue Collar Tips & Reviews fee.
 4. Employees → Add employee: enter each tech or driver's name, email and phone. Each one gets a personal QR code and tip link.
 5. Print the QR codes (Employees → QR) and put them on trucks, invoices or business cards.
 6. Optional: connect TowBook / GoHighLevel so a rating link is texted automatically when a job closes (see Integrations).
@@ -53,7 +53,7 @@ Low ratings are flagged and appear under Ratings & feedback → Discrepancy flag
         audience: ["admin", "employee"],
         body: `- Company admin: runs the workspace. Adds employees, sets branding and tip split, sees every rating and tip, requests company payouts, and opens support tickets on behalf of the company.
 - Employee (driver / tech): has their own dashboard with their QR code, tips, ratings, earnings wallet and payout account. They can also open support tickets.
-- Blue Collar Tips (platform): operates the service, processes card payments, reviews and pays out withdrawal requests, and answers support tickets.
+- Blue Collar Tips & Reviews (platform): operates the service, processes card payments, reviews and pays out withdrawal requests, and answers support tickets.
 
 One person can be an admin in one company and an employee in another. Use the workspace switcher at the top of the left navigation.`,
       },
@@ -103,15 +103,15 @@ The code never changes for that employee, so you can print once. If a customer c
         id: "dispatch-link",
         title: "Automatically text a rating link when a job closes",
         audience: ["admin"],
-        body: `Blue Collar Tips exposes a webhook your dispatch software (TowBook via GoHighLevel, or anything that can call a URL) hits when a job is completed. It returns a one-time rating link for that exact job, driver and customer, which your automation then texts to the customer.
+        body: `Blue Collar Tips & Reviews exposes a webhook your dispatch software (TowBook via GoHighLevel, or anything that can call a URL) hits when a job is completed. It returns a one-time rating link for that exact job, driver and customer, which your automation then texts to the customer.
 
 What to send: your company slug, the job ID, the driver (name, email, phone or slug — any one that matches an employee), and the customer's name, phone and email.
 
 What you get back: a link that pre-fills the customer's details, is tied to the right employee, and expires after 10 days (configurable 1–30).
 
-If the driver name dispatch sends does not match an employee, the rating still comes in as a company-level rating. Under Ratings & feedback you will see "Dispatch said: <name>" with a one-click Assign button so you can attribute it afterwards. Keeping employee names in Blue Collar Tips identical to the names in your dispatch software avoids this.
+If the driver name dispatch sends does not match an employee, the rating still comes in as a company-level rating. Under Ratings & feedback you will see "Dispatch said: <name>" with a one-click Assign button so you can attribute it afterwards. Keeping employee names in Blue Collar Tips & Reviews identical to the names in your dispatch software avoids this.
 
-Ask Blue Collar Tips support for the webhook URL and secret for your company — open a ticket under "TowBook / GHL / webhooks".`,
+Ask Blue Collar Tips & Reviews support for the webhook URL and secret for your company — open a ticket under "TowBook / GHL / webhooks".`,
       },
       {
         id: "outbound-webhook",
@@ -129,15 +129,15 @@ Ask Blue Collar Tips support for the webhook URL and secret for your company —
         id: "money-flow",
         title: "Where the money goes — the full flow",
         audience: ["admin", "employee"],
-        body: `1. A customer tips by card on the rating page. The charge is processed by Stripe into the Blue Collar Tips platform account.
-2. The tip is split automatically the moment it succeeds: 90% to the employee and a flat 10% Blue Collar Tips fee. The company keeps no share. Every tip stores its own split, so the ledger is auditable to the penny.
+        body: `1. A customer tips by card on the rating page. The charge is processed by Stripe into the Blue Collar Tips & Reviews platform account.
+2. The tip is split automatically the moment it succeeds: 90% to the employee and a flat 10% Blue Collar Tips & Reviews fee. The company keeps no share. Every tip stores its own split, so the ledger is auditable to the penny.
 3. The employee's share lands in their Earnings wallet. A tip with no employee waits under Unassigned company tips until an admin assigns it.
 4. Either party can request a withdrawal once their available balance is at or above the platform minimum (default $25). They choose the payout method on file: bank transfer, Cash App, Venmo, Zelle, PayPal or check.
-5. Blue Collar Tips reviews and pays each request within the processing window (0–5 days, shown on the wallet), then marks it paid with a reference number you can see in your request history.
+5. Blue Collar Tips & Reviews reviews and pays each request within the processing window (0–5 days, shown on the wallet), then marks it paid with a reference number you can see in your request history.
 
 Tips that are disputed or refunded are removed from the available balance. A tip that arrived without an employee (company-level page, or dispatch sent an unknown driver) sits under Unassigned company tips until an admin assigns it — only then does the employee's share become withdrawable.
 
-Manual tips (cash, or a tip the employee logs themselves) are bookkeeping only. Blue Collar Tips never held that money, so no split is taken and they do not fund the wallet.`,
+Manual tips (cash, or a tip the employee logs themselves) are bookkeeping only. Blue Collar Tips & Reviews never held that money, so no split is taken and they do not fund the wallet.`,
       },
       {
         id: "company-payout",
@@ -175,9 +175,9 @@ Employees have the same on their dashboard under Earnings & withdrawals → Payo
       },
       {
         id: "fees",
-        title: "What Blue Collar Tips costs",
+        title: "What Blue Collar Tips & Reviews costs",
         audience: ["admin"],
-        body: `There is no subscription. Blue Collar Tips keeps a flat 10% of each card tip; card processing is included. Ratings, feedback, QR codes, texting links and the dashboards are free to use. Cash and manual tips are never charged.`,
+        body: `There is no subscription. Blue Collar Tips & Reviews keeps a flat 10% of each card tip; card processing is included. Ratings, feedback, QR codes, texting links and the dashboards are free to use. Cash and manual tips are never charged.`,
       },
     ],
   },
@@ -193,7 +193,7 @@ Employees have the same on their dashboard under Earnings & withdrawals → Payo
 
 Go to Ratings & feedback. Each rating has an Employee picker; choose the right person and it is re-attributed immediately (their stats update too). If dispatch sent a name, you will see "Dispatch said: …" with an Assign shortcut.
 
-To stop it happening: make sure employee names in Blue Collar Tips match your dispatch software exactly, or have dispatch send the employee's phone or email as well.`,
+To stop it happening: make sure employee names in Blue Collar Tips & Reviews match your dispatch software exactly, or have dispatch send the employee's phone or email as well.`,
       },
       {
         id: "public-reviews",
@@ -236,7 +236,7 @@ If you cannot receive email, open a support ticket from someone else's account i
         body: `Use the Contact support form on this page. Pick a category, tell us what you expected and what happened, and include the employee or customer name and the date if it is about a specific tip or rating.
 
 You will get replies in the ticket thread here and by email. Status meanings:
-- Waiting on Blue Collar Tips — we owe you a reply.
+- Waiting on Blue Collar Tips & Reviews — we owe you a reply.
 - Waiting on you — we asked a question or need you to try something.
 - Resolved — we believe it is fixed; reply if not and it reopens.
 

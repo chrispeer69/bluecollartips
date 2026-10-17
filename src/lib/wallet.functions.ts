@@ -513,7 +513,7 @@ export const recoverStripeTip = createServerFn({ method: "POST" })
     return { ok: true, alreadyRecorded: !result.recorded, amountCents: intent.amount };
   });
 
-/** Imports successful Blue Collar Tips PaymentIntents from Stripe in bounded
+/** Imports successful Blue Collar Tips & Reviews PaymentIntents from Stripe in bounded
  * batches. Unrelated Stripe payments without company attribution are skipped.
  */
 export const syncStripeTipHistory = createServerFn({ method: "POST" })

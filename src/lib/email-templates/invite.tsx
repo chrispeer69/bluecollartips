@@ -24,18 +24,18 @@ interface Props {
 
 const InviteEmail = ({
   recipientName,
-  companyName = 'Blue Collar Tips',
+  companyName = 'Blue Collar Tips & Reviews',
   inviteUrl = 'https://bluecollartips.app',
   inviteCode = '',
   role = 'company_admin',
 }: Props) => {
   const isAdmin = role === 'company_admin'
   const headline = isAdmin
-    ? `You've been invited to run ${companyName} on Blue Collar Tips`
+    ? `You've been invited to run ${companyName} on Blue Collar Tips & Reviews`
     : `You've been added as a driver at ${companyName}`
   const intro = isAdmin
     ? `You've been set up as the admin for ${companyName}. Click the button below to activate your account, add your team, and start collecting tips.`
-    : `${companyName} added you as a driver on Blue Collar Tips. Click the button below to activate your profile and start receiving tips from customers.`
+    : `${companyName} added you as a driver on Blue Collar Tips & Reviews. Click the button below to activate your profile and start receiving tips from customers.`
 
   return (
     <Html lang="en" dir="ltr">
@@ -43,7 +43,7 @@ const InviteEmail = ({
       <Preview>{headline}</Preview>
       <Body style={main}>
         <Container style={container}>
-          <Heading style={h1}>Blue Collar Tips</Heading>
+          <Heading style={h1}>Blue Collar Tips & Reviews</Heading>
           <Text style={greeting}>Hi {recipientName || 'there'},</Text>
           <Heading as="h2" style={h2}>
             {headline}
@@ -68,7 +68,7 @@ const InviteEmail = ({
           )}
           <Hr style={hr} />
           <Text style={footer}>
-            This invite was sent by Blue Collar Tips. If you weren't expecting it,
+            This invite was sent by Blue Collar Tips & Reviews. If you weren't expecting it,
             you can safely ignore this email.
           </Text>
         </Container>
@@ -82,7 +82,7 @@ export const template = {
   subject: (data: Record<string, any>) =>
     data?.role === 'driver'
       ? `You've been added as a driver at ${data?.companyName ?? 'your company'}`
-      : `You're invited to manage ${data?.companyName ?? 'your company'} on Blue Collar Tips`,
+      : `You're invited to manage ${data?.companyName ?? 'your company'} on Blue Collar Tips & Reviews`,
   displayName: 'Invite (admin or driver)',
   previewData: {
     recipientName: 'Jane',

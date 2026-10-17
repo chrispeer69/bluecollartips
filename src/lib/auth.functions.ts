@@ -56,7 +56,7 @@ export const requestPasswordReset = createServerFn({ method: "POST" })
       const hash = createHash("sha256").update(token).digest("hex");
       await sql()`insert into password_reset_tokens (user_id, token_hash, expires_at) values (${users[0].id}, ${hash}, now() + interval '1 hour')`;
       const base = process.env.APP_BASE_URL ?? process.env.APP_PUBLIC_URL ?? "http://localhost:3000";
-      await sendEmail({ to: users[0].email, subject: "Reset your Blue Collar Tips password", html: `<p>Use the link below to reset your password. It expires in one hour.</p><p><a href="${base}/reset-password?token=${encodeURIComponent(token)}">Reset password</a></p>` });
+      await sendEmail({ to: users[0].email, subject: "Reset your Blue Collar Tips & Reviews password", html: `<p>Use the link below to reset your password. It expires in one hour.</p><p><a href="${base}/reset-password?token=${encodeURIComponent(token)}">Reset password</a></p>` });
     }
     return { ok: true };
   });

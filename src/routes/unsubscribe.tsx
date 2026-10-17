@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 
 export const Route = createFileRoute('/unsubscribe')({
-  head: () => ({ meta: [{ title: 'Unsubscribe — Blue Collar Tips' }, { name: 'robots', content: 'noindex' }] }),
+  head: () => ({ meta: [{ title: 'Unsubscribe — Blue Collar Tips & Reviews' }, { name: 'robots', content: 'noindex' }] }),
   component: UnsubscribePage,
   validateSearch: (s: Record<string, unknown>) => ({
     token: typeof s.token === 'string' ? s.token : '',
@@ -69,7 +69,7 @@ function UnsubscribePage() {
         {state.status === 'ready' && (
           <>
             <p className="text-muted-foreground">
-              Click below to stop receiving emails from Blue Collar Tips at this
+              Click below to stop receiving emails from Blue Collar Tips & Reviews at this
               address.
             </p>
             <button

@@ -6,14 +6,14 @@ import { resetPassword } from "@/lib/auth.functions";
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
     meta: [
-      { title: "Set a new password — Blue Collar Tips" },
+      { title: "Set a new password — Blue Collar Tips & Reviews" },
       {
         name: "description",
         content:
-          "Choose a new password for your Blue Collar Tips account and get back to managing tips, ratings, and your team.",
+          "Choose a new password for your Blue Collar Tips & Reviews account and get back to managing tips, ratings, and your team.",
       },
-      { property: "og:title", content: "Set a new password — Blue Collar Tips" },
-      { property: "og:description", content: "Choose a new password for your Blue Collar Tips account." },
+      { property: "og:title", content: "Set a new password — Blue Collar Tips & Reviews" },
+      { property: "og:description", content: "Choose a new password for your Blue Collar Tips & Reviews account." },
       { property: "og:type", content: "website" },
       // Account utility page: keep it out of search results.
       { name: "robots", content: "noindex" },

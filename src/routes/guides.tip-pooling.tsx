@@ -5,7 +5,7 @@ import { guideJsonLd } from "@/lib/seo";
 export const Route = createFileRoute("/guides/tip-pooling")({
   head: () => ({
     meta: [
-      { title: "Tip Pooling for Field Service Teams — Blue Collar Tips" },
+      { title: "Tip Pooling for Field Service Teams — Blue Collar Tips & Reviews" },
       {
         name: "description",
         content:
@@ -48,7 +48,7 @@ function TipPoolingGuide() {
             <div className="grid h-8 w-8 place-items-center rounded-md bg-primary font-bold text-primary-foreground">
               B
             </div>
-            <span className="font-semibold">Blue Collar Tips</span>
+            <span className="font-semibold">Blue Collar Tips & Reviews</span>
           </Link>
           <Link
             to="/auth"
@@ -144,7 +144,7 @@ function TipPoolingGuide() {
           <ul className="list-disc space-y-2 pl-6">
             <li>
               <strong>Document the formula in writing</strong> and have drivers acknowledge
-              it during onboarding. Blue Collar Tips captures this at invite time.
+              it during onboarding. Blue Collar Tips & Reviews captures this at invite time.
             </li>
             <li>
               <strong>Keep an immutable record of every tip and split.</strong> A scanned

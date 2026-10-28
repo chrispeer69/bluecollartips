@@ -37,3 +37,18 @@ export async function deliverReviewWebhook(db: any, company: any, payload: Recor
     console.error("review webhook delivery failed", error);
   }
 }
+
+/**
+ * Job city/service columns for the GHL review-link upsert. A missing or blank
+ * value is LEFT OUT, so a re-send for the same job never wipes a city or
+ * service already stored on the link (the upsert only updates columns it is
+ * given); a non-empty new value still replaces the old one.
+ */
+export function jobDetailColumns(city?: string | null, service?: string | null): { job_city?: string; job_service?: string } {
+  const out: { job_city?: string; job_service?: string } = {};
+  const c = (city ?? "").trim();
+  const s = (service ?? "").trim();
+  if (c) out.job_city = c;
+  if (s) out.job_service = s;
+  return out;
+}
